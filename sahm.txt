@@ -1,0 +1,45 @@
+//@version=6
+indicator("萨姆规则衰退指标 (Sahm Rule)", overlay = false, precision = 3)
+
+// --- 1. 核心算法函数化 (严格对齐官方逻辑) ---
+// 定义计算逻辑：3个月均值 减去 12个月内均值的低点
+calc_sahm() =>
+    sma3 = ta.sma(close, 3)
+    low_of_sma3 = ta.lowest(sma3, 12)
+    [close, sma3 - low_of_sma3]
+
+// --- 2. 数据抓取 ---
+// 将函数 calc_sahm 传入 security，确保在 FRED 数据环境下执行计算
+[unrate, sahm_val] = request.security("FRED:UNRATE", "M", calc_sahm(), gaps = barmerge.gaps_off)
+
+// --- 3. 视觉配置与绘图 ---
+threshold = 0.5
+c_green   = color.lime
+c_red     = color.red
+c_yellow  = color.yellow
+
+plot_color = sahm_val >= threshold ? c_red : (sahm_val >= 0.3 ? c_yellow : c_green)
+
+// 绘图
+plot(sahm_val, "萨姆规则数值", color = plot_color, linewidth = 3, style = plot.style_line)
+
+// 辅助线
+hline(threshold, "衰退触发线 (0.5%)", color = c_red, linestyle = hline.style_dashed, linewidth = 2)
+hline(0.3, "警戒预警线 (0.3%)", color = color.gray, linestyle = hline.style_dotted)
+hline(0, "零轴", color = color.new(color.gray, 50))
+
+bgcolor(sahm_val >= threshold ? color.new(c_red, 90) : na)
+
+// --- 4. 实时看板渲染 ---
+if barstate.islast
+    var table info = table.new(position.top_right, 2, 2, bgcolor = color.new(color.black, 20), border_width = 1)
+    table.cell(info, 0, 0, "当前失业率:", text_color = color.white)
+    table.cell(info, 1, 0, str.tostring(unrate, "0.0") + "%", text_color = color.white)
+    table.cell(info, 0, 1, "萨姆数值:", text_color = color.white)
+    table.cell(info, 1, 1, str.tostring(sahm_val, "0.3"), text_color = plot_color)
+
+    label.new(bar_index, sahm_val, 
+         "萨姆指标: " + str.tostring(sahm_val, "0.3") + 
+         (sahm_val >= threshold ? "\n【警告】已进入衰退确认区" : 
+          sahm_val >= 0.3 ? "\n【预警】就业市场显著降温" : "\n【安全】劳动力市场稳健"),
+         color = plot_color, textcolor = color.black, style = label.style_label_left)
