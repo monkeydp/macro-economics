@@ -257,9 +257,10 @@ else // Normal (<3.5)
         s4 := 0.5
 
 // 3.5 Liquidity
-if liq_val > 0.2
+// Logic: Strict 2-month confirmation to filter noise
+if liq_val > 0.2 and liq_val_1 > 0.2
     s5 := 1.0
-else if liq_val < -0.2
+else if liq_val < -0.2 and liq_val_1 < -0.2
     s5 := -1.0
 else
     s5 := 0.0
@@ -267,16 +268,18 @@ else
 // 3.6 Profit
 // 3-month contraction: curr <= 1m <= 2m <= 3m (allow flat, break only on reversal)
 prof_contract = prof_val <= prof_val_1 and prof_val_1 <= prof_val_2 and prof_val_2 <= prof_val_3
+// 2-month expansion: curr > 1m > 2m
+prof_expand = prof_val > prof_val_1 and prof_val_1 > prof_val_2
 
 if prof_val < -0.1
     s6 := -1.0
 else if prof_val > 0.1
-    if prof_val > prof_val_1 // Growing
+    if prof_expand // 2-mo expansion (Confirmed)
         s6 := 1.0
-    else if prof_contract // 3-mo contraction
+    else if prof_contract // 3-mo contraction (Confirmed)
         s6 := 0.5
     else
-        s6 := 0.0 // >0.1 but not growing and not 3-mo contraction
+        s6 := 0.0 // >0.1 but not confirmed trend
 else
     s6 := 0.0
 
