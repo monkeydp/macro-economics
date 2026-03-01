@@ -1,0 +1,273 @@
+//@version=6
+indicator("[薯仔] 宏观经济", overlay = false, precision = 2, max_labels_count = 500)
+
+// --- 1. 设置与配色 (严格执行白皮书规范) ---
+show_report = input.bool(true, "显示决策看板", group="显示设置")
+mode = input.string("1. 基准利率 (EFFR)", "当前显示曲线",
+     options=["1. 基准利率 (EFFR)", "2. 真实利率 (10Y TIPS)", "3. 利差结构 (10Y-2Y)",
+     "4. 信用风险 (OAS)", "5. 流动性 (M1-M2)", "6. 利润空间 (CPI-PPI)",
+     "7. 实体热度 (铜金比)", "8. 衰退熔断 (就业)"], group="显示设置")
+region = input.string("美国 (US)", "监控地区", options=["美国 (US)", "中国 (CN)"], group="显示设置", tooltip="仅影响5,6维度描述")
+y_limit = input.float(20.0, "Y轴限高阈值", minval = 1.0, group="数据设置")
+
+effr_ema_len = input.int(10, "基准利率 EMA 周期", minval=1, group="周期参数设置", tooltip="仅影响1维度均线")
+yoy_len = input.int(12, "增速同比周期 (月)", minval=1, group="周期参数设置", tooltip="仅影响5,6维度计算")
+slope_len = input.int(20, "斜率观测周期 (日)", minval=1, group="周期参数设置", tooltip="仅影响3,4,7维度计算")
+
+// 配色锁定：信号灯体系
+c_beige = #F5F5DC, c_white = color.white, c_lime = color.lime, c_red = color.red, c_yell = color.yellow
+c_bg = color.new(color.black, 15), c_header = color.new(color.gray, 10)
+
+// --- 2. 核心数据 ---
+get_yoy(sym, len) => request.security(sym, "M", (close / close[len] - 1) * 100, gaps = barmerge.gaps_off)
+get_daily_delta(sym, len) => request.security(sym, "D", close - close[len], gaps = barmerge.gaps_off)
+
+effr = request.security("FRED:EFFR", "M", close, gaps = barmerge.gaps_off), effr_ema = ta.ema(effr, effr_ema_len)
+eff_delta = (effr[1] - effr) * 100
+tips_val = request.security("FRED:DFII10", "D", close, gaps = barmerge.gaps_off)
+y2 = request.security("FRED:GS2", "D", close), y10 = request.security("FRED:GS10", "D", close), yield_curve = y10 - y2
+d_y2 = get_daily_delta("FRED:GS2", slope_len), d_y10 = get_daily_delta("FRED:GS10", slope_len)
+oas_val = request.security("FRED:BAMLH0A0HYM2", "D", close, gaps = barmerge.gaps_off), oas_slope = get_daily_delta("FRED:BAMLH0A0HYM2", slope_len)
+m_gap = get_yoy(region == "美国 (US)" ? "FRED:M1SL" : "ECONOMICS:CNM1", yoy_len) - get_yoy(region == "美国 (US)" ? "FRED:M2SL" : "ECONOMICS:CNM2", yoy_len)
+p_gap = get_yoy(region == "美国 (US)" ? "FRED:CPIAUCSL" : "ECONOMICS:CNCPI", yoy_len) - get_yoy(region == "美国 (US)" ? "FRED:PPIACO" : "ECONOMICS:CNPPI", yoy_len)
+cg_ratio = (request.security("COMEX:HG1!", "D", close) / request.security("COMEX:GC1!", "D", close)) * 1000
+cg_slope = cg_ratio - (request.security("COMEX:HG1!", "D", close[slope_len]) / request.security("COMEX:GC1!", "D", close[slope_len])) * 1000
+sahm_val = request.security("FRED:UNRATE", "M", close) - request.security("FRED:UNRATE", "M", ta.lowest(close, 12))
+
+// 新增美国真实GDP审计数据 (季度环比折年率)
+gdp_growth = request.security("FRED:A191RL1Q225SBEA", "3M", close, gaps = barmerge.gaps_off)
+gdp_half = gdp_growth / 2
+
+// --- 3. 绘图处理 ---
+float raw_val = switch mode
+    "1. 基准利率 (EFFR)"    => effr
+    "2. 真实利率 (10Y TIPS)" => tips_val
+    "3. 利差结构 (10Y-2Y)"   => yield_curve
+    "4. 信用风险 (OAS)"      => oas_val
+    "5. 流动性 (M1-M2)"      => m_gap
+    "6. 利润空间 (CPI-PPI)"   => p_gap
+    "7. 实体热度 (铜金比)"    => cg_ratio
+    "8. 衰退熔断 (就业)"     => sahm_val
+    => 0.0
+
+is_clipped = (mode == "5. 流动性 (M1-M2)" or mode == "6. 利润空间 (CPI-PPI)" or mode == "3. 利差结构 (10Y-2Y)") and math.abs(raw_val) > y_limit
+float plot_val = is_clipped ? (raw_val > 0 ? y_limit : -y_limit) : raw_val
+
+// 绘图动态色：基于信号灯体系
+color dynamic_color = switch mode
+    "1. 基准利率 (EFFR)"    => effr < effr_ema ? (eff_delta >= 50 ? c_yell : c_lime) : c_red
+    "2. 真实利率 (10Y TIPS)" => tips_val < 1.0 ? c_lime : c_red
+    "3. 利差结构 (10Y-2Y)"   => (yield_curve > 0 and d_y2 < d_y10 and d_y2 < 0) ? c_yell : (yield_curve >= 0 ? c_lime : c_red)
+    "4. 信用风险 (OAS)"      => oas_slope < 0 ? c_lime : c_red
+    "5. 流动性 (M1-M2)"      => m_gap > 0 ? c_lime : c_red
+    "6. 利润空间 (CPI-PPI)"  => p_gap > 0 ? c_lime : c_red
+    "7. 实体热度 (铜金比)"    => cg_slope > 0 ? c_lime : c_red
+    "8. 衰退熔断 (就业)"     => sahm_val < 0.5 ? c_lime : c_red
+    => c_white
+
+plot(not is_clipped ? plot_val : na, "主审计曲线", color = dynamic_color, linewidth = 2, style = (mode == "1. 基准利率 (EFFR)" or mode == "5. 流动性 (M1-M2)" or mode == "6. 利润空间 (CPI-PPI)" or mode == "8. 衰退熔断 (就业)") ? plot.style_stepline : plot.style_line)
+plot(is_clipped ? plot_val : na, "限高段", color = color.new(color.gray, 50), linewidth = 2)
+plot(mode == "1. 基准利率 (EFFR)" ? effr_ema : na, "EMA10", color = color.red, linewidth = 1)
+
+// --- 3. 绘图处理 (修正参数报错版) ---
+// 使用 max/min 嵌套限制 GDP 绘图在 [-5, 10] 区间，防止缩放挤压
+gdp_for_plot = math.max(math.min(gdp_growth, 10.0), -5.0)
+gdp_half_for_plot = math.max(math.min(gdp_half, 5.0), -2.5)
+
+// 真实利率专用：美国真实GDP参考线
+show_gdp = (mode == "2. 真实利率 (10Y TIPS)")
+plot(show_gdp ? gdp_for_plot : na, "美国真实GDP增速", color = color.new(color.gray, 80), style = plot.style_stepline)
+plot(show_gdp ? gdp_half_for_plot : na, "GDP增速之半(重力线)", color = color.new(color.orange, 70), style = plot.style_stepline)
+
+// GDP参考线标注 (修正了 color.new 的参数错误)
+if barstate.islast and show_gdp
+    label.new(bar_index, gdp_for_plot, "真实GDP增速", xloc = xloc.bar_index, color = color.new(color.black, 100), textcolor = color.new(color.gray, 40), style = label.style_none, size = size.small)
+    label.new(bar_index, gdp_half_for_plot, "生死线(真实GDP增速的一半)", xloc = xloc.bar_index, color = color.new(color.black, 100), textcolor = color.new(color.orange, 40), style = label.style_none, size = size.small)
+
+hline(0, "零轴", color = color.gray, linestyle = hline.style_dashed)
+bgcolor(not is_clipped ? color.new(dynamic_color, 92) : na)
+
+// --- 4. 加权评分 ---
+s1 = (effr < effr_ema ? 1.0 : -1.0)
+s2 = (tips_val < 1.0 ? 1.5 : -1.5)
+s3 = (yield_curve > 0 and d_y2 < d_y10 and d_y2 < 0) ? -2.0 : (yield_curve >= 0 ? 2.0 : -2.0)
+s4 = (oas_slope < 0 ? 1.5 : -1.5)
+s5 = (m_gap > 0 ? 1.0 : -1.0)
+s6 = (p_gap > 0 ? 1.0 : -1.0)
+s7 = (cg_slope > 0 ? 1.0 : -1.0)
+s8 = (sahm_val < 0.5 ? 2.0 : -2.0)
+total_score = s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8
+concl_color = total_score >= 6 ? c_lime : (total_score <= -6 ? c_red : c_yell)
+string final_cmd = total_score >= 6 ? "100% 仓位进攻各赛道核心龙头" : total_score >= 2 ? "70% 进攻各行业核心巨头\n30% 留作红利资产防守" : total_score >= -2 ? "50% 仓位守住高息红利股\n50% 强制保留现金" : total_score >= -6 ? "仅留 30% 具备回购注销能力的巨头\n70% 持有实物黄金或现金避险" : "最高级警报！100% 撤回现金或黄金\n拒绝任何博弈动作"
+
+// --- 5. 表格逻辑 (4列审计结构) ---
+var table info = table.new(position.middle_right, 4, 6, bgcolor = c_bg, border_width = 1, border_color = color.gray)
+var table report = table.new(position.middle_left, 6, 10, bgcolor = c_bg, border_width = 1, border_color = color.gray)
+
+if barstate.islast and show_report
+    s1_txt = s1 > 0 ? "+" + str.tostring(s1, "0.0") : str.tostring(s1, "0.0")
+    s2_txt = s2 > 0 ? "+" + str.tostring(s2, "0.0") : str.tostring(s2, "0.0")
+    s3_txt = s3 > 0 ? "+" + str.tostring(s3, "0.0") : str.tostring(s3, "0.0")
+    s4_txt = s4 > 0 ? "+" + str.tostring(s4, "0.0") : str.tostring(s4, "0.0")
+    s5_txt = s5 > 0 ? "+" + str.tostring(s5, "0.0") : str.tostring(s5, "0.0")
+    s6_txt = s6 > 0 ? "+" + str.tostring(s6, "0.0") : str.tostring(s6, "0.0")
+    s7_txt = s7 > 0 ? "+" + str.tostring(s7, "0.0") : str.tostring(s7, "0.0")
+    s8_txt = s8 > 0 ? "+" + str.tostring(s8, "0.0") : str.tostring(s8, "0.0")
+
+    string title = "", string intro = "", string cur_s = "", string cur_v = "", string cur_d = "", string cur_t = "", string pre_v = "", string pre_d = "", string pre_t = ""
+    color pr_col = c_lime
+    
+    if mode == "1. 基准利率 (EFFR)"
+        title := "基准利率\n[EFFR]", intro := "美联储基准利率/全球水龙头\n利率下降(降息) = 央行向社会输送低成本流动性\n预防性降息: <50bp; 救火式降息: ≥50bp", cur_s := "权重: ±1.0", cur_v := str.tostring(effr, "0.00")+"%\n(持续跌破 EMA10)", cur_d := effr < effr_ema ? "进入降息周期，水龙头拧开" : "加息或高位维持，水龙头紧闭", cur_t := effr < effr_ema ? (eff_delta >= 50 ? "【救火式降息】\n经济衰退临近信号" : "预防性降息\n利好估值修复") : "紧缩维持\n持有现金收益更高", pre_v := effr < effr_ema ? "观察利率底部\n(连续3个月±12.5 bp)" : "下穿 EMA10", pre_d := effr < effr_ema ? "观察通胀是否反弹导致降息停止" : "货币政策正式转鸽，流动性底确认", pre_t := "预防性降息\n配置科技资产", pr_col := c_lime
+    else if mode == "2. 真实利率 (10Y TIPS)"
+        title := "真实利率\n[10Y TIPS]", intro := "折现率锚点\n实际利率越高，持有现金收益越高\n1% 是生死线，约为是美国真实GDP 1.8% 的一半\n>1% 会对风险资产产生‘虹吸效应’并压制估值天花板", cur_s := "权重: ±1.5", cur_v := str.tostring(tips_val, "0.00")+"%", cur_d := tips_val > 1.0 ? "极高重力区\n持币收益过高\n虹吸风险资产血液" : "低重力区\n持有现金性价比下降\n资金被迫寻找高收益去处", cur_t := tips_val > 1.0 ? "避开一切高估值成长股" : "进攻时刻，估值天花板打开", pre_v := "跌破 1.0%", pre_d := "重力逐渐减弱\n估值天花板打开\n资产开启“外溢模式”", pre_t := "满仓进攻高弹性资产\n(HSTECH/BTC)", pr_col := c_lime
+    else if mode == "3. 利差结构 (10Y-2Y)"
+        title := "利差结构\n[10Y-2Y]", intro := "大崩溃预警\n10Y指10年期美债(看前景); 2Y是短债(看政策)\n倒挂(负值): 衰退强预警\n牛陡(2Y跌快): 救火降息/硬着陆风险\n熊陡(10Y涨快): 通胀预期/健康扩张", cur_s := "权重: ±2.0", cur_v := str.tostring(yield_curve, "0.00"), cur_d := "曲线已回正，风险释放期", cur_t := "现金为王，绝对不要加任何杠杆", pre_v := "熊陡健康回正", pre_d := "确认复苏开启\n经济动能切换", pre_t := "切入顺周期板块\n博弈牛市下半场", pr_col := c_lime
+    else if mode == "4. 信用风险 (OAS)"
+        title := "信用风险\n[OAS]", intro := "高收益利差/违约风险监控\n利差走阔 = 银行由于恐惧而拒绝借钱给企业\n斜率向上 = 金融机构惜贷，信用环境收缩", cur_s := "权重: ±1.5", cur_v := str.tostring(oas_val, "0.2"), cur_d := oas_slope > 0 ? "信用环境恶化\n违约风险与惜贷情绪飙升" : "信用平稳，融资顺畅", cur_t := oas_slope > 0 ? "强避高负债公司及小盘股" : "持有绩优蓝筹\n享受融资红利", pre_v := "利差急剧走阔", pre_d := "信用崩塌风险\n垃圾债连锁爆雷开始", pre_t := "现金为王\n避开所有杠杆资产", pr_col := c_red
+    else if mode == "5. 流动性 (M1-M2)"
+        title := "流动性增速差\n[M1-M2]", intro := region == "美国 (US)" ? "全球市场的“水量”\nM1增速和M2增速的差值为正 = 钱正从银行存款流向市场\n即流入市场的水变多" : "中国信贷脉搏\n差值为负 = 钱在银行空转（流动性陷阱）", cur_s := "权重: ±1.0", cur_v := str.tostring(m_gap, "0.00"), cur_d := region == "中国 (CN)" ? "钱在银行空转\n实体投资意愿极低" : "水量萎缩\n钱缩回定期存款", cur_t := region == "中国 (CN)" ? "死守高息红利股\n（中字头/运营商）" : "死守收息红利股防守", pre_v := "向上突破 0 轴", pre_d := region == "中国 (CN)" ? "信贷真实扩张\n中国经济走出通缩阴影" : "美联储转鸽\n全球分时流动性修复开始", pre_t := region == "中国 (CN)" ? "全仓出击\n恒生科技/顺周期权重" : "大幅加仓纳指/AI核心巨头", pr_col := c_lime
+    else if mode == "6. 利润空间 (CPI-PPI)"
+        title := "利润空间\n[CPI-PPI]", intro := region == "美国 (US)" ? "企业“赚钱难度”\n售价(CPI) - 原材料成本(PPI) = 企业利润\n数值越高 = 企业利润空间越大" : "中国制造业‘内卷’监控\n警惕‘通缩型利差虚增’", cur_s := "权重: ±1.0", cur_v := str.tostring(p_gap, "0.00"), cur_d := region == "中国 (CN)" ? "通缩型利润扩张\n成本跌得比售价快" : "企业正在赚取成本下降的红利", cur_t := region == "中国 (CN)" ? "防守反击\n寻找内卷胜出的剩者龙头" : "重仓利润扩张的互联网/消费", pre_v := "数值维持 > 0", pre_d := region == "中国 (CN)" ? "内卷出清\n行业从价格战转向价值竞争" : "定价权红利逻辑不破，美股EPS有支撑", pre_t := region == "中国 (CN)" ? "布局高端制造/品牌出海" : "锁定龙头不松手, 破 0 则调仓", pr_col := c_lime
+    else if mode == "7. 实体热度 (铜金比)"
+        title := "实体热度\n[铜金比]", intro := "经济的“体温脉搏”\n铜代表工厂开工需求，金代表恐惧避险\n核心看斜率", cur_s := "权重: ±1.0", cur_v := str.tostring(cg_ratio, "0.00"), cur_d := cg_slope < 0 ? "斜率向下\n避险跑赢需求，实体冷" : "斜率向上\n需求跑赢避险，真实扩张", cur_t := cg_slope < 0 ? "买黄金避险\n撤出工业周期股" : "进攻工业周期/大宗商品板块", pre_v := "斜率持续向上", pre_d := "确认经济复苏\n牛市由虚火变实火", pre_t := "全仓切入周期\n博弈复苏爆发", pr_col := c_lime
+    else if mode == "8. 衰退熔断 (就业)"
+        title := "衰退预警\n[萨姆规则]", intro := "美联储终极救急信号\n当失业率3个月均值比过去12个月低点上升超 0.5% 时\n历史上 100% 确认经济进入硬着陆通道", cur_s := "权重: ±2.0", cur_v := str.tostring(sahm_val, "0.2"), cur_d := sahm_val < 0.5 ? "就业尚具韧性，软着陆仍有希望" : "触发萨姆规则，经济进入硬着陆状态", cur_t := sahm_val < 0.5 ? "观察美联储降息政策" : "最高级防御，撤离一切生产类资产", pre_v := "数值 > 0.5", pre_d := "大衰退确认，系统性风险全面爆发", pre_t := "清仓股权类资产\n持币保命", pr_col := c_red
+
+    string obs_v = switch mode
+        "1. 基准利率 (EFFR)"    => str.tostring(effr_ema_len) + " 月 (EMA)"
+        "2. 真实利率 (10Y TIPS)" => "每日实时"
+        "3. 利差结构 (10Y-2Y)"   => str.tostring(slope_len) + " 日 (斜率)"
+        "4. 信用风险 (OAS)"      => str.tostring(slope_len) + " 日 (斜率)"
+        "5. 流动性 (M1-M2)"      => str.tostring(yoy_len) + " 月 (同比)"
+        "6. 利润空间 (CPI-PPI)"   => str.tostring(yoy_len) + " 月 (同比)"
+        "7. 实体热度 (铜金比)"    => str.tostring(slope_len) + " 日 (斜率)"
+        "8. 衰底熔断 (就业)"     => "12 月 (低点)"
+        => ""
+
+    string obs_desc = switch mode
+        "1. 基准利率 (EFFR)"    => "站上EMA: 紧缩维持\n跌破EMA: 水龙头开启"
+        "2. 真实利率 (10Y TIPS)" => "站上1.0%: 高重力压制\n跌破1.0%: 弹性释放"
+        "3. 利差结构 (10Y-2Y)"   => "牛陡: 降息救火\n熊陡: 预期扩张\n熊平: 紧缩加压(压)\n牛平: 增长见顶(滞)"
+        "4. 信用风险 (OAS)"      => "斜率向上: 信用收缩/惜贷\n斜率向下: 融资顺畅回升"
+        "5. 流动性 (M1-M2)"      => "数值>0: 活钱入场/激活\n数值<0: 资金空转/枯竭"
+        "6. 利润空间 (CPI-PPI)"   => "数值>0: 利润扩张/养分足\n数值<0: 成本反噬/内卷"
+        "7. 实体热度 (铜金比)"    => "斜率向上: 需求扩张确认\n斜率向下: 避险情绪主导"
+        "8. 衰退熔断 (就业)"     => "站上0.5: 触发衰退/熔断\n低于0.5: 就业尚具韧性"
+        => ""
+
+    string confirm_v = switch mode
+        "1. 基准利率 (EFFR)"    => "公布日确认"
+        "2. 真实利率 (10Y TIPS)" => "持续5日确认"
+        "3. 利差结构 (10Y-2Y)"   => "即刻信号确认"
+        "4. 信用风险 (OAS)"      => "持续5日确认"
+        "5. 流动性 (M1-M2)"      => "公布日确认"
+        "6. 利润空间 (CPI-PPI)"   => "公布日确认"
+        "7. 实体热度 (铜金比)"    => "持续5日确认"
+        "8. 衰退熔断 (就业)"     => "公布日确认"
+        => ""
+
+    f_c1 = #78D6FB
+    
+    // --- 右表渲染 ---
+    table.cell(info, 0, 0, title, text_color = c_white, bgcolor = c_header)
+    table.cell(info, 1, 0, intro, text_color = c_white, text_halign = text.align_left), table.merge_cells(info, 1, 0, 3, 0)
+    
+    // Row 1: 审计标准行
+    table.cell(info, 0, 1, "观测周期:", text_color = c_beige, text_halign = text.align_left)
+    table.cell(info, 1, 1, obs_v, text_color = c_white, text_halign = text.align_left)
+    table.cell(info, 2, 1, obs_desc, text_color = c_beige, text_halign = text.align_left)
+    table.cell(info, 3, 1, confirm_v, text_color = f_c1, text_halign = text.align_left)
+
+    // Row 2-5: 现状与预判 (合并中间两列)
+    table.cell(info, 0, 2, cur_s, text_color = f_c1, text_halign = text.align_left)
+    table.cell(info, 1, 2, "【当前状态】", text_color = c_white, bgcolor = c_header), table.merge_cells(info, 1, 2, 2, 2)
+    table.cell(info, 3, 2, "【未来预判】", text_color = c_white, bgcolor = c_header)
+    
+    table.cell(info, 0, 3, "现状:", text_color = c_beige, text_halign = text.align_left)
+    table.cell(info, 1, 3, cur_v, text_color = dynamic_color, text_halign = text.align_left), table.merge_cells(info, 1, 3, 2, 3)
+    table.cell(info, 3, 3, pre_v, text_color = pr_col, text_halign = text.align_left)
+    
+    table.cell(info, 0, 4, "含义:", text_color = c_beige, text_halign = text.align_left)
+    table.cell(info, 1, 4, cur_d, text_color = c_white, text_halign = text.align_left), table.merge_cells(info, 1, 4, 2, 4)
+    table.cell(info, 3, 4, pre_d, text_color = c_white, text_halign = text.align_left)
+    
+    table.cell(info, 0, 5, "战术:", text_color = c_beige, text_halign = text.align_left)
+    table.cell(info, 1, 5, cur_t, text_color = c_white, text_halign = text.align_left), table.merge_cells(info, 1, 5, 2, 5)
+    table.cell(info, 3, 5, pre_t, text_color = c_white, text_halign = text.align_left)
+
+    // --- 左侧表渲染 ---
+    table.cell(report, 0, 0, "分析维度", text_color = c_white, bgcolor = c_header)
+    table.cell(report, 1, 0, "数值", text_color = c_white, bgcolor = c_header)
+    table.cell(report, 2, 0, "得分", text_color = c_white, bgcolor = c_header)
+    table.cell(report, 3, 0, "比喻", text_color = c_white, bgcolor = c_header)
+    table.cell(report, 4, 0, "现状含义", text_color = c_white, bgcolor = c_header)
+    table.cell(report, 5, 0, "建议操作逻辑", text_color = c_white, bgcolor = c_header)
+
+    eff_c = effr < effr_ema ? (eff_delta >= 50 ? c_yell : c_lime) : c_red
+    eff_tac = effr < effr_ema ? (eff_delta >= 50 ? "【避险】救火降息" : "【攻】估值修复") : "【守】现金为王"
+
+    table.cell(report, 0, 1, "1. 基准利率", text_color = c_white)
+    table.cell(report, 1, 1, str.tostring(effr, "0.00") + "%", text_color = eff_c)
+    table.cell(report, 2, 1, s1_txt, text_color = f_c1)
+    table.cell(report, 3, 1, "水龙头", text_color = c_white)
+    table.cell(report, 4, 1, effr < effr_ema ? "降息周期开启" : "水龙头依然紧闭", text_color = c_white)
+    table.cell(report, 5, 1, eff_tac, text_color = eff_c)
+
+    table.cell(report, 0, 2, "2. 真实利率", text_color=c_white)
+    table.cell(report, 1, 2, str.tostring(tips_val, "0.00")+"%", text_color=tips_val<1.0?c_lime:c_red)
+    table.cell(report, 2, 2, s2_txt, text_color = f_c1)
+    table.cell(report, 3, 2, "重力", text_color=c_white)
+    table.cell(report, 4, 2, tips_val<1.0?"低重力释放估值弹性":"高重力压制估值弹性", text_color=c_white)
+    table.cell(report, 5, 2, tips_val<1.0?"【攻】弹性资产":"【回避】高估值成长股", text_color=tips_val<1.0?c_lime:c_red)
+
+    table.cell(report, 0, 3, "3. 利差结构", text_color=c_white)
+    s3_c = (yield_curve > 0 and d_y2 < d_y10 and d_y2 < 0) ? c_yell : (yield_curve >= 0 ? c_lime : c_red)
+    table.cell(report, 1, 3, str.tostring(yield_curve, "0.00"), text_color=s3_c)
+    table.cell(report, 2, 3, s3_txt, text_color = f_c1)
+    table.cell(report, 3, 3, "结构压力", text_color=c_white)
+    table.cell(report, 4, 3, yield_curve>0?"曲线已回正, 风险释放期":"利差倒挂压抑, 极度悲观", text_color=c_white)
+    table.cell(report, 5, 3, yield_curve>0?(d_y2<d_y10 and d_y2<0?"【极险】卖股换金避崩盘":"【稳健】基本面回归"):"【现金】拒加任何杠杆", text_color=s3_c)
+
+    table.cell(report, 0, 4, "4. 信用风险", text_color=c_white)
+    table.cell(report, 1, 4, str.tostring(oas_val, "0.2"), text_color=oas_slope<0?c_lime:c_red)
+    table.cell(report, 2, 4, s4_txt, text_color = f_c1)
+    table.cell(report, 3, 4, "管道阻塞", text_color=c_white)
+    table.cell(report, 4, 4, oas_slope<0?"融资环境顺畅":"惜贷情绪抬头", text_color=c_white)
+    table.cell(report, 5, 4, oas_slope<0?"【持有】绩优蓝筹":"【强避】高杠杆标的", text_color=oas_slope<0?c_lime:c_red)
+
+    table.cell(report, 0, 5, "5. 流动性", text_color=c_white)
+    table.cell(report, 1, 5, str.tostring(m_gap, "0.00"), text_color=m_gap>0?c_lime:c_red)
+    table.cell(report, 2, 5, s5_txt, text_color = f_c1)
+    table.cell(report, 3, 5, "水位", text_color=c_white)
+    table.cell(report, 4, 5, region == "中国 (CN)" ? (m_gap > 0 ? "信贷脉搏活化" : "钱在银行空转") : (m_gap > 0 ? "资金活化" : "流动性枯竭"), text_color=c_white)
+    table.cell(report, 5, 5, m_gap > 0 ? "【攻】重仓核心龙头" : (region == "中国 (CN)" ? "【守】中字头/运营商" : "【守】石油/红利资产"), text_color=m_gap>0?c_lime:c_red)
+
+    table.cell(report, 0, 6, "6. 利润空间", text_color=c_white)
+    table.cell(report, 1, 6, str.tostring(p_gap, "0.00"), text_color=p_gap>0?c_lime:c_red)
+    table.cell(report, 2, 6, s6_txt, text_color = f_c1)
+    table.cell(report, 3, 6, "养分", text_color=c_white)
+    table.cell(report, 4, 6, region == "中国 (CN)" ? (p_gap > 0 ? "通缩型利润套利" : "产能过剩极度内卷") : (p_gap > 0 ? "毛利扩张" : "成本反噬"), text_color=c_white)
+    table.cell(report, 5, 6, p_gap > 0 ? "【重仓】仅留扩张巨头" : "【离场】避开中游制造", text_color=p_gap>0?c_lime:c_red)
+
+    table.cell(report, 0, 7, "7. 实体热度", text_color=c_white)
+    table.cell(report, 1, 7, str.tostring(cg_ratio, "0.00"), text_color=cg_slope>0?c_lime:c_red)
+    table.cell(report, 2, 7, s7_txt, text_color = f_c1)
+    table.cell(report, 3, 7, "体温", text_color=c_white)
+    table.cell(report, 4, 7, cg_slope > 0 ? "需求复苏, 增长跑赢恐惧" : "实体虚弱, 避险主导", text_color=c_white)
+    table.cell(report, 5, 7, cg_slope > 0 ? "【攻】顺周期资产" : "【避险】买入实物黄金", text_color=cg_slope>0?c_lime:c_red)
+
+    table.cell(report, 0, 8, "8. 衰退熔断", text_color=c_white)
+    table.cell(report, 1, 8, str.tostring(sahm_val, "0.2"), text_color=sahm_val<0.5?c_lime:c_red)
+    table.cell(report, 2, 8, s8_txt, text_color = f_c1)
+    table.cell(report, 3, 8, "熔断器", text_color=c_white)
+    table.cell(report, 4, 8, sahm_val<0.5?"就业韧性":"硬着陆预警", text_color=c_white)
+    table.cell(report, 5, 8, sahm_val<0.5?"【持有】观察美联储政策" : "【清仓】持币保命", text_color=sahm_val<0.5?c_lime:c_red)
+
+    // 最终诊断
+    table.cell(report, 0, 9, "最终诊断", bgcolor = color.navy, text_color = c_white)
+    table.cell(report, 1, 9, "", bgcolor = color.navy)
+    table.cell(report, 2, 9, str.tostring(total_score) + "/±11", bgcolor = color.navy, text_color = f_c1)
+    table.cell(report, 3, 9, "结论", bgcolor = color.navy, text_color = c_white)
+    table.cell(report, 4, 9, total_score >= 6 ? "全面进攻" : (total_score <= -6 ? "防御撤离" : "收缩博弈"), bgcolor = color.navy, text_color = concl_color)
+    table.cell(report, 5, 9, final_cmd, bgcolor = color.navy, text_color = concl_color)
