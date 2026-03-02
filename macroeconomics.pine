@@ -653,8 +653,8 @@ if barstate.islast and show_report
     table.cell(rpt, 4, 9, strat_desc, bgcolor = diag_bg, text_color = c_white), table.merge_cells(rpt, 4, 9, 5, 9)
 
     // Final Diagnosis Row
-    table.cell(rpt, 0, 10, "最终诊断", bgcolor = diag_bg, text_color = c_white), table.merge_cells(rpt, 0, 10, 1, 10)
+    table.cell(rpt, 0, 10, "最终诊断", bgcolor = diag_bg, text_color = c_beige), table.merge_cells(rpt, 0, 10, 1, 10)
     table.cell(rpt, 2, 10, str.tostring(total_score, "+0.0") + "/±" + str.tostring(max_possible, "0.0"), bgcolor = diag_bg, text_color = f_c1)
-    table.cell(rpt, 3, 10, "结论", bgcolor = diag_bg, text_color = c_white)
+    table.cell(rpt, 3, 10, "结论", bgcolor = diag_bg, text_color = c_beige)
     table.cell(rpt, 4, 10, diag_txt, bgcolor = diag_bg, text_color = meltdown_trigger ? c_white : concl_c)
     table.cell(rpt, 5, 10, final_cmd, bgcolor = diag_bg, text_color = meltdown_trigger ? c_white : concl_c)
