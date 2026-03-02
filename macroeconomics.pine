@@ -428,15 +428,15 @@ if barstate.islast and show_report
         pr_col := s2 > 0 ? c_red : (s2 == -1.5 ? c_yell : c_lime)
 
     else if mode == "3. 利差结构 (10Y-2Y)"
-        title := "利差结构\n[10Y-2Y]", intro := "10年期与2年期美债利差\n10Y看长期(经济前景); 2Y看短期(货币政策)\n牛陡 = 衰退恐慌(危机爆发)\n倒挂 = 衰退预警(经济下行)", cur_s := "权重: " + (w3 > 1.0 ? "x2" : "x1")
+        title := "利差结构\n[10Y-2Y]", intro := "10年期与2年期美债利差\n10Y看长期(经济前景); 2Y看短期(货币政策)", cur_s := "权重: " + (w3 > 1.0 ? "x2" : "x1")
         cur_v := str.tostring(yc_val_d, "0.00")
-        cur_d := s3 == -2.0 ? (is_bull_steep ? "【牛陡】衰退恐慌，市场预期降息" : "长短债倒挂，预警经济衰退") : (s3 > 0 ? "长债利率上行，确认复苏" : "利差收窄，方向未明")
-        cur_t := get_action_text(s3, is_bull_steep, false, "顺周期/价值", "持有短债/现金", "保留现金", a_gold)
-        pr_col := get_action_color(s3, is_bull_steep, false)
-        obs_v := str.tostring(slope_len) + "日(斜率)", obs_desc := "牛陡: 衰退恐慌\n熊陡: 复苏确认\n熊平: 紧缩加压\n牛平: 增长见顶", confirm_v := "即刻确认"
+        cur_d := s3 * w3 <= -1.5 ? (is_bull_steep ? "【牛陡】衰退恐慌，市场预期降息" : "长短债倒挂，预警经济衰退") : (s3 > 0 ? "长债利率上行，确认复苏" : "利差收窄，方向未明")
+        cur_t := get_action_text(s3 * w3, is_bull_steep, false, "顺周期/价值", "持有短债/现金", "保留现金", a_gold)
+        pr_col := get_action_color(s3 * w3, is_bull_steep, false)
+        obs_v := str.tostring(slope_len) + "日(斜率)", obs_desc := "倒挂: 衰退预警\n牛陡: 衰退恐慌\n熊陡: 复苏确认\n熊平: 紧缩加压\n牛平: 增长见顶", confirm_v := "即刻确认"
         if s3 == -2.0 and is_bull_steep 
             pre_v := "经济预期回暖", pre_d := "转为熊陡(复苏)", pre_t := "【进攻】" + a_comm, pr_col := c_lime
-        else if s3 == -2.0 
+        else if s3 * w3 <= -1.5 
             pre_v := "曲线回正", pre_d := "解除倒挂", pre_t := "【观察】等待牛陡确认", pr_col := c_yell
         else 
             pre_v := "重新倒挂", pre_d := "衰退风险回归", pre_t := "【防御】" + a_def_bond, pr_col := c_red
@@ -472,11 +472,11 @@ if barstate.islast and show_report
         pr_col := get_action_color(s6, false, s6!=1.0 and s6!=-1.0)
         obs_v := "12月同比差值 (趋势)", obs_desc := "走阔: 利润空间扩大\n收窄: 利润空间压缩", confirm_v := "公布日确认"
         if s6 == 1.0 
-            pre_v := "差值转跌", pre_d := "盈利见顶", pre_t := "【观察】等待确认", pr_col := c_lime
+            pre_v := "差值转跌", pre_d := "盈利见顶", pre_t := "【观察】等待确认", pr_col := c_yell
         else if s6 == -1.0 
-            pre_v := "重回 0 轴上方", pre_d := "盈利修复", pre_t := "【进攻】关注修复", pr_col := c_red
+            pre_v := "重回 0 轴上方", pre_d := "盈利修复", pre_t := "【进攻】关注修复", pr_col := c_lime
         else 
-            pre_v := "差值转涨", pre_d := "空间重新走阔", pre_t := "【进攻】" + "高毛利龙头", pr_col := c_yell
+            pre_v := "差值转涨", pre_d := "空间重新走阔", pre_t := "【进攻】" + "高毛利龙头", pr_col := c_lime
 
     else if mode == "7. 实体热度 (铜金比)"
         title := "实体热度\n[铜金比]", intro := "铜价 / 金价 | 经济周期风向标\n铜代表工业需求(经济复苏)\n金代表避险情绪(经济衰退)", cur_s := "权重: " + (w7 > 1.0 ? "x2" : "x1"), cur_v := str.tostring(cg_ratio, "0.00")
@@ -506,7 +506,7 @@ if barstate.islast and show_report
         else if sahm_val >= 0.3
             pre_v := "跌回 0.3 下方", pre_d := "风险缓解", pre_t := "【进攻】分批加仓核心资产", pr_col := c_lime
         else
-            pre_v := "上穿 0.5", pre_d := "警惕就业恶化", pre_t := "【回避】防守(红利/现金)", pr_col := c_red
+            pre_v := "上穿 0.3", pre_d := "警惕就业恶化", pre_t := "【回避】防守(红利/现金)", pr_col := c_red
 
     // Render Right Table
     table.cell(info, 0, 0, title, text_color = c_white, bgcolor = c_header)
@@ -573,7 +573,7 @@ if barstate.islast and show_report
     table.cell(rpt, 2, 3, s3_txt, text_color = c_score_col, tooltip = "基础分: " + str.tostring(s3) + "\n权重: x" + str.tostring(w3))
     table.cell(rpt, 3, 3, s3_max, text_color = c_white)
     table.cell(rpt, 4, 3, "天气预报", text_color = c_white)
-    table.cell(rpt, 5, 3, s3 == -2.0 ? (is_bull_steep ? "【牛陡】暴雨将至" : "长短债倒挂衰退") : (s3 > 0 ? "熊陡复苏确认" : "利差收窄/平坦"), text_color = c_white)
+    table.cell(rpt, 5, 3, s3 * w3 <= -1.5 ? (is_bull_steep ? "【牛陡】衰退恐慌" : "长短债倒挂衰退") : (s3 > 0 ? "熊陡复苏确认" : "利差收窄/平坦"), text_color = c_white)
     table.cell(rpt, 6, 3, get_action_text(s3*w3, is_bull_steep, false, "顺周期/价值", "防守(短债/现金)", "保留现金", a_gold), text_color = get_action_color(s3*w3, is_bull_steep, false))
 
     // Row 4: OAS
