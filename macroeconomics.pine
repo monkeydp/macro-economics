@@ -256,10 +256,12 @@ if sahm_val < 0.3
         s8 := -0.5 // Warning triggered despite low Sahm
     else
         s8 := 1.0
-else if sahm_val > 0.5
+else if sahm_val >= 0.5
     s8 := -1.0
 else
-    s8 := icsa_warn ? -0.5 : 0.0
+    // 0.3 <= sahm_val < 0.5: Warning Zone
+    // Assign -0.5 so that dynamic weight (x2) results in -1.0 score impact
+    s8 := -0.5
 
 // Total Score Calculation
 total_score = s1*w1 + s2*w2 + s3*w3 + s4*w4 + s5*w5 + s6*w6 + s7*w7 + s8*w8
