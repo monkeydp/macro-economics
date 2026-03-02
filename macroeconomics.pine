@@ -583,8 +583,8 @@ if barstate.islast and show_report
     table.cell(rpt, 2, 4, s4_txt, text_color = c_score_col, tooltip = "基础分: " + str.tostring(s4) + "\n权重: x" + str.tostring(w4))
     table.cell(rpt, 3, 4, s4_max, text_color = c_white)
     table.cell(rpt, 4, 4, "风险保证金", text_color = c_white)
-    table.cell(rpt, 5, 4, s4 > 0 ? "企业融资畅通" : (s4 <= -1.5 ? "【熔断】信用崩塌" : "银行惜贷情绪升温"), text_color = c_white)
-    table.cell(rpt, 6, 4, get_action_text(s4*w4, false, s4==0.5, "超跌修复", "规避高杠杆", "分批布局", "全线避险"), text_color = get_action_color(s4*w4, false, s4==0.5))
+    table.cell(rpt, 5, 4, s4 > 0 ? "企业融资容易，信用环境好" : (s4 <= -1.5 ? "【熔断】企业借不到钱，信用崩塌" : "银行不敢借钱，企业融资难"), text_color = c_white)
+    table.cell(rpt, 6, 4, get_action_text(s4*w4, false, s4==0.5, "超跌修复", "规避高杠杆", "分批布局", a_gold), text_color = get_action_color(s4*w4, false, s4==0.5))
 
     // Row 5: Liquidity
     table.cell(rpt, 0, 5, "5. 流动性", text_color = c_white)
@@ -592,8 +592,8 @@ if barstate.islast and show_report
     table.cell(rpt, 2, 5, s5_txt, text_color = c_score_col, tooltip = "基础分: " + str.tostring(s5) + "\n权重: x" + str.tostring(w5))
     table.cell(rpt, 3, 5, s5_max, text_color = c_white)
     table.cell(rpt, 4, 5, "鱼池活水率", text_color = c_white)
-    table.cell(rpt, 5, 5, s5 > 0 ? (region == "美国 (US)" ? "美国实际货币扩张" : "中国信贷脉搏激活") : (region == "美国 (US)" ? "美国实际货币收缩" : "资金空转/流动性陷阱"), text_color = c_white)
-    table.cell(rpt, 6, 5, get_action_text(s5*w5, false, s5==0.0, a_tech, "减持科技成长", "分批布局", ""), text_color = get_action_color(s5*w5, false, s5==0.0))
+    table.cell(rpt, 5, 5, s5 > 0 ? (region == "美国 (US)" ? "全球美元流动性充裕" : "中国企业愿意借钱投资了") : (region == "美国 (US)" ? "全球美元流动性收紧" : "中国企业只存钱不投资"), text_color = c_white)
+    table.cell(rpt, 6, 5, get_action_text(s5*w5, false, s5==0.0, a_tech, "减持科技成长", "分批布局", a_gold), text_color = get_action_color(s5*w5, false, s5==0.0))
 
     // Row 6: Profit
     table.cell(rpt, 0, 6, "6. 利润空间", text_color = c_white)
@@ -601,8 +601,8 @@ if barstate.islast and show_report
     table.cell(rpt, 2, 6, s6_txt, text_color = c_score_col, tooltip = "基础分: " + str.tostring(s6) + "\n权重: x" + str.tostring(w6))
     table.cell(rpt, 3, 6, s6_max, text_color = c_white)
     table.cell(rpt, 4, 6, "养鱼账本", text_color = c_white)
-    table.cell(rpt, 5, 6, s6 == 1.0 ? "企业利润空间走阔" : (s6 == -1.0 ? "成本倒挂反噬企业" : (s6 == 0.5 ? "企业利润空间收窄" : "企业利润空间震荡")), text_color = c_white)
-    table.cell(rpt, 6, 6, get_action_text(s6*w6, false, s6!=1.0 and s6!=-1.0, "高毛利/定价权龙头", "减仓观望", "分批布局", ""), text_color = get_action_color(s6*w6, false, s6!=1.0 and s6!=-1.0))
+    table.cell(rpt, 5, 6, s6 == 1.0 ? "企业利润变厚，赚钱容易" : (s6 == -1.0 ? "成本太高，企业亏本经营" : (s6 == 0.5 ? "企业利润变薄，赚钱难" : "企业利润波动，方向不明")), text_color = c_white)
+    table.cell(rpt, 6, 6, get_action_text(s6*w6, false, s6!=1.0 and s6!=-1.0, "高毛利/定价权龙头", "减仓观望", "分批布局", a_gold), text_color = get_action_color(s6*w6, false, s6!=1.0 and s6!=-1.0))
 
     // Row 7: Real Economy
     table.cell(rpt, 0, 7, "7. 实体热度", text_color = c_white)
