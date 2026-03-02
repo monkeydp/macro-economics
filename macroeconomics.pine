@@ -632,8 +632,9 @@ if barstate.islast and show_report
     // Final Diagnosis Logic
     string final_cmd = ""
     color concl_c = c_white
+    // 熔断条件：必须使用加权后分数判断 (s * w)，因为原始分最大仅为 -1.0
     bool is_bull_steep_final = (yc_val_d > 0) and (math.abs(y10_slope - y2_slope) > 0.02) and (y2_slope < 0) and (y2_slope < y10_slope)
-    bool meltdown_trigger = (s8 == -2.0) or is_bull_steep_final or (s4 <= -1.5)
+    bool meltdown_trigger = (s8 * w8 <= -1.5) or is_bull_steep_final or (s4 * w4 <= -1.5)
 
     if meltdown_trigger or total_score < -5.0
         final_cmd := "最高级警报！100% 撤回现金或黄金\n拒绝任何博弈动作"
@@ -654,11 +655,11 @@ if barstate.islast and show_report
     string diag_txt = "收缩博弈"
     color diag_bg = color.navy
     string meltdown_src = ""
-    if s8 == -2.0
+    if s8 * w8 <= -1.5
         meltdown_src := "8.萨姆规则"
     else if is_bull_steep_final
         meltdown_src := "3.牛陡"
-    else if s4 <= -1.5
+    else if s4 * w4 <= -1.5
         meltdown_src := "4.信用崩塌"
 
     if meltdown_trigger
