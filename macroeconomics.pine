@@ -340,7 +340,7 @@ if barstate.islast and show_gdp
     if q_raw > 4
         q_raw := 1
         y := y + 1
-    label.new(bar_index, g_p, "GDP (" + str.tostring(y) + " Q" + str.tostring(q_raw) + ")", textcolor = color.gray, style = label.style_none, size = size.normal)
+    label.new(bar_index, g_p, "真实美国GDP (" + str.tostring(y) + " Q" + str.tostring(q_raw) + ")", textcolor = color.gray, style = label.style_none, size = size.normal)
 
 hline(0, "零轴", color = color.gray, linestyle = hline.style_dashed)
 
@@ -404,36 +404,36 @@ if barstate.islast and show_report
 
     // 5.2 Right Table Logic
     if mode == "1. 基准利率 (EFFR)"
-        title := "基准利率\n[EFFR]", intro := "总水坝闸门\n利率下降(降息) = 闸门开大，水流增加\n救火式降息: <50bp; 开启降息周期: ≥50bp", cur_s := "权重: " + (w1 > 1.0 ? "x2" : "x1")
+        title := "基准利率\n[EFFR]", intro := "美联储联邦基金有效利率\n利率下降(降息) = 资金成本降低，流动性释放\n救火式降息: <50bp; 开启降息周期: ≥50bp", cur_s := "权重: " + (w1 > 1.0 ? "x2" : "x1")
         cur_v := str.tostring(effr_live, "0.00") + "% | " + fmt_ymd(effr_live_time) + "\n" + "(EMA" + str.tostring(effr_ema_len) + "：" + str.tostring(effr_ema, "0.00") + "% )"
         cur_d := is_rescue ? "央行被迫大幅降息" : (s1 > 0 ? "央行开始降息" : "央行加息或利率维持高位")
         cur_t := get_action_text(s1, is_rescue, false, a_tech, a_def_bond, "观察确认", a_gold)
         pr_col := get_action_color(s1, is_rescue, false)
-        obs_v := str.tostring(effr_ema_len) + "月(EMA)", obs_desc := "站上EMA: 闸门关小\n跌破EMA: 闸门开大", confirm_v := "公布日确认"
+        obs_v := str.tostring(effr_ema_len) + "月(EMA)", obs_desc := "站上EMA: 加息周期\n跌破EMA: 降息周期", confirm_v := "公布日确认"
         pre_v := s1 > 0 ? "上穿 EMA" + str.tostring(effr_ema_len) : "观察利率底部\n(连续3个月±12.5 bp)"
-        pre_d := s1 > 0 ? "政策重新紧缩风险" : "观察通胀是否反弹导致降息停止"
+        pre_d := s1 == 1.0 ? "降息周期\n流动性充裕" : "加息周期\n流动性收紧"
         pre_t := s1 > 0 ? "【回避】" + a_def_bond : "【进攻】" + a_tech
         pr_col := s1 > 0 ? c_red : c_lime 
 
     else if mode == "2. 真实利率 (10Y TIPS)"
-        title := "真实利率\n[10Y TIPS]", intro := "水厂回购价\n回购价越高，资金越流回水厂(买美债)\n回购价越低，资金才流向鱼池(股市)\n回购价>GDP增速会对风险资产产生‘虹吸效应’", cur_s := "影响力: " + (w2 > 1.0 ? "x2" : "x1")
+        title := "真实利率\n[10Y TIPS]", intro := "10年期通胀保值债券收益率\n实际利率上行 = 资金流出风险资产(买美债)\n实际利率下行 = 资金流入风险资产(股市)\n实际利率>GDP增速会对风险资产产生‘虹吸效应’", cur_s := "权重: " + (w2 > 1.0 ? "x2" : "x1")
         cur_v := str.tostring(tips_live, "0.00") + "%\n(真实美国GDP: " + t_g + "%)"
-        cur_d := s2 == -1.5 ? "【崩坏】躺赚收益超过干活收益" : (s2 == -1.0 ? "【压制】资金成本过高" : "【利好】资金成本低，利好资产")
+        cur_d := s2 == -1.5 ? "【崩坏】无风险收益高于真实GDP" : (s2 == -1.0 ? "【压制】实际利率过高，压制估值" : "【利好】实际利率适宜，支撑估值")
         cur_t := get_action_text(s2, false, not tips_confirmed, "高弹性资产", "减配高估值", "趋势确认中", a_gold)
         pr_col := get_action_color(s2, false, not tips_confirmed)
-        obs_v := "每日实时", obs_desc := "上穿真实GDP: 崩坏\n站上重力线: 压制\n跌破重力线: 释放", confirm_v := "持续5日确认"
+        obs_v := "每日实时", obs_desc := "上穿真实GDP: 估值极度承压\n站上重力线: 估值承压\n跌破重力线: 估值支撑", confirm_v := "持续5日确认"
         pre_v := s2 > 0 ? "站上 " + t_h + "%" : (s2 == -1.5 ? "跌破 " + t_g + "%" : "跌破 " + t_h + "%")
-        pre_d := s2 > 0 ? "回购价上涨\n估值承压" : (s2 == -1.5 ? "崩坏解除\n回归压制" : "回购价下跌\n估值打开")
+        pre_d := s2 > 0 ? "实际利率上行\n估值承压" : (s2 == -1.5 ? "估值崩坏\n回归压制" : "实际利率下行\n估值修复")
         pre_t := s2 > 0 ? "【回避】减配高估值" : (s2 == -1.5 ? "【观察】等待确认" : "【进攻】" + a_tech)
         pr_col := s2 > 0 ? c_red : (s2 == -1.5 ? c_yell : c_lime)
 
     else if mode == "3. 利差结构 (10Y-2Y)"
-        title := "利差结构\n[10Y-2Y]", intro := "天气预报\n10Y看长期(前景); 2Y看短期(政策)\n牛陡 = 暴雨将至(危机爆发)\n倒挂 = 预报大旱(衰退)", cur_s := "影响力: " + (w3 > 1.0 ? "x2" : "x1")
+        title := "利差结构\n[10Y-2Y]", intro := "10年期与2年期美债利差\n10Y看长期(经济前景); 2Y看短期(货币政策)\n牛陡 = 衰退恐慌(危机爆发)\n倒挂 = 衰退预警(经济下行)", cur_s := "权重: " + (w3 > 1.0 ? "x2" : "x1")
         cur_v := str.tostring(yc_val_d, "0.00")
-        cur_d := s3 == -2.0 ? (is_bull_steep ? "【牛陡】危机爆发，央行急救" : "长短债利差倒挂，预警衰退") : (s3 > 0 ? "长债收益率上涨，确认复苏" : "利差收窄，方向未明")
+        cur_d := s3 == -2.0 ? (is_bull_steep ? "【牛陡】衰退恐慌，市场预期降息" : "长短债倒挂，预警经济衰退") : (s3 > 0 ? "长债利率上行，确认复苏" : "利差收窄，方向未明")
         cur_t := get_action_text(s3, is_bull_steep, false, "顺周期/价值", "持有短债/现金", "保留现金", a_gold)
         pr_col := get_action_color(s3, is_bull_steep, false)
-        obs_v := str.tostring(slope_len) + "日(斜率)", obs_desc := "牛陡: 暴雨将至\n熊陡: 复苏确认\n熊平: 紧缩加压\n牛平: 增长见顶", confirm_v := "即刻确认"
+        obs_v := str.tostring(slope_len) + "日(斜率)", obs_desc := "牛陡: 衰退恐慌\n熊陡: 复苏确认\n熊平: 紧缩加压\n牛平: 增长见顶", confirm_v := "即刻确认"
         if s3 == -2.0 and is_bull_steep 
             pre_v := "经济预期回暖", pre_d := "转为熊陡(复苏)", pre_t := "【进攻】" + a_comm, pr_col := c_lime
         else if s3 == -2.0 
@@ -442,35 +442,35 @@ if barstate.islast and show_report
             pre_v := "重新倒挂", pre_d := "衰退风险回归", pre_t := "【防御】" + a_def_bond, pr_col := c_red
 
     else if mode == "4. 信用风险 (OAS)"
-        title := "信用风险\n[OAS]", intro := "风险保证金\n利差走阔 = 银行要求更多押金才肯借钱\n斜率向上 = 银行惜贷，信用收缩", cur_s := "影响力: " + (w4 > 1.0 ? "x2" : "x1"), cur_v := str.tostring(oas_val, "0.2") + "%"
-        cur_d := s4 > 0 ? "企业融资容易，信用环境好" : (s4 <= -1.5 ? "【熔断】企业借不到钱，信用崩塌" : "银行不敢借钱，企业融资难")
+        title := "信用风险\n[OAS]", intro := "高收益企业债期权调整利差\n利差走阔 = 市场风险偏好下降，融资成本上升\n斜率向上 = 银行惜贷，信用收缩", cur_s := "权重: " + (w4 > 1.0 ? "x2" : "x1"), cur_v := str.tostring(oas_val, "0.2") + "%"
+        cur_d := s4 > 0 ? "信用利差收窄，融资环境宽松" : (s4 <= -1.5 ? "【熔断】信用利差飙升，流动性枯竭" : "信用利差走阔，融资环境收紧")
         cur_t := get_action_text(s4, false, s4==0.5, "超跌修复", "规避高杠杆", "分批布局", a_gold)
         pr_col := get_action_color(s4, false, s4==0.5)
-        obs_v := str.tostring(slope_len) + "日(斜率)", obs_desc := "向上: 信用收缩\n向下: 融资顺畅", confirm_v := "持续3日确认"
+        obs_v := str.tostring(slope_len) + "日(斜率)", obs_desc := "向上: 信用收缩\n向下: 信用扩张", confirm_v := "持续3日确认"
         pre_v := s4 > 0 ? "斜率转正(3日)" : "斜率转负(3日)"
-        pre_d := s4 > 0 ? "信用收缩" : "信用确认破冰"
+        pre_d := s4 > 0 ? "信用收缩" : "信用环境改善"
         pre_t := s4 > 0 ? "【防御】规避高杠杆" : "【进攻】博弈超跌龙头"
         pr_col := s4 > 0 ? c_red : c_lime 
 
     else if mode == "5. 流动性 (M1-M2)"
-        title := region == "美国 (US)" ? "流动性增速\n[M2REAL YoY]" : "流动性增速差\n[M1增速 - M2增速]", intro := region == "美国 (US)" ? "鱼池活水率(美)\nM2REAL 同比>0 = 鱼池水量增加\n全球美元充裕" : "鱼池活水率(中)\n增速差为负 = 钱在蓄水罐空转\n实体缺水", cur_s := "影响力: " + (w5 > 1.0 ? "x2" : "x1")
+        title := region == "美国 (US)" ? "流动性增速\n[M2REAL YoY]" : "流动性增速差\n[M1增速 - M2增速]", intro := region == "美国 (US)" ? "广义货币供应量(剔除通胀)\nM2REAL 同比>0 = 货币供应扩张\n全球美元充裕" : "M1增速 - M2增速 (信贷脉搏)\n增速差为负 = 资金在金融体系空转\n实体流动性紧缩", cur_s := "权重: " + (w5 > 1.0 ? "x2" : "x1")
         cur_v := str.tostring(liq_val, "0.00") + " | " + fmt_ym(liq_time)
-        cur_d := region == "美国 (US)" ? (s5 > 0 ? "全球美元流动性充裕" : "全球美元流动性收紧") : (s5 > 0 ? "中国企业愿意借钱投资了" : "中国企业只存钱不投资")
+        cur_d := region == "美国 (US)" ? (s5 > 0 ? "全球美元流动性充裕" : "全球美元流动性收紧") : (s5 > 0 ? "M1增速回升，企业资金活化" : "M1增速低迷，企业资金空转")
         cur_t := get_action_text(s5, false, s5==0.0, a_tech, "减持科技成长", "分批布局", a_gold)
         pr_col := get_action_color(s5, false, s5==0.0)
-        obs_v := str.tostring(yoy_len) + "月(同比)", obs_desc := "数值>0: 活水入场\n数值<0: 资金枯竭", confirm_v := "公布日确认"
+        obs_v := str.tostring(yoy_len) + "月(同比)", obs_desc := "数值>0: 流动性扩张\n数值<0: 流动性收缩", confirm_v := "公布日确认"
         pre_v := s5 > 0 ? "跌破 0 轴" : "向上突破 0 轴"
         pre_d := s5 > 0 ? "流动性收缩" : "信贷真实扩张确认"
         pre_t := s5 > 0 ? "【回避】降低科技敞口" : "【进攻】加仓" + a_tech
         pr_col := s5 > 0 ? c_red : c_lime
 
     else if mode == "6. 利润空间 (CPI-PPI)"
-        title := "利润空间\n[CPI-PPI]", intro := region == "美国 (US)" ? "养鱼账本(美)\n卖价(CPI) - 成本(PPI) = 利润\n差值走阔 = 企业赚钱容易" : "养鱼账本(中)\n警惕‘通缩型利差虚增’", cur_s := "影响力: " + (w6 > 1.0 ? "x2" : "x1")
+        title := "利润空间\n[CPI-PPI]", intro := region == "美国 (US)" ? "CPI(售价) - PPI(成本) | 利润剪刀差(美)\n卖价(CPI) - 成本(PPI) = 利润\n差值走阔 = 企业盈利改善" : "CPI(需求) - PPI(产能) | 利润剪刀差(中)\n警惕‘通缩型利差虚增’", cur_s := "权重: " + (w6 > 1.0 ? "x2" : "x1")
         cur_v := str.tostring(prof_val, "0.00") + " | " + fmt_ym(prof_time)
-        cur_d := s6 == 1.0 ? "企业利润变厚，赚钱容易" : (s6 == -1.0 ? "成本太高，企业亏本经营" : (s6 == 0.5 ? "企业利润变薄，赚钱难" : "企业利润波动，方向不明"))
+        cur_d := s6 == 1.0 ? "剪刀差走阔，企业盈利改善" : (s6 == -1.0 ? "剪刀差倒挂，企业盈利承压" : (s6 == 0.5 ? "剪刀差收窄，盈利空间压缩" : "剪刀差震荡，盈利方向未明"))
         cur_t := get_action_text(s6, false, s6!=1.0 and s6!=-1.0, "高毛利/定价权龙头", "减仓观望", "分批布局", a_gold)
         pr_col := get_action_color(s6, false, s6!=1.0 and s6!=-1.0)
-        obs_v := "12月同比差值 (趋势)", obs_desc := "走阔: 利润释放\n收窄: 空间压缩", confirm_v := "公布日确认"
+        obs_v := "12月同比差值 (趋势)", obs_desc := "走阔: 利润空间扩大\n收窄: 利润空间压缩", confirm_v := "公布日确认"
         if s6 == 1.0 
             pre_v := "差值转跌", pre_d := "红利见顶", pre_t := "【观察】等待确认", pr_col := c_lime
         else if s6 == -1.0 
@@ -479,14 +479,14 @@ if barstate.islast and show_report
             pre_v := "差值转涨", pre_d := "空间重新走阔", pre_t := "【进攻】" + "高毛利龙头", pr_col := c_yell
 
     else if mode == "7. 实体热度 (铜金比)"
-        title := "实体热度\n[铜金比]", intro := "扩建 vs 避险\n铜代表买砖头扩建(需求)\n金代表买金子避险(恐惧)", cur_s := "影响力: " + (w7 > 1.0 ? "x2" : "x1"), cur_v := str.tostring(cg_ratio, "0.00")
+        title := "实体热度\n[铜金比]", intro := "铜价 / 金价 | 经济周期风向标\n铜代表工业需求(经济复苏)\n金代表避险情绪(经济衰退)", cur_s := "权重: " + (w7 > 1.0 ? "x2" : "x1"), cur_v := str.tostring(cg_ratio, "0.00")
         string s7_zero_txt = ""
         if s7 == 0.0
             if cg_slope > 0 
                 s7_zero_txt := "实体复苏信号确认中"
             else 
                 s7_zero_txt := "铜金背离 (金强于铜)"
-        cur_d := s7 > 0 ? "实体经济需求旺盛" : (s7 < 0 ? "大家都在避险，不敢投资实体" : s7_zero_txt)
+        cur_d := s7 > 0 ? "铜强金弱，实体需求复苏" : (s7 < 0 ? "金强铜弱，避险情绪主导" : s7_zero_txt)
         cur_t := get_action_text(s7, false, s7==0.0, a_comm, "持有黄金/美债", "等待方向确认", a_gold)
         pr_col := get_action_color(s7, false, s7==0.0)
         obs_v := str.tostring(slope_len) + "日(斜率)", obs_desc := "向上: 复苏确认\n向下: 避险主导", confirm_v := "持续5日确认"
@@ -496,9 +496,9 @@ if barstate.islast and show_report
         pr_col := s7 > 0 ? c_red : c_lime
 
     else if mode == "8. 衰退熔断 (就业)"
-        title := "衰退预警\n[萨姆规则]", cur_s := "影响力: " + (w8 > 1.0 ? "x2" : "x1")
-        intro := "没人买鱼了\n失业率飙升 = 没人买鱼 = 经济熄火\n历史100%确认衰退指标", cur_v := str.tostring(sahm_val, "0.3") + " | " + fmt_ym(sahm_time)
-        cur_d := s8 == -2.0 ? "失业率飙升，经济硬着陆" : "就业市场健康"
+        title := "衰退预警\n[萨姆规则]", cur_s := "权重: " + (w8 > 1.0 ? "x2" : "x1")
+        intro := "实时萨姆衰退指标 | 衰退确认信号\n失业率飙升 = 消费萎缩 = 经济衰退\n历史100%准确的衰退指标", cur_v := str.tostring(sahm_val, "0.3") + " | " + fmt_ym(sahm_time)
+        cur_d := s8 == -2.0 ? "衰退确认\n立刻清仓" : "就业韧性\n无需恐慌"
         cur_t := get_action_text(s8, false, sahm_val >= 0.3 and sahm_val < 0.5, "", "", "美联储政策", a_gold)
         obs_v := "12月(低点)", obs_desc := "突破0.5: 确认衰退\n低于0.5: 就业尚具韧性", confirm_v := "公布日确认"
         if sahm_val >= 0.5
