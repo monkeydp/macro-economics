@@ -411,7 +411,7 @@ if barstate.islast and show_report
         pr_col := get_action_color(s1, is_rescue, false)
         obs_v := str.tostring(effr_ema_len) + "月(EMA)", obs_desc := "站上EMA: 加息周期\n跌破EMA: 降息周期", confirm_v := "公布日确认"
         pre_v := s1 > 0 ? "上穿 EMA" + str.tostring(effr_ema_len) : "观察利率底部\n(连续3个月±12.5 bp)"
-        pre_d := s1 == 1.0 ? "降息周期\n流动性充裕" : "加息周期\n流动性收紧"
+        pre_d := s1 > 0 ? "加息周期，流动性收紧" : "降息周期，流动性充裕"
         pre_t := s1 > 0 ? "【回避】" + a_def_bond : "【进攻】" + a_tech
         pr_col := s1 > 0 ? c_red : c_lime 
 
@@ -423,7 +423,7 @@ if barstate.islast and show_report
         pr_col := get_action_color(s2, false, not tips_confirmed)
         obs_v := "每日实时", obs_desc := "上穿真实GDP: 估值极度承压\n站上重力线: 估值承压\n跌破重力线: 估值支撑", confirm_v := "持续5日确认"
         pre_v := s2 > 0 ? "站上 " + t_h + "%" : (s2 == -1.5 ? "跌破 " + t_g + "%" : "跌破 " + t_h + "%")
-        pre_d := s2 > 0 ? "实际利率上行\n估值承压" : (s2 == -1.5 ? "估值崩坏\n回归压制" : "实际利率下行\n估值修复")
+        pre_d := s2 > 0 ? "实际利率上行，估值承压" : (s2 == -1.5 ? "估值崩坏，回归压制" : "实际利率下行，估值修复")
         pre_t := s2 > 0 ? "【回避】减配高估值" : (s2 == -1.5 ? "【观察】等待确认" : "【进攻】" + a_tech)
         pr_col := s2 > 0 ? c_red : (s2 == -1.5 ? c_yell : c_lime)
 
@@ -448,7 +448,7 @@ if barstate.islast and show_report
         pr_col := get_action_color(s4, false, s4==0.5)
         obs_v := str.tostring(slope_len) + "日(斜率)", obs_desc := "向上: 信用收缩\n向下: 信用扩张", confirm_v := "持续3日确认"
         pre_v := s4 > 0 ? "斜率转正(3日)" : "斜率转负(3日)"
-        pre_d := s4 > 0 ? "信用收缩" : "信用环境改善"
+        pre_d := s4 > 0 ? "信用环境变差" : "信用环境改善"
         pre_t := s4 > 0 ? "【防御】规避高杠杆" : "【进攻】博弈超跌龙头"
         pr_col := s4 > 0 ? c_red : c_lime 
 
@@ -460,7 +460,7 @@ if barstate.islast and show_report
         pr_col := get_action_color(s5, false, s5==0.0)
         obs_v := str.tostring(yoy_len) + "月(同比)", obs_desc := "数值>0: 流动性扩张\n数值<0: 流动性收缩", confirm_v := "公布日确认"
         pre_v := s5 > 0 ? "跌破 0 轴" : "向上突破 0 轴"
-        pre_d := s5 > 0 ? "流动性收缩" : "信贷真实扩张确认"
+        pre_d := s5 > 0 ? "流动性收缩" : "流动性扩张"
         pre_t := s5 > 0 ? "【回避】降低科技敞口" : "【进攻】加仓" + a_tech
         pr_col := s5 > 0 ? c_red : c_lime
 
@@ -472,9 +472,9 @@ if barstate.islast and show_report
         pr_col := get_action_color(s6, false, s6!=1.0 and s6!=-1.0)
         obs_v := "12月同比差值 (趋势)", obs_desc := "走阔: 利润空间扩大\n收窄: 利润空间压缩", confirm_v := "公布日确认"
         if s6 == 1.0 
-            pre_v := "差值转跌", pre_d := "红利见顶", pre_t := "【观察】等待确认", pr_col := c_lime
+            pre_v := "差值转跌", pre_d := "盈利见顶", pre_t := "【观察】等待确认", pr_col := c_lime
         else if s6 == -1.0 
-            pre_v := "重回 0 轴上方", pre_d := "红利重现", pre_t := "【进攻】关注修复", pr_col := c_red
+            pre_v := "重回 0 轴上方", pre_d := "盈利修复", pre_t := "【进攻】关注修复", pr_col := c_red
         else 
             pre_v := "差值转涨", pre_d := "空间重新走阔", pre_t := "【进攻】" + "高毛利龙头", pr_col := c_yell
 
