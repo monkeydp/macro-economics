@@ -443,7 +443,7 @@ if barstate.islast and show_report
             pre_v := "重新倒挂", pre_d := "衰退风险回归", pre_t := "【防御】" + a_def_bond, pr_col := c_red
 
     else if mode == "4. 信用风险 (OAS)"
-        title := "信用风险\n[OAS]", intro := "高收益企业债期权调整利差\n利差走阔 = 市场风险偏好下降，融资成本上升\n斜率向上 = 银行惜贷，信用收缩", cur_s := "权重: " + (w4 > 1.0 ? "x2" : "x1"), cur_v := str.tostring(oas_val, "0.2") + "%"
+        title := "信用风险\n[OAS]", intro := "高收益企业债期权调整利差\n斜率向上 = 银行惜贷，信用收缩\n斜率向下 = 市场风险偏好下降，融资成本上升", cur_s := "权重: " + (w4 > 1.0 ? "x2" : "x1"), cur_v := str.tostring(oas_val, "0.2") + "%"
         cur_d := s4 > 0 ? "信用利差收窄，融资环境宽松" : (s4 <= -1.5 ? "【熔断】信用利差飙升，流动性枯竭" : "信用利差走阔，融资环境收紧")
         cur_t := get_action_text(s4, false, s4==0.5, "超跌修复", "规避高杠杆", "分批布局", a_gold)
         pr_col := get_action_color(s4, false, s4==0.5)
