@@ -1,177 +1,273 @@
 //@version=6
-indicator("[薯仔] 宏观经济", overlay = false, precision = 2, max_labels_count = 500)
+indicator("[薯仔] 宏观经济 (Expert Edition)", overlay = false, precision = 2, max_labels_count = 500)
 
-// --- 1. 设置与配色 (严格执行白皮书规范) ---
+// --- 1. 设置与配色 ---
 show_report = input.bool(true, "显示决策看板", group="显示设置")
 mode = input.string("1. 基准利率 (EFFR)", "当前显示曲线",
      options=["1. 基准利率 (EFFR)", "2. 真实利率 (10Y TIPS)", "3. 利差结构 (10Y-2Y)",
      "4. 信用风险 (OAS)", "5. 流动性 (M1-M2)", "6. 利润空间 (CPI-PPI)",
      "7. 实体热度 (铜金比)", "8. 衰退熔断 (就业)"], group="显示设置")
 region = input.string("美国 (US)", "监控地区", options=["美国 (US)", "中国 (CN)"], group="显示设置", tooltip="仅影响: 5.流动性 / 6.利润空间")
-y_limit = input.float(20.0, "Y轴限高阈值", minval = 1.0, group="数据设置")
 
-effr_ema_len = input.int(10, "基准利率 EMA 周期", minval=1, group="周期参数设置", tooltip="仅影响: 1.基准利率")
-yoy_len = input.int(12, "增速同比周期 (月)", minval=1, group="周期参数设置", tooltip="仅影响: 5.流动性 / 6.利润空间")
-slope_len = input.int(20, "斜率观测周期 (日)", minval=1, group="周期参数设置", tooltip="仅影响: 3.利差 / 4.信用 / 7.实体")
+effr_ema_len = input.int(10, "基准利率 EMA 周期", minval=1, group="周期参数设置")
+yoy_len = input.int(12, "增速同比周期 (月)", minval=1, group="周期参数设置")
+slope_len = input.int(20, "斜率观测周期 (日)", minval=1, group="周期参数设置")
 
-// 配色锁定 (保持原版配色)
+// 配色
 c_beige = #F5F5DC, c_white = color.white, c_lime = color.lime, c_red = color.red, c_yell = color.yellow, c_maroon = #800000
 c_bg = color.new(color.black, 15), c_header = color.new(color.gray, 10)
 c_score_col = #78D6FB
 
-// --- 2. 核心数据 (计算逻辑下沉，解决周期切换变形) ---
+// --- 2. 核心数据与辅助计算 ---
 
-// Helper for date format
-fmt_ym(t) =>
-    y = year(t), m = month(t)
-    str.tostring(y) + "-" + (m < 10 ? "0" : "") + str.tostring(m)
+// Helper Functions
+fmt_ym(t) => str.tostring(year(t)) + "-" + (month(t) < 10 ? "0" : "") + str.tostring(month(t))
+fmt_ymd(t) => str.tostring(year(t)) + "-" + (month(t) < 10 ? "0" : "") + str.tostring(month(t)) + "-" + (dayofmonth(t) < 10 ? "0" : "") + str.tostring(dayofmonth(t))
 
-fmt_ymd(t) =>
-    y = year(t), m = month(t), d = dayofmonth(t)
-    str.tostring(y) + "-" + (m < 10 ? "0" : "") + str.tostring(m) + "-" + (d < 10 ? "0" : "") + str.tostring(d)
-
-// 2.1 辅助计算函数 (v6要求: 纯粹计算，不含request.security)
-// EFFR Metrics
-calc_effr_m() =>
-    [close, ta.ema(close, 10), close[1], close[2], (close[1] - close) * 100]
-
-// Slope Metrics (Generic)
-calc_slope(len) =>
-    [close, close - close[len]]
-
-// YoY Metrics (Generic)
-calc_yoy_3(len) =>
+calc_effr_m() => [close, ta.ema(close, 10), close[1], (close[1] - close) * 100]
+calc_slope(len) => [close, close - close[len]]
+calc_yoy_3(len) => 
     v = (close / close[len] - 1) * 100
-    [v, v[1], v[2], v[3]] // Current, 1m ago, 2m ago, 3m ago
-
-// Sahm Metrics
+    [v, v[1], v[2], v[3]]
 calc_sahm_m() =>
     u = close
     s = ta.sma(u, 3)
     l = ta.lowest(s, 12)
     val = s - l
     [val, val[1]]
-
-calc_val_and_lag(len) =>
-    [close, close[len]]
-
-// 3-Day Slope Confirmation (Generic)
-calc_slope_3d(len) =>
+calc_val_and_lag(len) => [close, close[len]]
+calc_slope_3d(len) => 
     s = close - close[len]
     [s, s[1], s[2]]
+calc_chg_5d() => (close / close[5] - 1) * 100
+calc_seq_5d_above(val, th) => val > th and val[1] > th and val[2] > th and val[3] > th and val[4] > th
+calc_seq_5d_below(val, th) => val < th and val[1] < th and val[2] < th and val[3] < th and val[4] < th
 
-// 5-Day Change (Generic)
-calc_chg_5d() =>
-    (close / close[5] - 1) * 100
-
-// 5-Day Sequence Check (Generic)
-// Check if value > threshold for 5 consecutive bars
-calc_seq_5d_above(val, th) =>
-    val > th and val[1] > th and val[2] > th and val[3] > th and val[4] > th
-
-// Check if value < threshold for 5 consecutive bars
-calc_seq_5d_below(val, th) =>
-    val < th and val[1] < th and val[2] < th and val[3] < th and val[4] < th
-
-// 2.2 数据抓取 (严格执行跨周期对齐 + gaps_off)
+// 2.2 数据抓取 (全面升级)
 
 // 1. EFFR
-effr_live = request.security("FRED:EFFR", "D", close, gaps = barmerge.gaps_off) // 实时值
-[effr_m, effr_ema, effr_m_1, effr_m_2, effr_drop] = request.security("FRED:EFFR", "M", calc_effr_m(), gaps = barmerge.gaps_off)
-effr_time = request.security("FRED:EFFR", "M", time, gaps = barmerge.gaps_off)
-effr_live_time = request.security("FRED:EFFR", "D", time, gaps = barmerge.gaps_off) // 获取最新日频时间
+effr_live = request.security("FRED:EFFR", "D", close, gaps = barmerge.gaps_off)
+[effr_m, effr_ema, effr_m_1, effr_drop] = request.security("FRED:EFFR", "M", calc_effr_m(), gaps = barmerge.gaps_off)
+effr_live_time = request.security("FRED:EFFR", "D", time, gaps = barmerge.gaps_off)
 
 // 2. TIPS
 tips_live = request.security("FRED:DFII10", "D", close, gaps = barmerge.gaps_off)
 [gdp_val, gdp_time] = request.security("FRED:A191RL1Q225SBEA", "D", [close, time_close], gaps = barmerge.gaps_off)
 gdp_half = gdp_val * 0.5
-// TIPS 5-day confirmation
 tips_above_gdp_5d = request.security("FRED:DFII10", "D", calc_seq_5d_above(close, gdp_val), gaps = barmerge.gaps_off)
 tips_below_half_5d = request.security("FRED:DFII10", "D", calc_seq_5d_below(close, gdp_half), gaps = barmerge.gaps_off)
 tips_above_half_5d = request.security("FRED:DFII10", "D", calc_seq_5d_above(close, gdp_half), gaps = barmerge.gaps_off)
 
 // 3. Yield Curve
-// Need: yc_val, y10_slope, y2_slope
 [y10_d, y10_d_old] = request.security("FRED:GS10", "D", calc_val_and_lag(slope_len), gaps = barmerge.gaps_off)
 [y2_d, y2_d_old] = request.security("FRED:GS2", "D", calc_val_and_lag(slope_len), gaps = barmerge.gaps_off)
 yc_val_d = y10_d - y2_d
 y10_slope = y10_d - y10_d_old
 y2_slope = y2_d - y2_d_old
 
-// 4. OAS
-// Need: val, 3-day slope, 5-day change
+// 4. OAS & NFCI (Scheme B: Validation)
 [oas_val, oas_old] = request.security("FRED:BAMLH0A0HYM2", "D", calc_val_and_lag(slope_len), gaps = barmerge.gaps_off)
 [oas_s0, oas_s1, oas_s2] = request.security("FRED:BAMLH0A0HYM2", "D", calc_slope_3d(slope_len), gaps = barmerge.gaps_off)
 oas_chg_5d = request.security("FRED:BAMLH0A0HYM2", "D", calc_chg_5d(), gaps = barmerge.gaps_off)
-oas_slope = oas_val - oas_old
+nfci_val = request.security("FRED:NFCI", "W", close, gaps = barmerge.gaps_off) // Weekly
 
-// 5. Liquidity
-// US: M2REAL YoY. CN: M1 YoY - M2 YoY.
-[m2real_yoy, m2real_yoy_1, m2real_yoy_2, m2real_yoy_3] = request.security("FRED:M2REAL", "D", calc_yoy_3(yoy_len), gaps = barmerge.gaps_off)
-m2real_time = request.security("FRED:M2REAL", "D", time_close, gaps = barmerge.gaps_off)
+// 5. Liquidity (Scheme C: Global Fetch)
+// Fixed: Using "M" timeframe to correctly calculate YoY (12 months)
+[m2real_yoy, m2real_yoy_1, m2real_yoy_2, m2real_yoy_3] = request.security("FRED:M2REAL", "M", calc_yoy_3(yoy_len), gaps = barmerge.gaps_off)
+m2real_time = request.security("FRED:M2REAL", "M", time_close, gaps = barmerge.gaps_off)
 
-[cn_m1_yoy, cn_m1_yoy_1, cn_m1_yoy_2, cn_m1_yoy_3] = request.security("ECONOMICS:CNM1", "D", calc_yoy_3(yoy_len), gaps = barmerge.gaps_off)
-[cn_m2_yoy, cn_m2_yoy_1, cn_m2_yoy_2, cn_m2_yoy_3] = request.security("ECONOMICS:CNM2", "D", calc_yoy_3(yoy_len), gaps = barmerge.gaps_off)
-cn_time = request.security("ECONOMICS:CNM1", "D", time_close, gaps = barmerge.gaps_off)
+[cn_m1_yoy, cn_m1_yoy_1, cn_m1_yoy_2, cn_m1_yoy_3] = request.security("ECONOMICS:CNM1", "M", calc_yoy_3(yoy_len), gaps = barmerge.gaps_off)
+[cn_m2_yoy, cn_m2_yoy_1, cn_m2_yoy_2, cn_m2_yoy_3] = request.security("ECONOMICS:CNM2", "M", calc_yoy_3(yoy_len), gaps = barmerge.gaps_off)
+cn_time = request.security("ECONOMICS:CNM1", "M", time_close, gaps = barmerge.gaps_off)
 
-float liq_val = na, float liq_val_1 = na, float liq_val_2 = na
-int liq_time = na
+// Selected Region Liquidity
+float liq_val = na, float liq_val_1 = na, int liq_time = na
 if region == "美国 (US)"
-    liq_val := m2real_yoy
-    liq_val_1 := m2real_yoy_1
-    liq_val_2 := m2real_yoy_2
-    liq_time := m2real_time
+    liq_val := m2real_yoy, liq_val_1 := m2real_yoy_1, liq_time := m2real_time
 else
-    liq_val := cn_m1_yoy - cn_m2_yoy
-    liq_val_1 := cn_m1_yoy_1 - cn_m2_yoy_1
-    liq_val_2 := cn_m1_yoy_2 - cn_m2_yoy_2
-    liq_time := cn_time
+    liq_val := cn_m1_yoy - cn_m2_yoy, liq_val_1 := cn_m1_yoy_1 - cn_m2_yoy_1, liq_time := cn_time
 
-// 6. Profit (CPI - PPI)
-[cpi_yoy, cpi_yoy_1, cpi_yoy_2, cpi_yoy_3] = request.security(region == "美国 (US)" ? "FRED:CPIAUCSL" : "ECONOMICS:CNCPI", "D", calc_yoy_3(yoy_len), gaps = barmerge.gaps_off)
-[ppi_yoy, ppi_yoy_1, ppi_yoy_2, ppi_yoy_3] = request.security(region == "美国 (US)" ? "FRED:PPIACO" : "ECONOMICS:CNPPI", "D", calc_yoy_3(yoy_len), gaps = barmerge.gaps_off)
-prof_time = request.security(region == "美国 (US)" ? "FRED:CPIAUCSL" : "ECONOMICS:CNCPI", "D", time_close, gaps = barmerge.gaps_off)
-
+// 6. Profit (CPI-PPI)
+// Fixed: Using "M" timeframe for correct YoY
+[cpi_yoy, cpi_yoy_1, cpi_yoy_2, cpi_yoy_3] = request.security(region == "美国 (US)" ? "FRED:CPIAUCSL" : "ECONOMICS:CNCPI", "M", calc_yoy_3(yoy_len), gaps = barmerge.gaps_off)
+[ppi_yoy, ppi_yoy_1, ppi_yoy_2, ppi_yoy_3] = request.security(region == "美国 (US)" ? "FRED:PPIACO" : "ECONOMICS:CNPPI", "M", calc_yoy_3(yoy_len), gaps = barmerge.gaps_off)
+prof_time = request.security(region == "美国 (US)" ? "FRED:CPIAUCSL" : "ECONOMICS:CNCPI", "M", time_close, gaps = barmerge.gaps_off)
 prof_val = cpi_yoy - ppi_yoy
 prof_val_1 = cpi_yoy_1 - ppi_yoy_1
-prof_val_2 = cpi_yoy_2 - ppi_yoy_2
-prof_val_3 = cpi_yoy_3 - ppi_yoy_3
 
-// 7. Real Economy (Copper/Gold)
+// 7. Real Economy
 [hg_d, hg_d_old] = request.security("COMEX:HG1!", "D", calc_val_and_lag(slope_len), gaps = barmerge.gaps_off)
 [gc_d, gc_d_old] = request.security("COMEX:GC1!", "D", calc_val_and_lag(slope_len), gaps = barmerge.gaps_off)
-
 cg_ratio = (hg_d / gc_d) * 1000
 cg_ratio_old = (hg_d_old / gc_d_old) * 1000
 cg_slope = cg_ratio - cg_ratio_old
 hg_slope = hg_d - hg_d_old
-// Shock Lock: 5-day cg ratio drop > 3%
 cg_ratio_5d_val = request.security("(COMEX:HG1!/COMEX:GC1!)*1000", "D", close[5], gaps = barmerge.gaps_off)
 cg_drop_5d = (cg_ratio / cg_ratio_5d_val - 1) * 100
-
-// 5-day confirmation
 cg_up_5d = request.security("(COMEX:HG1!/COMEX:GC1!)*1000", "D", calc_seq_5d_above(close - close[20], 0), gaps = barmerge.gaps_off)
 
-// 8. Sahm
+// 8. Sahm & ICSA (Scheme B: Leading Indicator)
 [sahm_val, sahm_val_1] = request.security("FRED:UNRATE", "M", calc_sahm_m(), gaps = barmerge.gaps_off)
 sahm_time = request.security("FRED:UNRATE", "M", time, gaps = barmerge.gaps_off)
 
+// ICSA: 4-week YoY Check
+// FRED:ICSA is Weekly
+calc_icsa_yoy() => (close - close[52]) / close[52] * 100
+icsa_yoy = request.security("FRED:ICSA", "W", calc_icsa_yoy(), gaps = barmerge.gaps_off)
+icsa_warn = request.security("FRED:ICSA", "W", ta.lowest(icsa_yoy, 4) > 15.0, gaps = barmerge.gaps_off) // 4 weeks > 15%
 
-// --- 3. 评分系统 (8维度) ---
+// --- 3. 评分系统 (Scheme A: Dynamic Weights & Logic) ---
+
+// 3.0 Regime Definition
+// Fixed: Using "M" timeframe
+[us_cpi_yoy_raw, _1, _2, _3] = request.security("FRED:CPIAUCSL", "M", calc_yoy_3(12), gaps = barmerge.gaps_off)
+is_inflation_era = us_cpi_yoy_raw > 3.0
+
+yc_slope_diff = math.abs(y10_slope - y2_slope)
+is_bull_steep = yc_val_d > 0 and yc_slope_diff > 0.02 and y2_slope < 0 and y2_slope < y10_slope
+is_panic_era = sahm_val > 0.3 or is_bull_steep
+
+// Base Weights
+float w1 = 1.0, float w2 = 1.5, float w3 = 2.0, float w4 = 1.5
+float w5 = 1.0, float w6 = 1.0, float w7 = 1.0, float w8 = 2.0
+
+// Dynamic Weight Adjustment
+if is_inflation_era
+    w6 := w6 * 2.0 // Profit (CPI-PPI)
+    w7 := w7 * 2.0 // Real Econ (Copper)
+
+if is_panic_era
+    w3 := w3 * 2.0 // Yield Curve
+    w4 := w4 * 2.0 // OAS
+    w8 := w8 * 2.0 // Sahm
+
+// Raw Scores
 var float s1 = 0.0, var float s2 = 0.0, var float s3 = 0.0, var float s4 = 0.0
 var float s5 = 0.0, var float s6 = 0.0, var float s7 = 0.0, var float s8 = 0.0
 
-// Action Helpers
+// S1: EFFR
+if effr_m < 1.25
+    s1 := 1.0
+else if effr_m < (effr_ema - 0.05)
+    s1 := 1.0
+else if effr_m > (effr_ema + 0.05)
+    s1 := -1.0
+is_rescue = effr_drop >= 0.50
+
+// S2: TIPS
+if tips_below_half_5d
+    s2 := 1.5
+else if tips_above_gdp_5d
+    s2 := -1.5
+else if tips_above_half_5d
+    s2 := -1.0
+else
+    if tips_live < gdp_half
+        s2 := 1.5
+    else if tips_live >= gdp_val
+        s2 := -1.5
+    else
+        s2 := -1.0
+tips_confirmed = (s2 == 1.5 and tips_below_half_5d) or (s2 == -1.5 and tips_above_gdp_5d) or (s2 == -1.0 and tips_above_half_5d)
+
+// S3: Yield Curve
+if yc_val_d > 0
+    if yc_slope_diff > 0.02
+        if y10_slope > 0 and y10_slope > y2_slope
+            s3 := 2.0 // Bear Steep
+        else if is_bull_steep
+            s3 := -2.0 // Bull Steep
+        else
+            s3 := -1.0 // Flat
+    else
+        s3 := -1.0 // Flat
+else
+    s3 := -2.0 // Inverted
+
+// S4: OAS (with NFCI Validation)
+oas_up_3d = oas_s0 > 0.01 and oas_s1 > 0.01 and oas_s2 > 0.01
+oas_dn_3d = oas_s0 < -0.01 and oas_s1 < -0.01 and oas_s2 < -0.01
+oas_meltdown = oas_val > 10.0 or oas_chg_5d >= 20.0
+
+if oas_meltdown
+    s4 := -1.5
+else if oas_val > 6.0
+    s4 := -1.5
+else if oas_val > 3.5 // Elevated
+    // NFCI Check: If OAS high but NFCI loose (<0), it's local stress, not systemic
+    if nfci_val < 0
+        s4 := -0.5 // Reduced penalty
+    else
+        s4 := oas_dn_3d ? 0.5 : -1.0
+else // Normal
+    if oas_dn_3d
+        s4 := 1.5
+    else if oas_up_3d
+        s4 := -1.0
+    else
+        s4 := 0.5
+
+// S5: Liquidity
+if liq_val > 0.2 and liq_val_1 > 0.2
+    s5 := 1.0
+else if liq_val < -0.2 and liq_val_1 < -0.2
+    s5 := -1.0
+else
+    s5 := 0.0
+
+// S6: Profit (with Anti-Illusion)
+prof_contract = prof_val <= prof_val_1
+prof_expand = prof_val > prof_val_1
+// Anti-Illusion Rule
+if cpi_yoy < 0 and ppi_yoy < 0
+    s6 := -1.0 // Deflationary Illusion -> Negative
+else if prof_val < -0.1
+    s6 := -1.0
+else if prof_val > 0.1
+    s6 := prof_expand ? 1.0 : (prof_contract ? 0.5 : 0.0)
+else
+    s6 := 0.0
+
+// S7: Real Economy
+if cg_drop_5d < -3.0
+    s7 := -1.0
+else if cg_slope > 0
+    if hg_slope >= 0
+        s7 := cg_up_5d ? 1.0 : 0.0
+    else
+        s7 := -1.0 // Fake
+else
+    s7 := hg_slope >= 0 ? 0.0 : -1.0
+
+// S8: Sahm (with ICSA Leading Indicator)
+if sahm_val < 0.3
+    // Leading Indicator Check
+    if icsa_warn
+        s8 := -1.0 // Warning triggered despite low Sahm
+    else
+        s8 := 2.0
+else if sahm_val > 0.5
+    s8 := -2.0
+else
+    s8 := icsa_warn ? -1.0 : 0.0
+
+// Total Score Calculation
+total_score = s1*w1 + s2*w2 + s3*w3 + s4*w4 + s5*w5 + s6*w6 + s7*w7 + s8*w8
+max_possible = 1.0*w1 + 1.5*w2 + 2.0*w3 + 1.5*w4 + 1.0*w5 + 1.0*w6 + 1.0*w7 + 2.0*w8
+
+// --- 4. 绘图与可视化 ---
+
+// Helper for action text
 get_action_color(score, is_rescue, is_obs) =>
-    if score <= -1.5 or score == -2.0 // Meltdown/Crash
-        c_red // Use c_red for text on dark bg, background will be maroon
-    else if is_rescue // Rescue/Warn
-        c_yell
-    else if score > 0 and not is_obs // Attack
-        c_lime
-    else if score < 0 and not is_obs // Defend
+    if score <= -1.5 or score == -2.0
         c_red
-    else // Observe
+    else if is_rescue
+        c_yell
+    else if score > 0 and not is_obs
+        c_lime
+    else if score < 0 and not is_obs
+        c_red
+    else
         c_yell
 
 get_action_text(score, is_rescue, is_obs, assets_atk, assets_def, assets_obs, assets_crash) =>
@@ -186,136 +282,6 @@ get_action_text(score, is_rescue, is_obs, assets_atk, assets_def, assets_obs, as
     else
         "【观察】" + assets_obs
 
-// 3.1 EFFR
-if effr_m < 1.25
-    s1 := 1.0
-else if effr_m < (effr_ema - 0.05) and effr_m_1 < (effr_ema[1] - 0.05)
-    s1 := 1.0
-else if effr_m > (effr_ema + 0.05) and effr_m_1 > (effr_ema[1] + 0.05)
-    s1 := -1.0
-is_rescue = effr_drop >= 0.50
-
-// 3.2 TIPS
-// Logic: Needs 5-day confirmation to change score
-// State persistence is needed, but here we calculate based on 5-day confirmed state
-if tips_below_half_5d // Confirmed Light
-    s2 := 1.5
-else if tips_above_gdp_5d // Confirmed Crash
-    s2 := -1.5
-else if tips_above_half_5d // Confirmed Heavy
-    s2 := -1.0
-else 
-    // In transition (failed 5-day check), maintain previous logic direction but downgrade to observe?
-    // Simplified: if not confirmed into a new zone, use current zone but mark as observe if moving
-    if tips_live < gdp_half
-        s2 := 1.5
-    else if tips_live >= gdp_val
-        s2 := -1.5
-    else
-        s2 := -1.0
-// 5d check for action status
-tips_confirmed = (s2 == 1.5 and tips_below_half_5d) or (s2 == -1.5 and tips_above_gdp_5d) or (s2 == -1.0 and tips_above_half_5d)
-
-// 3. Yield Curve
-yc_slope_diff = math.abs(y10_slope - y2_slope)
-is_bull_steep = false
-if yc_val_d > 0
-    if yc_slope_diff > 0.02
-        if y10_slope > 0 and y10_slope > y2_slope
-            s3 := 2.0 // Bear Steep
-        else if y2_slope < 0 and y2_slope < y10_slope
-            s3 := -2.0 // Bull Steep
-            is_bull_steep := true
-        else
-            s3 := -1.0 // Flat
-    else
-        s3 := -1.0 // Flat (Slope diff within deadzone)
-else
-    s3 := -2.0 // Inverted
-
-// 3.4 OAS
-// 3-day confirmation: s0, s1, s2 all same direction
-oas_up_3d = oas_s0 > 0.01 and oas_s1 > 0.01 and oas_s2 > 0.01
-oas_dn_3d = oas_s0 < -0.01 and oas_s1 < -0.01 and oas_s2 < -0.01
-
-oas_meltdown = oas_val > 10.0 or oas_chg_5d >= 20.0
-if oas_meltdown
-    s4 := -1.5
-else if oas_val > 6.0 // High Stress
-    s4 := -1.5
-else if oas_val > 3.5 // Elevated
-    if oas_dn_3d
-        s4 := 0.5 // Recovering from stress
-    else
-        s4 := -1.0 // Stress building
-else // Normal (<3.5)
-    if oas_dn_3d
-        s4 := 1.5
-    else if oas_up_3d
-        s4 := -1.0
-    else
-        s4 := 0.5
-
-// 3.5 Liquidity
-// Logic: Strict 2-month confirmation to filter noise
-if liq_val > 0.2 and liq_val_1 > 0.2
-    s5 := 1.0
-else if liq_val < -0.2 and liq_val_1 < -0.2
-    s5 := -1.0
-else
-    s5 := 0.0
-
-// 3.6 Profit
-// 3-month contraction: curr <= 1m <= 2m <= 3m (allow flat, break only on reversal)
-prof_contract = prof_val <= prof_val_1 and prof_val_1 <= prof_val_2 and prof_val_2 <= prof_val_3
-// 2-month expansion: curr > 1m > 2m
-prof_expand = prof_val > prof_val_1 and prof_val_1 > prof_val_2
-
-if prof_val < -0.1
-    s6 := -1.0
-else if prof_val > 0.1
-    if prof_expand // 2-mo expansion (Confirmed)
-        s6 := 1.0
-    else if prof_contract // 3-mo contraction (Confirmed)
-        s6 := 0.5
-    else
-        s6 := 0.0 // >0.1 but not confirmed trend
-else
-    s6 := 0.0
-
-// 3.7 Real Economy
-// Logic Update:
-// - Shock Lock (<-3%): s7=-1 (Crash)
-// - Up 5d & Cu stable: s7=1 (Attack)
-// - Up but <5d: s7=0 (Observe)
-// - Down: s7=-1 (Defend)
-if cg_drop_5d < -3.0
-    s7 := -1.0 // Shock Lock
-else if cg_slope > 0
-    if hg_slope >= 0
-        if cg_up_5d
-            s7 := 1.0 // Health Confirmed
-        else
-            s7 := 0.0 // Up but not confirmed (Observe)
-    else
-        s7 := -1.0 // Fake (Copper dropping) -> Defend
-else // cg_slope <= 0
-    if hg_slope >= 0
-        s7 := 0.0 // Hedge (Observe)
-    else
-        s7 := -1.0 // Cold (Defend)
-
-// 3.8 Sahm
-if sahm_val < 0.3
-    s8 := 2.0
-else if sahm_val > 0.5
-    s8 := -2.0
-else
-    s8 := 0.0
-
-total_score = s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8
-
-// --- 4. 绘图处理 ---
 float plot_val = switch mode
     "1. 基准利率 (EFFR)"    => effr_live
     "2. 真实利率 (10Y TIPS)" => tips_live
@@ -357,37 +323,58 @@ if barstate.islast and show_gdp
     y = year(gdp_time)
     m = month(gdp_time)
     d_day = dayofmonth(gdp_time)
-    // Fix: If timestamp is end-of-quarter (e.g., Sep 30), treat as next quarter
     q_offset = (m % 3 == 0 and d_day > 20) ? 1 : 0
     q_raw = math.ceil(m / 3) + q_offset
-    // Handle Q5 rollover
     if q_raw > 4
         q_raw := 1
         y := y + 1
-    
-    label.new(bar_index, g_p, "真实美国GDP (" + str.tostring(y) + " Q" + str.tostring(q_raw) + ")", textcolor = color.gray, style = label.style_none, size = size.normal)
-    label.new(bar_index, h_p, "重力线", textcolor = color.orange, style = label.style_none, size = size.normal)
+    label.new(bar_index, g_p, "GDP (" + str.tostring(y) + " Q" + str.tostring(q_raw) + ")", textcolor = color.gray, style = label.style_none, size = size.normal)
 
 hline(0, "零轴", color = color.gray, linestyle = hline.style_dashed)
-// hline only works globally, cannot be conditional. Use plot instead for conditional horizontal lines.
-// plot(mode == "8. 衰退熔断 (就业)" ? 0.5 : na, "衰退触发线 (0.5%)", color = c_red, style = plot.style_linebr, linewidth = 2)
-// plot(mode == "8. 衰退熔断 (就业)" ? 0.3 : na, "警戒预警线 (0.3%)", color = color.gray, style = plot.style_circles)
 
 if barstate.islast and mode == "8. 衰退熔断 (就业)"
     line.new(bar_index - 1, 0.5, bar_index, 0.5, xloc=xloc.bar_index, extend=extend.both, color=c_red, style=line.style_dashed, width=2)
-    line.new(bar_index - 1, 0.3, bar_index, 0.3, xloc=xloc.bar_index, extend=extend.both, color=color.gray, style=line.style_dotted, width=1)
-    
     s_col = sahm_val >= 0.5 ? c_red : (sahm_val >= 0.3 ? c_yell : c_lime)
-    msg = "萨姆指标: " + str.tostring(sahm_val, "0.3") + (sahm_val >= 0.5 ? "\n【警告】已进入衰退确认区" : (sahm_val >= 0.3 ? "\n【预警】就业市场显著降温" : "\n【安全】劳动力市场稳健"))
+    msg = "萨姆: " + str.tostring(sahm_val, "0.3") + (icsa_warn ? "\n【预警】初请失业金激增" : "")
     label.new(bar_index, sahm_val, msg, color = s_col, textcolor = color.black, style = label.style_label_left)
 
 bgcolor(color.new(dyn_c, 92))
 
 // --- 5. 看板渲染 ---
 var table info = table.new(position.middle_right, 4, 6, bgcolor = c_bg, border_width = 1, border_color = color.gray)
-var table rpt = table.new(position.middle_left, 6, 10, bgcolor = c_bg, border_width = 1, border_color = color.gray)
+var table rpt = table.new(position.middle_left, 6, 11, bgcolor = c_bg, border_width = 1, border_color = color.gray)
 
 if barstate.islast and show_report
+    // US/CN Logic
+    bool us_tight = effr_m > effr_ema or m2real_yoy < 0
+    bool us_loose = effr_m < effr_ema and m2real_yoy > 0
+    float cn_pulse = cn_m1_yoy - cn_m2_yoy
+    bool cn_tight = cn_pulse < -5.0
+    bool cn_loose = cn_pulse > 0
+
+    // Strategy Matrix
+    string strat_title = "中美策略", string strat_desc = "", color strat_col = c_white
+    
+    // State Descriptions
+    string us_state_txt = us_tight ? "美紧: 货币紧缩" : (us_loose ? "美松: 货币宽松" : "美平: 政策观察")
+    string cn_state_txt = cn_tight ? "中紧: 资金空转" : (cn_loose ? "中松: 信贷激活" : "中平: 信用磨底")
+    
+    if us_loose and cn_loose
+        strat_title := "共振复苏", strat_desc := "全仓进攻 (铜+原油+澳元)", strat_col := c_lime
+    else if us_tight and cn_tight
+        strat_title := "双重紧缩", strat_desc := "美元独强 (做多USD+空A股)", strat_col := c_red
+    else if is_panic_era and cn_tight
+        strat_title := "衰退共振", strat_desc := "现金为王 (美债+黄金+日元)", strat_col := c_maroon
+    else if is_panic_era and cn_loose
+        strat_title := "东升西降", strat_desc := "结构性做多 (多A股+空美股)", strat_col := c_yell
+    // New Granular Scenarios
+    else if us_tight and cn_loose
+        strat_title := "分化博弈", strat_desc := "多美元(吃利息) + 多A股(独立行情)", strat_col := c_white
+    else if us_loose and cn_tight
+        strat_title := "单极驱动", strat_desc := "做多美股/黄金，规避工业大宗", strat_col := c_white
+    else
+        strat_title := "垃圾时间", strat_desc := "多看少动，等待新一轮趋势", strat_col := c_white
+
     // 5.1 Variables
     string title = "", string intro = "", string cur_s = "", string cur_v = "", string cur_d = "", string cur_t = "", string pre_v = "", string pre_d = "", string pre_t = ""
     string obs_v = "", string obs_desc = "", string confirm_v = ""
@@ -395,9 +382,9 @@ if barstate.islast and show_report
     t_g = str.tostring(gdp_val, "#.##"), t_h = str.tostring(gdp_half, "#.##")
 
     // Assets Templates
-    string a_tech = "流动性受益资产" // More generic
+    string a_tech = "流动性受益资产" 
     string a_cash = "红利/现金/短债"
-    string a_gold = "转持现金/黄金" // Updated: Explicit switch action
+    string a_gold = "转持现金/黄金"
     string a_comm = "工业金属/大宗/顺周期"
     string a_core = "各赛道核心龙头"
     string a_def_bond = "持有高股息/国债"
@@ -414,7 +401,7 @@ if barstate.islast and show_report
         pre_v := s1 > 0 ? "上穿 EMA" + str.tostring(effr_ema_len) : "观察利率底部\n(连续3个月±12.5 bp)"
         pre_d := s1 > 0 ? "政策重新紧缩风险" : "观察通胀是否反弹导致降息停止"
         pre_t := s1 > 0 ? "【回避】" + a_def_bond : "【进攻】" + a_tech
-        pr_col := s1 > 0 ? c_red : c_lime // Inflection color
+        pr_col := s1 > 0 ? c_red : c_lime 
 
     else if mode == "2. 真实利率 (10Y TIPS)"
         title := "真实利率\n[10Y TIPS]", intro := "折现率锚点\n真实利率越高，持有现金收益越高\n重力线约为真实美国GDP的一半\n真实利率>重力线会对风险资产产生‘虹吸效应’，\n并压制估值天花板", cur_s := "权重: ±1.5"
@@ -426,7 +413,7 @@ if barstate.islast and show_report
         pre_v := s2 > 0 ? "站上 " + t_h + "%" : (s2 == -1.5 ? "跌破 " + t_g + "%" : "跌破 " + t_h + "%")
         pre_d := s2 > 0 ? "重力增加\n估值承压" : (s2 == -1.5 ? "崩坏解除\n回归压制" : "重力减弱\n估值打开")
         pre_t := s2 > 0 ? "【回避】减配高估值" : (s2 == -1.5 ? "【观察】等待确认" : "【进攻】" + a_tech)
-        pr_col := s2 > 0 ? c_red : (s2 == -1.5 ? c_yell : c_lime) // Inflection
+        pr_col := s2 > 0 ? c_red : (s2 == -1.5 ? c_yell : c_lime)
 
     else if mode == "3. 利差结构 (10Y-2Y)"
         title := "利差结构\n[10Y-2Y]", intro := "大崩溃预警\n10Y指10年期美债(看前景); 2Y是短债(看政策)\n若 10Y-2Y 陡峭向上且 2Y 跌更快(牛陡)，代表降息救火开始", cur_s := "权重: ±2.0"
@@ -435,12 +422,11 @@ if barstate.islast and show_report
         cur_t := get_action_text(s3, is_bull_steep, false, "顺周期/价值", "持有短债/现金", "保留现金", a_gold)
         pr_col := get_action_color(s3, is_bull_steep, false)
         obs_v := str.tostring(slope_len) + "日(斜率)", obs_desc := "牛陡: 救火降息\n熊陡: 预期扩张 （利好）\n熊平: 紧缩加压\n牛平: 增长见顶", confirm_v := "即刻确认"
-        // Fix inflection logic: If currently Bull Steep (Bad), next step is Bear Steep (Good/Recovery)
-        if s3 == -2.0 and is_bull_steep // Current is Bull Steep
+        if s3 == -2.0 and is_bull_steep 
             pre_v := "经济预期回暖", pre_d := "转为熊陡(复苏)", pre_t := "【进攻】" + a_comm, pr_col := c_lime
-        else if s3 == -2.0 // Inverted
+        else if s3 == -2.0 
             pre_v := "曲线回正", pre_d := "解除倒挂", pre_t := "【观察】等待牛陡确认", pr_col := c_yell
-        else // Normal/Bear Steep
+        else 
             pre_v := "重新倒挂", pre_d := "衰退风险回归", pre_t := "【防御】" + a_def_bond, pr_col := c_red
 
     else if mode == "4. 信用风险 (OAS)"
@@ -452,7 +438,7 @@ if barstate.islast and show_report
         pre_v := s4 > 0 ? "斜率转正(3日)" : "斜率转负(3日)"
         pre_d := s4 > 0 ? "信用收缩" : "信用确认破冰"
         pre_t := s4 > 0 ? "【防御】规避高杠杆" : "【进攻】博弈超跌龙头"
-        pr_col := s4 > 0 ? c_red : c_lime // Inflection color fix
+        pr_col := s4 > 0 ? c_red : c_lime 
 
     else if mode == "5. 流动性 (M1-M2)"
         title := region == "美国 (US)" ? "流动性增速\n[M2REAL YoY]" : "流动性增速差\n[M1-M2]", intro := region == "美国 (US)" ? "实际货币供应\nM2REAL 同比>0 = 实际货币供应扩张 = 央行向市场输送活钱" : "中国信贷脉搏\n差值为负 = 钱在银行空转（流动性陷阱）", cur_s := "权重: ±1.0"
@@ -473,25 +459,21 @@ if barstate.islast and show_report
         cur_t := get_action_text(s6, false, s6!=1.0 and s6!=-1.0, "高毛利/定价权龙头", "减仓观望", "分批布局", "")
         pr_col := get_action_color(s6, false, s6!=1.0 and s6!=-1.0)
         obs_v := "12月同比差值 (趋势)", obs_desc := "走阔: 利润释放\n收窄: 空间压缩", confirm_v := "公布日确认"
-        
-        if s6 == 1.0 // Widening
+        if s6 == 1.0 
             pre_v := "差值转跌", pre_d := "红利见顶", pre_t := "【观察】等待确认", pr_col := c_lime
-        else if s6 == -1.0 // Negative
+        else if s6 == -1.0 
             pre_v := "重回 0 轴上方", pre_d := "红利重现", pre_t := "【进攻】关注修复", pr_col := c_red
-        else // Narrowing/Flat
+        else 
             pre_v := "差值转涨", pre_d := "空间重新走阔", pre_t := "【进攻】" + "高毛利龙头", pr_col := c_yell
 
     else if mode == "7. 实体热度 (铜金比)"
         title := "实体热度\n[铜金比]", intro := "经济的“体温脉搏”\n铜代表工厂开工需求，金代表恐惧避险", cur_s := "权重: ±1.0", cur_v := str.tostring(cg_ratio, "0.00")
-        
-        // Refine s7=0 logic for display
         string s7_zero_txt = ""
         if s7 == 0.0
-            if cg_slope > 0 // Ratio Up but not confirmed
+            if cg_slope > 0 
                 s7_zero_txt := "复苏信号确认中"
-            else // Ratio Down but Copper Up (Divergence)
+            else 
                 s7_zero_txt := "铜金背离 (金强于铜)"
-
         cur_d := s7 > 0 ? "需求复苏，增长跑赢恐惧" : (s7 < 0 ? "避险跑赢需求，实体寒冬" : s7_zero_txt)
         cur_t := get_action_text(s7, false, s7==0.0, a_comm, "持有黄金/美债", "等待方向确认", a_gold)
         pr_col := get_action_color(s7, false, s7==0.0)
@@ -603,7 +585,6 @@ if barstate.islast and show_report
     table.cell(rpt, 2, 7, s7_txt, text_color = c_score_col)
     table.cell(rpt, 3, 7, "体温", text_color = c_white)
     
-    // Logic for Left Table Row 7 text (re-implementing display logic here to avoid using cur_d from other modes)
     string s7_left_txt = ""
     if s7 == 0.0
         if cg_slope > 0 
@@ -624,11 +605,11 @@ if barstate.islast and show_report
     table.cell(rpt, 4, 8, s8 == -2.0 ? "触发萨姆规则" : "就业尚具韧性", text_color = c_white)
     table.cell(rpt, 5, 8, get_action_text(s8, false, sahm_val >= 0.3 and sahm_val < 0.5, "", "", "美联储政策", a_gold), text_color = sahm_val >= 0.5 ? c_red : (sahm_val >= 0.3 ? c_yell : c_lime))
 
-    // Final Diagnosis
+    // Final Diagnosis Logic
     string final_cmd = ""
     color concl_c = c_white
-    bool is_bull_steep = (yc_val_d > 0) and (math.abs(y10_slope - y2_slope) > 0.02) and (y2_slope < 0) and (y2_slope < y10_slope)
-    bool meltdown_trigger = (s8 == -2.0) or is_bull_steep or (s4 <= -1.5)
+    bool is_bull_steep_final = (yc_val_d > 0) and (math.abs(y10_slope - y2_slope) > 0.02) and (y2_slope < 0) and (y2_slope < y10_slope)
+    bool meltdown_trigger = (s8 == -2.0) or is_bull_steep_final or (s4 <= -1.5)
 
     if meltdown_trigger or total_score < -6.0
         final_cmd := "最高级警报！100% 撤回现金或黄金\n拒绝任何博弈动作"
@@ -646,13 +627,12 @@ if barstate.islast and show_report
         final_cmd := "仅留 30% 具备回购注销能力的巨头\n70% 持有实物黄金或现金避险"
         concl_c := c_red
 
-    // Meltdown Override
     string diag_txt = "收缩博弈"
     color diag_bg = color.navy
     string meltdown_src = ""
     if s8 == -2.0
         meltdown_src := "8.萨姆规则"
-    else if is_bull_steep
+    else if is_bull_steep_final
         meltdown_src := "3.牛陡"
     else if s4 <= -1.5
         meltdown_src := "4.信用崩塌"
@@ -660,10 +640,26 @@ if barstate.islast and show_report
     if meltdown_trigger
         diag_txt := "【熔断】" + meltdown_src + "确认"
         diag_bg := c_maroon
-        concl_c := c_white // Text white on maroon
+        concl_c := c_white
 
-    table.cell(rpt, 0, 9, "最终诊断", bgcolor = diag_bg, text_color = c_white)
-    table.cell(rpt, 2, 9, str.tostring(total_score) + "/±11.5", bgcolor = diag_bg, text_color = f_c1)
-    table.cell(rpt, 3, 9, "结论", bgcolor = diag_bg, text_color = c_white)
-    table.cell(rpt, 4, 9, diag_txt, bgcolor = diag_bg, text_color = meltdown_trigger ? c_white : concl_c)
-    table.cell(rpt, 5, 9, final_cmd, bgcolor = diag_bg, text_color = meltdown_trigger ? c_white : concl_c)
+    // Global Macro Strategy Row (New)
+    // Merging logic: 
+    // Col 0-1: Fixed Title "综合中美流动性判断"
+    // Col 2: Strategy Name
+    // Col 3: US State
+    // Col 4-5: CN State + Action
+    table.cell(rpt, 0, 9, "综合中美流动性判断", bgcolor = diag_bg, text_color = c_beige, tooltip = "判定依据:\n1. 美国: 真实M2同比 + 利率趋势\n2. 中国: M1-M2信贷脉搏剪刀差"), table.merge_cells(rpt, 0, 9, 1, 9)
+    table.cell(rpt, 2, 9, strat_title, bgcolor = diag_bg, text_color = strat_col)
+    
+    // US Cell (Col 3) -> Status
+    table.cell(rpt, 3, 9, us_state_txt + "\n" + cn_state_txt, bgcolor = diag_bg, text_color = c_white)
+
+    // CN Cell + Strategy (Col 4-5) -> Action
+    table.cell(rpt, 4, 9, strat_desc, bgcolor = diag_bg, text_color = c_white), table.merge_cells(rpt, 4, 9, 5, 9)
+
+    // Final Diagnosis Row
+    table.cell(rpt, 0, 10, "最终诊断", bgcolor = diag_bg, text_color = c_white), table.merge_cells(rpt, 0, 10, 1, 10)
+    table.cell(rpt, 2, 10, str.tostring(total_score, "+0.0") + "/±" + str.tostring(max_possible, "0.0"), bgcolor = diag_bg, text_color = f_c1)
+    table.cell(rpt, 3, 10, "结论", bgcolor = diag_bg, text_color = c_white)
+    table.cell(rpt, 4, 10, diag_txt, bgcolor = diag_bg, text_color = meltdown_trigger ? c_white : concl_c)
+    table.cell(rpt, 5, 10, final_cmd, bgcolor = diag_bg, text_color = meltdown_trigger ? c_white : concl_c)
