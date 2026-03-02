@@ -642,13 +642,8 @@ if barstate.islast and show_report
         diag_bg := c_maroon
         concl_c := c_white
 
-    // Global Macro Strategy Row (New)
-    // Merging logic: 
-    // Col 0-1: Fixed Title "综合中美流动性判断"
-    // Col 2: Strategy Name
-    // Col 3: US State
-    // Col 4-5: CN State + Action
-    table.cell(rpt, 0, 9, "综合中美流动性判断", bgcolor = diag_bg, text_color = c_beige, tooltip = "判定依据:\n1. 美国: 真实M2同比 + 利率趋势\n2. 中国: M1-M2信贷脉搏剪刀差"), table.merge_cells(rpt, 0, 9, 1, 9)
+    // Global Macro Strategy Row
+    table.cell(rpt, 0, 9, "中美宏观对冲", bgcolor = diag_bg, text_color = c_beige, tooltip = "判定依据:\n1. 美国: 真实M2同比 + 利率趋势\n2. 中国: M1-M2信贷脉搏剪刀差"), table.merge_cells(rpt, 0, 9, 1, 9)
     table.cell(rpt, 2, 9, strat_title, bgcolor = diag_bg, text_color = strat_col)
     
     // US Cell (Col 3) -> Status
