@@ -441,7 +441,7 @@ if barstate.islast and show_report
         pr_col := s4 > 0 ? c_red : c_lime 
 
     else if mode == "5. 流动性 (M1-M2)"
-        title := region == "美国 (US)" ? "流动性增速\n[M2REAL YoY]" : "流动性增速差\n[M1-M2]", intro := region == "美国 (US)" ? "实际货币供应\nM2REAL 同比>0 = 实际货币供应扩张 = 央行向市场输送活钱" : "中国信贷脉搏\n差值为负 = 钱在银行空转（流动性陷阱）", cur_s := "权重: ±1.0"
+        title := region == "美国 (US)" ? "流动性增速\n[M2REAL YoY]" : "流动性增速差\n[M1增速 - M2增速]", intro := region == "美国 (US)" ? "实际货币供应\nM2REAL 同比>0 = 实际货币供应扩张 = 央行向市场输送活钱" : "中国信贷脉搏\n增速差为负 = 钱在银行空转（流动性陷阱）", cur_s := "权重: ±1.0"
         cur_v := str.tostring(liq_val, "0.00") + " | " + fmt_ym(liq_time)
         cur_d := region == "美国 (US)" ? (s5 > 0 ? "实际货币供应扩张" : "实际货币供应收缩") : (s5 > 0 ? "信贷脉搏激活" : "钱在银行空转\n实体投资意愿极低")
         cur_t := get_action_text(s5, false, s5==0.0, a_tech, "减持科技成长", "分批布局", "")
@@ -643,7 +643,7 @@ if barstate.islast and show_report
         concl_c := c_white
 
     // Global Macro Strategy Row
-    table.cell(rpt, 0, 9, "中美宏观对冲", bgcolor = diag_bg, text_color = c_beige, tooltip = "判定依据:\n1. 美国: 真实M2同比 + 利率趋势\n2. 中国: M1-M2信贷脉搏剪刀差"), table.merge_cells(rpt, 0, 9, 1, 9)
+    table.cell(rpt, 0, 9, "中美宏观对冲", bgcolor = diag_bg, text_color = c_beige, tooltip = "判定依据:\n1. 美国: 真实M2同比 + 利率趋势\n2. 中国: M1增速 - M2增速"), table.merge_cells(rpt, 0, 9, 1, 9)
     table.cell(rpt, 2, 9, strat_title, bgcolor = diag_bg, text_color = strat_col)
     
     // US Cell (Col 3) -> Status
