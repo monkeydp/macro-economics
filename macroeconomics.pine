@@ -1,5 +1,5 @@
 //@version=6
-indicator("[薯仔] 宏观经济 (Expert Edition)", overlay = false, precision = 2, max_labels_count = 500)
+indicator("[薯仔] 宏观经济", overlay = false, precision = 2, max_labels_count = 500)
 
 // --- 1. 设置与配色 ---
 show_report = input.bool(true, "显示决策看板", group="显示设置")
@@ -434,10 +434,11 @@ if barstate.islast and show_report
         cur_t := get_action_text(s3 * w3, is_bull_steep, false, "顺周期/价值", "持有短债/现金", "保留现金", a_gold)
         pr_col := get_action_color(s3 * w3, is_bull_steep, false)
         obs_v := str.tostring(slope_len) + "日(斜率)", obs_desc := "倒挂: 衰退预警\n牛陡: 衰退恐慌\n熊陡: 复苏确认\n熊平: 紧缩加压\n牛平: 增长见顶", confirm_v := "即刻确认"
-        if s3 == -2.0 and is_bull_steep 
-            pre_v := "经济预期回暖", pre_d := "转为熊陡(复苏)", pre_t := "【进攻】" + a_comm, pr_col := c_lime
-        else if s3 * w3 <= -1.5 
-            pre_v := "曲线回正", pre_d := "解除倒挂", pre_t := "【观察】等待牛陡确认", pr_col := c_yell
+        if s3 * w3 <= -1.5 
+            if is_bull_steep
+                pre_v := "长债利率上行", pre_d := "转为熊陡(复苏)", pre_t := "【进攻】" + a_comm, pr_col := c_lime
+            else
+                pre_v := "曲线回正", pre_d := "解除倒挂", pre_t := "【观察】等待熊陡确认", pr_col := c_lime
         else 
             pre_v := "重新倒挂", pre_d := "衰退风险回归", pre_t := "【防御】" + a_def_bond, pr_col := c_red
 
