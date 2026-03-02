@@ -14,7 +14,7 @@ yoy_len = input.int(12, "增速同比周期 (月)", minval=1, group="周期参�
 slope_len = input.int(20, "斜率观测周期 (日)", minval=1, group="周期参数设置")
 
 // 配色
-c_beige = #F5F5DC, c_white = color.white, c_lime = color.lime, c_red = color.red, c_yell = color.yellow, c_maroon = #800000
+c_beige = #F5F5DC, c_white = color.white, c_lime = color.lime, c_red = color.red, c_yell = color.yellow, c_maroon = #800000, c_orange = color.orange
 c_bg = color.new(color.black, 15), c_header = color.new(color.gray, 10)
 c_score_col = #78D6FB
 
@@ -266,7 +266,7 @@ get_action_color(score, is_rescue, is_obs) =>
     else if score > 0 and not is_obs
         c_lime
     else if score < 0 and not is_obs
-        c_red
+        c_orange
     else
         c_yell
 
@@ -295,19 +295,19 @@ float plot_val = switch mode
 
 color dyn_c = c_white
 if mode == "1. 基准利率 (EFFR)"
-    dyn_c := is_rescue ? c_yell : (s1 > 0 ? c_lime : c_red)
+    dyn_c := is_rescue ? c_yell : (s1 > 0 ? c_lime : c_orange)
 else if mode == "2. 真实利率 (10Y TIPS)"
     dyn_c := not tips_confirmed ? c_yell : (s2 > 0 ? c_lime : c_red)
 else if mode == "3. 利差结构 (10Y-2Y)"
-    dyn_c := is_bull_steep ? c_red : (s3 > 0 ? c_lime : c_red)
+    dyn_c := is_bull_steep ? c_red : (s3 > 0 ? c_lime : c_orange)
 else if mode == "4. 信用风险 (OAS)"
-    dyn_c := s4 > 0 ? c_lime : c_red
+    dyn_c := s4 > 0 ? c_lime : c_orange
 else if mode == "5. 流动性 (M1-M2)"
-    dyn_c := s5 > 0 ? c_lime : (s5 == 0.0 ? c_yell : c_red)
+    dyn_c := s5 > 0 ? c_lime : (s5 == 0.0 ? c_yell : c_orange)
 else if mode == "6. 利润空间 (CPI-PPI)"
     dyn_c := s6 == 1.0 ? c_lime : (s6 == -1.0 ? c_red : c_yell)
 else if mode == "7. 实体热度 (铜金比)"
-    dyn_c := s7 > 0 ? c_lime : (s7 == 0.0 ? c_yell : c_red)
+    dyn_c := s7 > 0 ? c_lime : (s7 == 0.0 ? c_yell : c_orange)
 else if mode == "8. 衰退熔断 (就业)"
     dyn_c := sahm_val >= 0.5 ? c_red : (sahm_val >= 0.3 ? c_yell : c_lime)
 
