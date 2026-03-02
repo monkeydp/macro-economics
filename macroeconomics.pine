@@ -15,6 +15,7 @@ slope_len = input.int(20, "斜率观测周期 (日)", minval=1, group="周期参
 
 // 配色
 c_beige = #F5F5DC, c_white = color.white, c_lime = color.lime, c_red = color.red, c_yell = color.yellow, c_maroon = #800000, c_orange = color.orange
+c_black = color.black, c_gray = color.gray
 c_bg = color.new(color.black, 15), c_header = color.new(color.gray, 10)
 c_score_col = #78D6FB
 
@@ -631,29 +632,37 @@ if barstate.islast and show_report
 
     // Final Diagnosis Logic
     string final_cmd = ""
-    color concl_c = c_white
+    
+    // 重新设计：结论单元格的背景色与文字色 (Traffic Light Style)
+    color concl_bg = c_gray
+    color concl_txt = c_white
+
     // 熔断条件：必须使用加权后分数判断 (s * w)，因为原始分最大仅为 -1.0
     bool is_bull_steep_final = (yc_val_d > 0) and (math.abs(y10_slope - y2_slope) > 0.02) and (y2_slope < 0) and (y2_slope < y10_slope)
     bool meltdown_trigger = (s8 * w8 <= -1.5) or is_bull_steep_final or (s4 * w4 <= -1.5)
 
     if meltdown_trigger or total_score < -5.0
         final_cmd := "最高级警报！100% 撤回现金或黄金\n拒绝任何博弈动作"
-        concl_c := c_red
+        concl_bg := c_red
+        concl_txt := c_white
     else if total_score > 4.0
         final_cmd := "100% 仓位进攻各赛道核心龙头"
-        concl_c := c_lime
+        concl_bg := c_lime
+        concl_txt := c_black
     else if total_score >= 1.0
         final_cmd := "70% 进攻各行业核心巨头\n30% 留作红利资产防守"
-        concl_c := c_lime
+        concl_bg := c_lime
+        concl_txt := c_black
     else if total_score >= -3.0
         final_cmd := "50% 仓位守住高息红利股\n50% 强制保留现金"
-        concl_c := c_yell
+        concl_bg := c_yell
+        concl_txt := c_black
     else // -5.0 to -3.0
         final_cmd := "仅留 30% 具备回购注销能力的巨头\n70% 持有实物黄金或现金避险"
-        concl_c := c_orange
+        concl_bg := c_orange
+        concl_txt := c_black
 
     string diag_txt = "收缩博弈"
-    color diag_bg = color.navy
     string meltdown_src = ""
     if s8 * w8 <= -1.5
         meltdown_src := "8.萨姆规则"
@@ -664,38 +673,45 @@ if barstate.islast and show_report
 
     if meltdown_trigger
         diag_txt := "【熔断】" + meltdown_src + "确认"
-        diag_bg := c_maroon
-        concl_c := c_white
+        concl_bg := c_maroon
+        concl_txt := c_yell
 
-    // Global Macro Strategy Row
-    table.cell(rpt, 0, 9, "中美宏观对冲", bgcolor = diag_bg, text_color = c_beige, tooltip = "判定依据:\n1. 美国: 真实M2同比 + 利率趋势\n2. 中国: M1增速 - M2增速 (信贷脉搏)"), table.merge_cells(rpt, 0, 9, 1, 9)
-    table.cell(rpt, 2, 9, strat_title, bgcolor = diag_bg, text_color = strat_col), table.merge_cells(rpt, 2, 9, 3, 9)
+    // Global Macro Strategy Row (Row 9) - 使用深蓝色背景区分
+    color row9_bg = color.new(color.navy, 60)
+    
+    table.cell(rpt, 0, 9, "中美宏观对冲", bgcolor = row9_bg, text_color = c_beige, tooltip = "判定依据:\n1. 美国: 真实M2同比 + 利率趋势\n2. 中国: M1增速 - M2增速 (信贷脉搏)"), table.merge_cells(rpt, 0, 9, 1, 9)
+    table.cell(rpt, 2, 9, strat_title, bgcolor = row9_bg, text_color = strat_col), table.merge_cells(rpt, 2, 9, 3, 9)
     
     // US Cell (Col 3) -> Status
-    table.cell(rpt, 4, 9, us_state_txt + "\n" + cn_state_txt, bgcolor = diag_bg, text_color = c_white)
+    table.cell(rpt, 4, 9, us_state_txt + "\n" + cn_state_txt, bgcolor = row9_bg, text_color = c_white)
 
     // CN Cell + Strategy (Col 4-5) -> Action
-    table.cell(rpt, 5, 9, strat_desc, bgcolor = diag_bg, text_color = c_white), table.merge_cells(rpt, 5, 9, 6, 9)
+    table.cell(rpt, 5, 9, strat_desc, bgcolor = row9_bg, text_color = c_white), table.merge_cells(rpt, 5, 9, 6, 9)
 
-    // Final Diagnosis Row
+    // Final Diagnosis Row (Row 10)
     string total_score_str = total_score == 0 ? "0" : ((total_score > 0 ? "+" : "") + str.tostring(total_score, "#.##"))
     string max_score_str = str.tostring(max_possible, "#.##")
     
-    color final_c = c_white
+    // 最终得分颜色 (Score Color) - 仅文字变色，背景保持深色以确保可读性
+    color final_score_c = c_white
     if total_score < -6.0
-        final_c := c_red
+        final_score_c := c_red
     else if total_score > 6.0
-        final_c := c_lime
+        final_score_c := c_lime
     else if total_score >= -2.0 and total_score <= 2.0
-        final_c := c_yell
+        final_score_c := c_yell
     else if total_score > 2.0
-        final_c := c_lime
+        final_score_c := c_lime
     else // -6.0 to -2.0
-        final_c := c_orange
+        final_score_c := c_orange
 
     table.cell(rpt, 0, 10, "最终诊断", bgcolor = c_bg, text_color = c_beige, tooltip = "总分 = Σ(原始分 × 动态权重)"), table.merge_cells(rpt, 0, 10, 1, 10)
-    table.cell(rpt, 2, 10, total_score_str, bgcolor = c_bg, text_color = final_c)
+    table.cell(rpt, 2, 10, total_score_str, bgcolor = c_bg, text_color = final_score_c)
     table.cell(rpt, 3, 10, max_score_str, bgcolor = c_bg, text_color = c_white)
-    table.cell(rpt, 4, 10, "结论", bgcolor = diag_bg, text_color = c_beige)
-    table.cell(rpt, 5, 10, diag_txt, bgcolor = diag_bg, text_color = meltdown_trigger ? c_white : concl_c)
-    table.cell(rpt, 6, 10, final_cmd, bgcolor = diag_bg, text_color = meltdown_trigger ? c_white : concl_c)
+    table.cell(rpt, 4, 10, "结论", bgcolor = c_bg, text_color = c_beige)
+    // 结论单元格：恢复为两列布局
+    // Col 5: 诊断结论 (Traffic Light Style)
+    table.cell(rpt, 5, 10, diag_txt, bgcolor = concl_bg, text_color = concl_txt)
+    
+    // Col 6: 操作建议 (与结论单元格保持一致配色，提高可读性)
+    table.cell(rpt, 6, 10, final_cmd, bgcolor = concl_bg, text_color = concl_txt)
