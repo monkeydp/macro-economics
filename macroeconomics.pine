@@ -307,21 +307,21 @@ float plot_val = switch mode
 
 color dyn_c = c_white
 if mode == "1. 基准利率 (EFFR)"
-    dyn_c := is_rescue ? c_yell : (s1 > 0 ? c_lime : c_orange)
+    dyn_c := get_action_color(s1 * w1, is_rescue, false)
 else if mode == "2. 真实利率 (10Y TIPS)"
-    dyn_c := not tips_confirmed ? c_yell : (s2 > 0 ? c_lime : c_red)
+    dyn_c := get_action_color(s2 * w2, false, not tips_confirmed)
 else if mode == "3. 利差结构 (10Y-2Y)"
-    dyn_c := is_bull_steep ? c_red : (s3 > 0 ? c_lime : c_orange)
+    dyn_c := get_action_color(s3 * w3, is_bull_steep, false)
 else if mode == "4. 信用风险 (OAS)"
-    dyn_c := s4 > 0 ? c_lime : c_orange
+    dyn_c := get_action_color(s4 * w4, false, s4 == 0.5)
 else if mode == "5. 流动性 (M1-M2)"
-    dyn_c := s5 > 0 ? c_lime : (s5 == 0.0 ? c_yell : c_orange)
+    dyn_c := get_action_color(s5 * w5, false, s5 == 0.0)
 else if mode == "6. 利润空间 (CPI-PPI)"
-    dyn_c := s6 == 1.0 ? c_lime : (s6 == -1.0 ? c_red : c_yell)
+    dyn_c := get_action_color(s6 * w6, false, s6 != 1.0 and s6 != -1.0)
 else if mode == "7. 实体热度 (铜金比)"
-    dyn_c := s7 > 0 ? c_lime : (s7 == 0.0 ? c_yell : c_orange)
+    dyn_c := get_action_color(s7 * w7, false, s7 == 0.0)
 else if mode == "8. 衰退熔断 (就业)"
-    dyn_c := sahm_val >= 0.5 ? c_red : (sahm_val >= 0.3 ? c_yell : c_lime)
+    dyn_c := get_action_color(s8 * w8, false, sahm_val >= 0.3 and sahm_val < 0.5)
 
 plot(plot_val, "审计主线", color = dyn_c, linewidth = 2, style = (mode == "1. 基准利率 (EFFR)" or mode == "5. 流动性 (M1-M2)" or mode == "6. 利润空间 (CPI-PPI)" or mode == "8. 衰退熔断 (就业)") ? plot.style_stepline : plot.style_line)
 plot(mode == "1. 基准利率 (EFFR)" ? effr_ema : na, "EMA10参考线", color = color.blue, linewidth = 1)
@@ -450,8 +450,8 @@ if barstate.islast and show_report
         obs_v := str.tostring(slope_len) + "日(斜率)", obs_desc := "向上: 信用收缩\n向下: 信用扩张", confirm_v := "持续3日确认"
         pre_v := s4 > 0 ? "斜率转正(3日)" : "斜率转负(3日)"
         pre_d := s4 > 0 ? "信用环境变差" : "信用环境改善"
-        pre_t := s4 > 0 ? "【防御】规避高杠杆" : "【进攻】博弈超跌龙头"
-        pr_col := s4 > 0 ? c_red : c_lime 
+        pre_t := s4 > 0 ? "【防御】规避高杠杆" : "【进攻】顺周期/价值"
+        pr_col := s4 > 0 ? c_orange : c_lime 
 
     else if mode == "5. 流动性 (M1-M2)"
         title := region == "美国 (US)" ? "流动性增速\n[M2REAL YoY]" : "流动性增速差\n[M1增速 - M2增速]", intro := region == "美国 (US)" ? "广义货币供应量(剔除通胀)\nM2REAL 同比>0 = 货币供应扩张\n全球美元充裕" : "M1增速 - M2增速 (信贷脉搏)\n增速差为负 = 资金在金融体系空转\n实体流动性紧缩", cur_s := "权重: " + (w5 > 1.0 ? "x2" : "x1")
@@ -583,8 +583,8 @@ if barstate.islast and show_report
     table.cell(rpt, 2, 4, s4_txt, text_color = c_score_col, tooltip = "基础分: " + str.tostring(s4) + "\n权重: x" + str.tostring(w4))
     table.cell(rpt, 3, 4, s4_max, text_color = c_white)
     table.cell(rpt, 4, 4, "风险保证金", text_color = c_white)
-    table.cell(rpt, 5, 4, s4 > 0 ? "企业融资容易，信用环境好" : (s4 <= -1.5 ? "【熔断】企业借不到钱，信用崩塌" : "银行不敢借钱，企业融资难"), text_color = c_white)
-    table.cell(rpt, 6, 4, get_action_text(s4*w4, false, s4==0.5, "超跌修复", "规避高杠杆", "分批布局", a_gold), text_color = get_action_color(s4*w4, false, s4==0.5))
+    table.cell(rpt, 5, 4, s4 * w4 <= -1.5 ? "【熔断】信用崩塌" : (s4 < 0 ? "利差走阔/收紧" : "信用扩张/宽松"), text_color = c_white)
+    table.cell(rpt, 6, 4, get_action_text(s4 * w4, false, s4 == 0.5, "顺周期/价值", "【防御】规避高杠杆", "【清仓】转持现金/黄金", a_gold), text_color = get_action_color(s4 * w4, false, s4 == 0.5))
 
     // Row 5: Liquidity
     table.cell(rpt, 0, 5, "5. 流动性", text_color = c_white)
