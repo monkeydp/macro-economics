@@ -642,28 +642,38 @@ if barstate.islast and show_report
     bool is_bull_steep_final = (yc_val_d > 0) and (math.abs(y10_slope - y2_slope) > 0.02) and (y2_slope < 0) and (y2_slope < y10_slope)
     bool meltdown_trigger = (s8 * w8 <= -1.5) or is_bull_steep_final or (s4 * w4 <= -1.5)
 
-    if meltdown_trigger or total_score < -5.0
+    if meltdown_trigger or total_score < -6.0
         final_cmd := "最高级警报！100% 撤回现金或黄金\n拒绝任何博弈动作"
         concl_bg := c_red
         concl_txt := c_white
-    else if total_score > 4.0
+    else if total_score > 6.0
         final_cmd := "100% 仓位进攻各赛道核心龙头"
         concl_bg := c_lime
         concl_txt := c_black
-    else if total_score >= 1.0
+    else if total_score >= 2.0
         final_cmd := "70% 进攻各行业核心巨头\n30% 留作红利资产防守"
-        concl_bg := c_lime
+        concl_bg := color.new(c_lime, 30)
         concl_txt := c_black
-    else if total_score >= -3.0
+    else if total_score >= -2.0
         final_cmd := "50% 仓位守住高息红利股\n50% 强制保留现金"
         concl_bg := c_yell
         concl_txt := c_black
-    else // -5.0 to -3.0
+    else // -6.0 to -2.0
         final_cmd := "仅留 30% 具备回购注销能力的巨头\n70% 持有实物黄金或现金避险"
         concl_bg := c_orange
         concl_txt := c_black
 
     string diag_txt = "收缩博弈"
+    if total_score > 6.0
+        diag_txt := "全面繁荣"
+    else if total_score >= 2.0
+        diag_txt := "结构性机会"
+    else if total_score >= -2.0
+        diag_txt := "震荡磨底"
+    else if total_score >= -6.0
+        diag_txt := "衰退防御"
+    else
+        diag_txt := "深度衰退"
     string meltdown_src = ""
     if s8 * w8 <= -1.5
         meltdown_src := "8.萨姆规则"
