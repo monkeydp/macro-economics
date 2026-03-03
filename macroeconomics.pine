@@ -28,8 +28,6 @@ fmt_ymd(t) => str.tostring(year(t)) + "-" + (month(t) < 10 ? "0" : "") + str.tos
 // Helper Function for Split Score
 fmt_s_act(s, w) => 
     float v = s * w
-    // Fix: Show "0" for zero, and show up to 2 decimals for non-zero (e.g. 2.25)
-    // Avoid rounding 2.25 to 2.3 by using "#.##" format
     v == 0 ? "0" : ((v > 0 ? "+" : "") + str.tostring(v, "#.##"))
 
 fmt_s_max(w) => "x" + str.tostring(w, "#")
@@ -82,7 +80,6 @@ oas_chg_5d = request.security("FRED:BAMLH0A0HYM2", "D", calc_chg_5d(), gaps = ba
 nfci_val = request.security("FRED:NFCI", "W", close, gaps = barmerge.gaps_off) // Weekly
 
 // 5. Liquidity (Scheme C: Global Fetch)
-// Fixed: Using "M" timeframe to correctly calculate YoY (12 months)
 [m2real_yoy, m2real_yoy_1, m2real_yoy_2, m2real_yoy_3] = request.security("FRED:M2REAL", "M", calc_yoy_3(yoy_len), gaps = barmerge.gaps_off)
 m2real_time = request.security("FRED:M2REAL", "M", time_close, gaps = barmerge.gaps_off)
 
@@ -129,7 +126,6 @@ icsa_warn = request.security("FRED:ICSA", "W", ta.lowest(icsa_yoy, 4) > 15.0, ga
 // --- 3. 评分系统 (Scheme A: Dynamic Weights & Logic) ---
 
 // 3.0 Regime Definition
-// Fixed: Using "M" timeframe
 [us_cpi_yoy_raw, _1, _2, _3] = request.security("FRED:CPIAUCSL", "M", calc_yoy_3(12), gaps = barmerge.gaps_off)
 is_inflation_era = us_cpi_yoy_raw > 3.0
 
