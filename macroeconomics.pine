@@ -408,7 +408,7 @@ if barstate.islast and show_report
     string a_comm = "顺周期 (铜/原油/工业)"
     string a_core = "核心资产 (标普/龙头)"
     string a_def  = "现金/红利 (短债/高股息)" // Replaces a_def_bond/a_cash
-    string a_safe = "转持避险资产 (黄金/美债)" // Replaces a_gold/a_def_gen
+    string a_safe = "转持避险 (黄金/美债)" // Replaces a_gold/a_def_gen
 
     // 5.2 Right Table Logic
     if mode == "1. 基准利率 (EFFR)"
