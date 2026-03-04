@@ -439,15 +439,15 @@ if barstate.islast and show_report
     if us_loose and cn_loose
         strat_title := "共振复苏", strat_desc := "全仓进攻 (铜+原油+澳元)", strat_col := c_lime, strat_icon := "🟢 "
     else if us_tight and cn_tight
-        strat_title := "双重紧缩", strat_desc := "美元独强 (做多USD+空A股)", strat_col := c_orange, strat_icon := "🟠 "
+        strat_title := "双重紧缩", strat_desc := "美元独强 (做多USD+空A股)", strat_col := c_orange, strat_icon := "🔴 "
     else if is_panic_era and cn_tight
-        strat_title := "衰退共振", strat_desc := "现金为王 (美债+黄金+日元)", strat_col := c_orange, strat_icon := "🟠 "
+        strat_title := "衰退共振", strat_desc := "现金为王 (美债+黄金+日元)", strat_col := c_orange, strat_icon := "🔴 "
     else if is_panic_era and cn_loose
-        strat_title := "东升西降", strat_desc := "结构性做多 (多A股+空美股)", strat_col := c_yellow, strat_icon := "🟡 "
+        strat_title := "东升西降", strat_desc := "结构性做多 (多A股+空美股)", strat_col := c_yellow, strat_icon := "🟠 "
     else if us_tight and cn_loose
-        strat_title := "分化博弈", strat_desc := "多美元(吃利息) + 多A股(独立行情)", strat_col := c_yellow, strat_icon := "🟡 "
+        strat_title := "分化博弈", strat_desc := "多美元(吃利息) + 多A股(独立行情)", strat_col := c_yellow, strat_icon := "🟠 "
     else if us_loose and cn_tight
-        strat_title := "单极驱动", strat_desc := "做多美股/黄金，规避工业大宗", strat_col := c_yellow, strat_icon := "🟡 "
+        strat_title := "单极驱动", strat_desc := "做多美股/黄金，规避工业大宗", strat_col := c_yellow, strat_icon := "🟠 "
     else
         strat_title := "垃圾时间", strat_desc := "多看少动，等待新一轮趋势", strat_col := c_yellow, strat_icon := "🟡 "
 
@@ -707,7 +707,7 @@ if barstate.islast and show_report
     if is_meltdown or total_score <= -6.0
         final_cmd := "最高级警报！撤回现金\n拒绝任何博弈动作"
         diag_txt := "深度衰退/熔断"
-        concl_bg := bg_super_red // 🛑 深红背景
+        concl_bg := c_red // 🔴 严重恶化
         concl_txt := c_yellow
     else if total_score >= 6.0
         final_cmd := "100% 满仓进攻\n各赛道核心龙头"
