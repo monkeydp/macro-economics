@@ -304,46 +304,53 @@ else // < 3.5
         s4 := 1.0 // 风险收敛
 
 // 5. Liquidity
+// 分别计算 US 和 CN 的流动性得分，用于宏观对冲逻辑
+float score_us_liq = 0.0
+float score_cn_liq = 0.0
+
+// --- US Liquidity Calculation ---
+// 枯竭: <-2.0% (连续 N 月)
+float sec_per_month_liq = 86400000 / 1000 * 30 // 近似
+int bars_liq_conf = math.max(1, math.ceil(dur_liq_conf * sec_per_month_liq / sec_per_bar))
+
+bool is_liq_crash = true
+for i = 0 to bars_liq_conf - 1
+    if us_m2_yoy[i] >= -2.0
+        is_liq_crash := false
+        break
+        
+bool is_liq_expand = true
+for i = 0 to bars_liq_conf - 1
+    if us_m2_yoy[i] <= th_liq_us_noise
+        is_liq_expand := false
+        break
+
+if is_liq_crash
+    score_us_liq := -1.0 // 枯竭
+// 紧缩: <阈值 (即时)
+else if us_m2_yoy < -th_liq_us_noise
+    score_us_liq := -0.5 // 紧缩
+// 扩张: >阈值 (连续 N 月)
+else if is_liq_expand
+    score_us_liq := 1.0  // 扩张
+else
+    score_us_liq := 0.0  // 存量博弈
+
+// --- CN Liquidity Calculation ---
+if cn_gap < -5.0
+    score_cn_liq := -1.0 // 严重空转
+else if cn_m1_yoy < cn_m2_yoy - th_liq_cn_noise
+    score_cn_liq := -0.5 // 资金空转
+else if cn_m1_yoy > cn_m2_yoy + th_liq_cn_noise
+    score_cn_liq := 1.0  // 活化
+else
+    score_cn_liq := 0.0  // 结构震荡
+
+// Assign s5 based on region selection
 if region == "美国"
-    // 枯竭: <-2.0% (连续 N 月)
-    // 修正：将月数转换为 Bar 数
-    // 如果当前是月线 (1M)，bars = months
-    // 如果当前是周线 (1W)，bars = months * 4
-    // 将 sec_per_month 移至外部或重新定义
-    float sec_per_month_liq = 86400000 / 1000 * 30 // 近似
-    int bars_liq_conf = math.max(1, math.ceil(dur_liq_conf * sec_per_month_liq / sec_per_bar))
-
-    bool is_liq_crash = true
-    for i = 0 to bars_liq_conf - 1
-        if us_m2_yoy[i] >= -2.0
-            is_liq_crash := false
-            break
-            
-    bool is_liq_expand = true
-    for i = 0 to bars_liq_conf - 1
-        if us_m2_yoy[i] <= th_liq_us_noise
-            is_liq_expand := false
-            break
-
-    if is_liq_crash
-        s5 := -1.0 // 枯竭
-    // 紧缩: <阈值 (即时)
-    else if us_m2_yoy < -th_liq_us_noise
-        s5 := -0.5 // 紧缩
-    // 扩张: >阈值 (连续 N 月)
-    else if is_liq_expand
-        s5 := 1.0  // 扩张
-    else
-        s5 := 0.0  // 存量博弈
+    s5 := score_us_liq
 else // CN
-    if cn_gap < -5.0
-        s5 := -1.0 // 严重空转
-    else if cn_m1_yoy < cn_m2_yoy - th_liq_cn_noise
-        s5 := -0.5 // 资金空转
-    else if cn_m1_yoy > cn_m2_yoy + th_liq_cn_noise
-        s5 := 1.0  // 活化
-    else
-        s5 := 0.0  // 结构震荡
+    s5 := score_cn_liq
 
 // 6. Profit
 if region == "美国"
@@ -837,38 +844,39 @@ if barstate.islast and show_report
 
     // Row 9: Macro Hedge Strategy
     // Logic: US (Liquidity + Rate), CN (Liquidity)
-    // US: Loose (Cut or Expand), Tight (Hike or Contract), Panic (Meltdown)
-    bool us_loose = s1 == 1.0 or s5 == 1.0
-    bool us_tight = s1 < 0 or s5 < 0
-    bool us_panic = is_panic_era or is_meltdown
+    // 修复：强制使用分离后的 US 和 CN 流动性数据，不再依赖 s5
+    bool us_loose = s1 == 1.0 or score_us_liq == 1.0 // US: 降息 OR M2扩张
+    bool us_tight = s1 < 0 or score_us_liq < 0       // US: 加息/救火 OR M2紧缩/枯竭
+    bool us_panic = is_panic_era or is_meltdown      // US: 恐慌
+
     // CN: Loose (Activate), Tight (Idle), Flat
-    bool cn_loose = s5 == 1.0
-    bool cn_tight = s5 < 0
-    
+    bool cn_loose = score_cn_liq == 1.0
+    bool cn_tight = score_cn_liq < 0
+
     string strat_t = "", string strat_d = "", string strat_us = "", string strat_cn = ""
     color strat_c = c_white
     
     if us_loose and cn_loose
         strat_t := "🟢 共振复苏", strat_d := "【全仓猛干】 买铜、原油、澳元、新兴市场(港股/A股)", strat_c := c_lime
-        strat_us := "🟢 松 (印钱)", strat_cn := "🟢 松 (放水)"
+        strat_us := "🟢 美松 (印钱)", strat_cn := "🟢 中松 (放水)"
     else if us_tight and cn_tight
         strat_t := "🔴 双重紧缩", strat_d := "【现金为王】 只持有美元现金，或者做空 A 股", strat_c := c_orange
-        strat_us := "🟠 紧 (抽水)", strat_cn := "🟠 紧 (空转)"
+        strat_us := "🟠 美紧 (抽水)", strat_cn := "🟠 中紧 (空转)"
     else if us_panic and cn_tight
         strat_t := "🔴 衰退共振", strat_d := "【避险】 买美债、黄金、日元避险", strat_c := c_orange
-        strat_us := "🔴 恐慌 (救火)", strat_cn := "🟠 紧 (空转)"
+        strat_us := "🔴 美恐 (救火)", strat_cn := "🟠 中紧 (空转)"
     else if us_panic and cn_loose
         strat_t := "🟠 东升西降", strat_d := "【结构性做多】 买 A股龙头，做空美股", strat_c := c_yellow
-        strat_us := "🔴 恐慌 (救火)", strat_cn := "🟢 松 (放水)"
+        strat_us := "🔴 美恐 (救火)", strat_cn := "🟢 中松 (放水)"
     else if us_tight and cn_loose
         strat_t := "🟠 分化博弈", strat_d := "【两头吃】 存美元吃利息，同时买 A股结构性机会", strat_c := c_yellow
-        strat_us := "🟠 紧 (加息)", strat_cn := "🟢 松 (放水)"
+        strat_us := "🟠 美紧 (加息)", strat_cn := "🟢 中松 (放水)"
     else if us_loose and cn_tight
         strat_t := "🟠 单极驱动", strat_d := "【只买美国】 买美股科技/黄金，千万别碰工业品", strat_c := c_yellow
-        strat_us := "🟢 松 (降息)", strat_cn := "🟠 紧 (躺平)"
+        strat_us := "🟢 美松 (降息)", strat_cn := "🟠 中紧 (躺平)"
     else
         strat_t := "🟡 垃圾时间", strat_d := "【多看少动】 别瞎折腾，等新趋势出来", strat_c := c_yellow
-        strat_us := "🟡 平", strat_cn := "🟡 平"
+        strat_us := "🟡 美平", strat_cn := "🟡 中平"
 
     table.cell(rpt, 0, 9, "中美宏观对冲", bgcolor = c_navy_60, text_color = c_white), table.merge_cells(rpt, 0, 9, 1, 9)
     table.cell(rpt, 2, 9, strat_t, bgcolor = c_navy_60, text_color = strat_c), table.merge_cells(rpt, 2, 9, 3, 9)
