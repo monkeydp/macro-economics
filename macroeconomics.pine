@@ -75,11 +75,14 @@ float sec_per_day = 86400
 // --- 1. 基准利率 (EFFR) ---
 // 确认时长: FOMC 公布日
 // 修改：只获取当前值，在本地计算跌幅，以适应不同周期 (周线/月线也能捕捉到降息)
-[effr_live, effr_time, effr_chg] = request.security("FRED:EFFR", "D", [close, time, close[1] - close], gaps = barmerge.gaps_off)
+// 修复：增加 effr_drop_max_22d 检测月内是否有救火降息
+[effr_live, effr_time, effr_chg, effr_drop_max_22d] = request.security("FRED:EFFR", "D", [close, time, close[1] - close, ta.highest(close[1] - close, 22)], gaps = barmerge.gaps_off)
 // 修改：使用月线 EMA 以匹配长期趋势 (10月EMA)
 effr_ema  = request.security("FRED:EFFR", "M", ta.ema(close, effr_ema_len), gaps = barmerge.gaps_off)
-// 核心修正：对比上一根 K 线的值 (适应周线/月线)
-effr_drop = effr_chg
+
+// 核心修正：如果当前是月线图，使用过去22天内的最大降幅
+bool is_monthly_tf_effr = sec_per_bar >= 2000000
+effr_drop = is_monthly_tf_effr ? effr_drop_max_22d : effr_chg
 
 // --- 2. 真实利率 (TIPS) ---
 // 确认时长: 连续 5 日
