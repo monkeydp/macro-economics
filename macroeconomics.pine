@@ -620,7 +620,23 @@ if barstate.islast and mode == "2. 真实利率"
               textalign = text.align_left)
 
 // 3. 利差结构: 10Y-2Y
-plot(mode == "3. 利差结构" ? plot_val : na, "10Y-2Y", color = dyn_c, linewidth = 2)
+// 牛陡熔断: 使用深红背景 + 文本标记
+bool is_bull_steep_melt = mode == "3. 利差结构" and s3 == -1.0 and w3 > 1.0
+
+// 1. 曲线变色 (保持深红)
+color yc_col = is_bull_steep_melt ? c_super_red : dyn_c
+// Fix: linewidth expects input int (constant), cannot be series. Use constant 2.
+plot(mode == "3. 利差结构" ? plot_val : na, "10Y-2Y", color = yc_col, linewidth = 2)
+
+// 2. 背景高亮 (深红半透明)
+// Fix: bgcolor color argument must be color, not bool.
+// Fix: title is optional.
+bgcolor(is_bull_steep_melt ? color.new(c_super_red, 70) : na, title="Bull Steep Melt BG")
+
+// 3. 文本标记 (仅在熔断开始时显示，避免拥挤)
+if is_bull_steep_melt and not is_bull_steep_melt[1]
+    label.new(bar_index, plot_val, "牛陡\n熔断", color = c_super_red, style = label.style_label_down, textcolor = c_white, size = size.small)
+
 
 // 4. 信用风险: OAS + 阈值
 plot(mode == "4. 信用风险" ? plot_val : na, "OAS", color = dyn_c, linewidth = 2)
@@ -658,13 +674,19 @@ fill_row(r, name, val_str, s, w, meta, status, action) =>
     float final_s = s * w
     string s_str = final_s > 0 ? "+" + str.tostring(final_s, "#.#") : (final_s == 0 ? "0" : str.tostring(final_s, "#.#"))
     
-    table.cell(rpt, 0, r, name, text_color = c_white)
-    table.cell(rpt, 1, r, val_str, text_color = c_s)
-    table.cell(rpt, 2, r, s_str, text_color = c_score_col)
-    table.cell(rpt, 3, r, w_str, text_color = c_white) // 权重字体改为白色
-    table.cell(rpt, 4, r, meta, text_color = c_white)
-    table.cell(rpt, 5, r, status, text_color = c_white)
-    table.cell(rpt, 6, r, action, text_color = c_s, text_halign = text.align_left)
+    // 熔断检测: 仅针对 "数值" 和 "现状含义" 修改背景色 (深红 + 黄字)
+    bool is_meltdown_row = w > 1.0 and s < 0
+    color bg_hlt = is_meltdown_row ? c_super_red : c_bg
+    color txt_hlt_val = is_meltdown_row ? c_yellow : c_s
+    color txt_hlt_stat = is_meltdown_row ? c_yellow : c_white
+
+    table.cell(rpt, 0, r, name, text_color = c_white, bgcolor = c_bg)
+    table.cell(rpt, 1, r, val_str, text_color = txt_hlt_val, bgcolor = bg_hlt)
+    table.cell(rpt, 2, r, s_str, text_color = c_score_col, bgcolor = c_bg)
+    table.cell(rpt, 3, r, w_str, text_color = c_white, bgcolor = c_bg) 
+    table.cell(rpt, 4, r, meta, text_color = c_white, bgcolor = c_bg)
+    table.cell(rpt, 5, r, status, text_color = txt_hlt_stat, bgcolor = bg_hlt)
+    table.cell(rpt, 6, r, action, text_color = c_s, bgcolor = c_bg, text_halign = text.align_left)
 
 if barstate.islast and show_report
     // --- 左表: 报告 ---
@@ -842,7 +864,7 @@ if barstate.islast and show_report
         d_risk := "估值支撑/压力缓解"
 
     else if mode == "3. 利差结构"
-        d_title := "利差结构\n[10Y-2Y]", d_def := "长债减短债收益率。\n预测未来经济状况的最准指标(天气预报)。"
+        d_title := "利差结构\n[10Y-2Y]", d_def := "10年期与2年期美债利差\n10Y看长期(经济前景); 2Y看短期(货币政策)"
         d_obs := "20日 (趋势)", d_logic := "🛑 牛陡: 熔断\n🟠 倒挂: <0\n🟡 平坦: ≈0\n🟢 熊陡: 复苏", d_conf := "即时生效(20日趋势)确认"
         d_w := w3 > 1.0 ? "x2" : "x1"
         d_cur_stat := t3_s
@@ -862,6 +884,7 @@ if barstate.islast and show_report
         else if s3 == 0.0 // 平坦
             d_cur_mean := "经济方向未定，多空博弈"
             d_tactics  := "倒挂/走阔转换期\n方向未定，多看少做"
+            // Fix: 震荡状态的拐点应为复苏确认 (正向)
             d_turn_val := "重新转正 (复苏确认)"
             d_tactics_turn := "复苏确认，加仓周期股\n做多商品"
         else // 熊陡
@@ -1130,6 +1153,9 @@ if barstate.islast and show_report
         else if s3 == 0.0 // 平坦 -> 复苏 (绿)
             turn_score_disp := 1.0
         else // 熊陡 -> 倒挂 (橙)
+            // 修正：当前是熊陡(复苏) +1.0，拐点应该是变坏，即回到倒挂/平坦
+            // 按照文档逻辑：熊陡 -> 重新倒挂 (再次衰退)
+            // 所以拐点得分应为 -0.5 (倒挂) 或 -1.0 (牛陡)，这里用 -0.5 对应倒挂状态
             turn_score_disp := -0.5
             
     else if mode == "4. 信用风险"
