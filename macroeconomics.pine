@@ -69,14 +69,17 @@ calc_slope_linreg(src, len) =>
 
 calc_yoy(src, len) => (src / src[len] - 1) * 100
 
+float sec_per_bar = timeframe.in_seconds(timeframe.period)
+float sec_per_day = 86400
+
 // --- 1. 基准利率 (EFFR) ---
 // 确认时长: FOMC 公布日
 // 修改：只获取当前值，在本地计算跌幅，以适应不同周期 (周线/月线也能捕捉到降息)
-[effr_live, effr_time] = request.security("FRED:EFFR", "D", [close, time], gaps = barmerge.gaps_off)
+[effr_live, effr_time, effr_chg] = request.security("FRED:EFFR", "D", [close, time, close[1] - close], gaps = barmerge.gaps_off)
 // 修改：使用月线 EMA 以匹配长期趋势 (10月EMA)
 effr_ema  = request.security("FRED:EFFR", "M", ta.ema(close, effr_ema_len), gaps = barmerge.gaps_off)
-// 核心修正：对比上一根 K 线的值 (适应周线/月线)，并放宽阈值至 45bp 以防数据波动
-effr_drop = effr_live[1] - effr_live
+// 核心修正：对比上一根 K 线的值 (适应周线/月线)
+effr_drop = effr_chg
 
 // --- 2. 真实利率 (TIPS) ---
 // 确认时长: 连续 5 日
@@ -86,31 +89,37 @@ effr_drop = effr_live[1] - effr_live
 
 // --- 3. 利差结构 (10Y-2Y) ---
 // 确认时长: 即时生效 (基于 20 日趋势)
-[y10, y10_prev] = request.security("FRED:GS10", "D", [close, close[1]], gaps = barmerge.gaps_off)
-[y2, y2_prev]   = request.security("FRED:GS2", "D", [close, close[1]], gaps = barmerge.gaps_off)
+// 修复：强制在 Daily 级别计算 Change，防止月线图上出现月度 Change 误判
+[y10, y10_chg_d] = request.security("FRED:GS10", "D", [close, close - close[1]], gaps = barmerge.gaps_off)
+[y2, y2_chg_d]   = request.security("FRED:GS2", "D", [close, close - close[1]], gaps = barmerge.gaps_off)
 yc_val = y10 - y2
 // 熔断检测: 双跌且短债跌幅 > 长债跌幅
-y10_chg = y10 - y10_prev
-y2_chg  = y2 - y2_prev
+y10_chg = y10_chg_d
+y2_chg  = y2_chg_d
 // 牛陡判定: 长跌且短跌，且短跌 > 长跌 (且短跌跌幅显著 > 阈值)
 is_bull_steep_trigger = y10_chg < 0 and y2_chg < -th_yc_bull_steep and y2_chg < y10_chg
 // 锁定 10 日 (默认)
+// 修正：将天数转换为 Bar 数，防止在月线图上锁定 10 个月
+int bars_lock_bull = math.max(1, math.ceil(lock_bull_steep * sec_per_day / sec_per_bar))
 var int bull_steep_cnt = 0
 if is_bull_steep_trigger
-    bull_steep_cnt := lock_bull_steep
+    bull_steep_cnt := bars_lock_bull
 else if bull_steep_cnt > 0
     bull_steep_cnt := bull_steep_cnt - 1
 is_bull_steep = bull_steep_cnt > 0
 
 // --- 4. 信用风险 (OAS) ---
 // 确认时长: 连续 3 日; 熔断即时
+// 修复：强制在 Daily 级别计算 5日涨幅，防止月线图误判
 [oas_val, oas_slope, oas_chg_5d_pct] = request.security("FRED:BAMLH0A0HYM2", "D", [close, calc_slope_linreg(close, slope_len), (close / close[5] - 1) * 100], gaps = barmerge.gaps_off)
 // 熔断检测: >10% 或 (>6% 且 5日涨幅 > 20%)
 is_oas_crash_trigger = oas_val > 10.0 or (oas_val > 6.0 and oas_chg_5d_pct > 20.0)
 // 锁定 10 日 (默认)
+// 修正：将天数转换为 Bar 数
+int bars_lock_credit = math.max(1, math.ceil(lock_credit_crash * sec_per_day / sec_per_bar))
 var int oas_crash_cnt = 0
 if is_oas_crash_trigger
-    oas_crash_cnt := lock_credit_crash
+    oas_crash_cnt := bars_lock_credit
 else if oas_crash_cnt > 0
     oas_crash_cnt := oas_crash_cnt - 1
 is_oas_crash = oas_crash_cnt > 0
@@ -135,23 +144,45 @@ cn_profit_gap = cn_cpi_yoy - cn_ppi_yoy
 
 // --- 7. 实体热度 (铜金比) ---
 // 确认时长: 连续 5 日
-[copper, copper_prev] = request.security("COMEX:HG1!", "D", [close, close[1]], gaps = barmerge.gaps_off)
+[copper, copper_chg_pct_d] = request.security("COMEX:HG1!", "D", [close, (close / close[1] - 1) * 100], gaps = barmerge.gaps_off)
 [gold, gold_prev]     = request.security("COMEX:GC1!", "D", [close, close[1]], gaps = barmerge.gaps_off)
-cg_ratio = (copper / gold) * 1000
-cg_ratio_prev = (copper_prev / gold_prev) * 1000
-// 崩盘检测: 单日跌幅 > 3%
-is_cg_crash_trigger = (cg_ratio / cg_ratio_prev - 1) * 100 < -3.0
+
+// 崩盘检测需要铜金比本身的日度变化
+// 我们可以直接在 Daily 级别计算铜金比及其变化
+// 修复：增加 was_crash_in_month 检测月内是否有崩盘
+[cg_ratio_d, cg_chg_pct_d, was_crash_in_month] = request.security("COMEX:HG1! / COMEX:GC1! * 1000", "D", [close, (close / close[1] - 1) * 100, ta.highest((close / close[1] - 1) * 100 < -3.0 ? 1.0 : 0.0, 22)], gaps = barmerge.gaps_off)
+
+// 崩盘检测: 单日跌幅 > 3% (强制使用日度数据)
+// 修复：如果当前是月线图 (sec_per_bar >= 2000000)，使用 was_crash_in_month 回溯检测
+// 如果是日线图，直接用 cg_chg_pct_d
+bool is_monthly_tf = sec_per_bar >= 2000000 // 粗略判断月线 (2592000)
+is_cg_crash_trigger = is_monthly_tf ? (was_crash_in_month > 0) : (cg_chg_pct_d < -3.0)
+
 // 锁定 5 日 (默认)
+// 修正：将天数转换为 Bar 数
+int bars_lock_cg = math.max(1, math.ceil(lock_cg_crash * sec_per_day / sec_per_bar))
 var int cg_crash_cnt = 0
 if is_cg_crash_trigger
-    cg_crash_cnt := lock_cg_crash
+    cg_crash_cnt := bars_lock_cg
 else if cg_crash_cnt > 0
     cg_crash_cnt := cg_crash_cnt - 1
 is_cg_crash = cg_crash_cnt > 0
 // 伪复苏: 铜金比 5日线涨 但 铜价 5日线跌 (右侧确认)
-float cg_sma = ta.sma(cg_ratio, 5)
-float cop_sma = ta.sma(copper, 5)
-is_fake_recovery = cg_sma > cg_sma[1] and cop_sma < cop_sma[1]
+// 这里的 SMA 5 需要在日线上计算，如果在月线上计算就是 5个月
+// 上面的 request 语法有误，不能在一个 request 里请求不同品种
+// 分拆请求
+[cg_sma_5d, cg_sma_5d_prev] = request.security("COMEX:HG1! / COMEX:GC1! * 1000", "D", [ta.sma(close, 5), ta.sma(close[1], 5)], gaps = barmerge.gaps_off)
+[cop_sma_5d, cop_sma_5d_prev] = request.security("COMEX:HG1!", "D", [ta.sma(close, 5), ta.sma(close[1], 5)], gaps = barmerge.gaps_off)
+
+is_fake_recovery = cg_sma_5d > cg_sma_5d_prev and cop_sma_5d < cop_sma_5d_prev
+// 为了后续逻辑兼容，cg_ratio 依然需要赋值
+float cg_ratio = cg_ratio_d
+// 计算 cg_ratio_prev 仅用于后续简单对比，这里可以用 cg_ratio_d / (1 + chg) 反推
+float cg_ratio_prev = cg_ratio_d / (1 + cg_chg_pct_d / 100)
+// copper 变量也需要赋值用于后续显示
+// 只需要补充 copper_prev
+float copper_prev_val = request.security("COMEX:HG1!", "D", close[1], gaps = barmerge.gaps_off)
+float copper_prev = copper_prev_val
 
 // --- 8. 萨姆规则 (就业) ---
 // 确认时长: 非农公布日
@@ -172,7 +203,7 @@ float w5=1.0, float w6=1.0, float w7=1.0, float w8=1.0
 
 // 时代判定 (Regime)
 bool is_inflation_era = us_cpi_yoy > 3.0
-bool is_panic_era     = sahm_val >= 0.3 or is_bull_steep
+bool is_panic_era     = sahm_val >= 0.5 or is_bull_steep
 
 // 动态权重调整
 if is_inflation_era
@@ -220,20 +251,18 @@ else
     s1 := 0.0  // 常态震荡
 
 // 2. TIPS
-// 确认时长: 连续 dur_tips_conf 日
-// 注意：Pine Script 中无法直接回溯变量满足条件的次数，需手动计算
-// 这里使用 ta.barssince() 变体或 sum() 变体
-// 简化逻辑：所有 TIPS 判定需满足连续 N 天
+int bars_tips_conf = math.max(1, math.ceil(dur_tips_conf * sec_per_day / sec_per_bar))
+
 // 辅助函数：连续满足
 is_sustained(cond, len) => math.sum(cond ? 1 : 0, len) == len
 
-if is_sustained(rgdp_val < 0, dur_tips_conf)
+if is_sustained(rgdp_val < 0, bars_tips_conf)
     s2 := -1.0 // 滞胀/萧条
-else if is_sustained(tips_live >= rgdp_val, dur_tips_conf)
+else if is_sustained(tips_live >= rgdp_val, bars_tips_conf)
     s2 := -1.0 // 虹吸
-else if is_sustained(tips_live >= 0.5 * rgdp_val, dur_tips_conf)
+else if is_sustained(tips_live >= 0.5 * rgdp_val, bars_tips_conf)
     s2 := -0.5 // 杀估值
-else if is_sustained(tips_live < 0, dur_tips_conf)
+else if is_sustained(tips_live < 0, bars_tips_conf)
     s2 := 1.0  // 负利率
 else
     s2 := 1.0  // 健康支撑
@@ -249,8 +278,10 @@ else if math.abs(yc_val) <= th_yc_noise
 else
     // 熊陡: 双涨且长债涨幅 > 短债涨幅 (且长债涨幅显著 > 阈值)
     // 增加确认期: 连续 N 日满足条件
+    // 修正：将 N 日转换为 N 个 Bar
+    int bars_yc_conf = math.max(1, math.ceil(dur_yc_bear_conf * sec_per_day / sec_per_bar))
     bool is_bear_steep_raw = y10_chg > th_yc_bear_steep and y2_chg > 0 and y10_chg > y2_chg
-    bool is_bear_steep = is_sustained(is_bear_steep_raw, dur_yc_bear_conf)
+    bool is_bear_steep = is_sustained(is_bear_steep_raw, bars_yc_conf)
     s3 := is_bear_steep ? 1.0 : 0.5 // 熊陡+1.0, 普通陡峭+0.5
 
 // 4. OAS
@@ -275,17 +306,21 @@ else // < 3.5
 // 5. Liquidity
 if region == "美国"
     // 枯竭: <-2.0% (连续 N 月)
-    // us_m2_yoy 是月线数据，[1] 代表上个月
-    // 通用化：连续 dur_liq_conf 个月
-    // 注意：月线数据的 [1] 就是上个月，无需 sum
+    // 修正：将月数转换为 Bar 数
+    // 如果当前是月线 (1M)，bars = months
+    // 如果当前是周线 (1W)，bars = months * 4
+    // 将 sec_per_month 移至外部或重新定义
+    float sec_per_month_liq = 86400000 / 1000 * 30 // 近似
+    int bars_liq_conf = math.max(1, math.ceil(dur_liq_conf * sec_per_month_liq / sec_per_bar))
+
     bool is_liq_crash = true
-    for i = 0 to dur_liq_conf - 1
+    for i = 0 to bars_liq_conf - 1
         if us_m2_yoy[i] >= -2.0
             is_liq_crash := false
             break
             
     bool is_liq_expand = true
-    for i = 0 to dur_liq_conf - 1
+    for i = 0 to bars_liq_conf - 1
         if us_m2_yoy[i] <= th_liq_us_noise
             is_liq_expand := false
             break
@@ -312,15 +347,18 @@ else // CN
 
 // 6. Profit
 if region == "美国"
-    // 通用化：连续 dur_prof_conf 个月
+    // 修正：将月数转换为 Bar 数
+    float sec_per_month_prof = 86400000 / 1000 * 30 // 近似
+    int bars_prof_conf = math.max(1, math.ceil(dur_prof_conf * sec_per_month_prof / sec_per_bar))
+
     bool is_prof_heat = true
-    for i = 0 to dur_prof_conf - 1
+    for i = 0 to bars_prof_conf - 1
         if us_cpi_yoy[i] <= 3.0
             is_prof_heat := false
             break
             
     bool is_prof_deflation = true
-    for i = 0 to dur_prof_conf - 1
+    for i = 0 to bars_prof_conf - 1
         if us_cpi_yoy[i] >= 0 or us_ppi_yoy[i] >= 0
             is_prof_deflation := false
             break
@@ -376,12 +414,29 @@ else
     s7 := 0.0  // 震荡
 
 // 8. Sahm
+// 修正：将周数转换为 Bar 数 (ICSA 是周更数据)
+float sec_per_week = 86400000 / 1000 * 7
+int bars_icsa_conf = math.max(1, math.ceil(2 * sec_per_week / sec_per_bar)) // 连续2周
+
+// ICSA 预警: 初请失业金同比 > 15% (连续 N 周)
+// 修正：使用 bars_icsa_conf 检查
+bool is_icsa_warn = true
+for i = 0 to bars_icsa_conf - 1
+    // 注意：icsa_yoy 是周线数据，这里需要获取对应的历史值
+    // 但 request.security 获取的已经是当前周期的序列
+    // 简化逻辑：如果当前是周线以上周期，只需检查当前值；如果是日线，检查过去 N 天
+    // 由于 icsa_yoy 已经是 request.security("W") 获取的，它在日线图上会自动填充
+    // 所以直接检查当前值持续 N 个 Bar 即可
+    if icsa_yoy[i] <= 15.0
+        is_icsa_warn := false
+        break
+
 if sahm_val >= 0.5
     s8 := -1.0 // 衰退熔断 (配合权重x2)
     w8 := 2.0
 else if sahm_val >= 0.3
     s8 := -1.0 // 衰退预警
-else if icsa_warn
+else if is_icsa_warn
     s8 := -0.5 // ICSA 预警
 else
     s8 := 1.0  // 就业健康
@@ -769,16 +824,16 @@ if barstate.islast and show_report
     fill_row(1, "1.基准利率", str.tostring(effr_live, "0.00")+"%", s1, w1, "总水坝闸门", t1_s, t1_a, false)
     fill_row(2, "2.真实利率", str.tostring(tips_live, "0.00")+"%", s2, w2, "水厂回购价", t2_s, t2_a, false)
     fill_row(3, "3.利差结构", str.tostring(yc_val, "0.00"), s3, w3, "天气预报", t3_s, t3_a, s3 == -1.0 and w3 > 1.0)
-    fill_row(4, "4.信用风险", str.tostring(oas_val, "0.2")+"%", s4, w4, "风险保证金", t4_s, t4_a, s4 == -1.0 and w4 > 1.0)
+    fill_row(4, "4.信用风险", str.tostring(oas_val, "0.00")+"%", s4, w4, "风险保证金", t4_s, t4_a, s4 == -1.0 and w4 > 1.0)
     
-    string l5_v = region == "美国 (US)" ? str.tostring(us_m2_yoy, "0.00")+"%" : str.tostring(cn_gap, "0.00")+"%"
+    string l5_v = region == "美国" ? str.tostring(us_m2_yoy, "0.00")+"%" : str.tostring(cn_gap, "0.00")+"%"
     fill_row(5, "5.流动性", l5_v, s5, w5, "鱼池活水率", t5_s, t5_a, false)
     
-    string l6_v = region == "美国 (US)" ? str.tostring(us_profit_gap, "0.00")+"%" : str.tostring(cn_profit_gap, "0.00")+"%"
+    string l6_v = region == "美国" ? str.tostring(us_profit_gap, "0.00")+"%" : str.tostring(cn_profit_gap, "0.00")+"%"
     fill_row(6, "6.利润空间", l6_v, s6, w6, "养鱼账本", t6_s, t6_a, false)
     
     fill_row(7, "7.实体热度", str.tostring(cg_ratio, "0.00"), s7, w7, "铜金比", t7_s, t7_a, false)
-    fill_row(8, "8.萨姆规则", str.tostring(sahm_val, "0.2")+"%", s8, w8, "死神信号", t8_s, t8_a, s8 == -1.0 and w8 > 1.0)
+    fill_row(8, "8.萨姆规则", str.tostring(sahm_val, "0.00")+"%", s8, w8, "死神信号", t8_s, t8_a, s8 == -1.0 and w8 > 1.0)
 
     // Row 9: Macro Hedge Strategy
     // Logic: US (Liquidity + Rate), CN (Liquidity)
@@ -892,11 +947,18 @@ if barstate.islast and show_report
             d_turn_val := "上穿 EMA (停止降息)"
             d_tactics_turn := "降息结束，利好出尽\n落袋为安，防范通胀反弹"
             
-        d_risk := s1 < 0 ? "流动性枯竭" : "通胀反弹"
+        if s1 == -1.0
+            d_risk := "恐慌消退"
+        else if s1 == -0.5
+            d_risk := "流动性转宽"
+        else if s1 == 1.0
+            d_risk := "流动性收紧"
+        else
+            d_risk := "方向明确"
 
     else if mode == "2. 真实利率"
         d_title := "真实利率\n[TIPS]", d_def := "10年期通胀保值债券收益率\nTIPS 上行 = 资金流出风险资产(买美债)\nTIPS 下行 = 资金流入风险资产(买股票)\nTIPS ≥ RGDP，会对风险资产产生‘虹吸效应’"
-        d_obs := "日线 (实时)", d_logic := "🔴 滞胀: RGDP < 0\n🔴 虹吸: ≥RGDP\n🟠 杀估值: ≥0.5RGDP\n🟢 健康: <0.5RGDP\n🟢 负利率: <0", d_conf := "连续5日确认"
+        d_obs := "日线 (实时)", d_logic := "🔴 滞胀: RGDP < 0\n🔴 虹吸: ≥ RGDP\n🟠 杀估值: ≥ 0.5RGDP\n🟢 健康: < 0.5RGDP\n🟢 负利率: < 0", d_conf := "连续5日确认"
         d_w := w2 > 1.0 ? "x2" : "x1"
         d_cur_stat := t2_s
         d_cur_val := str.tostring(tips_live, "0.00") + "% | " + fmt_ymd(tips_time)
@@ -911,30 +973,43 @@ if barstate.islast and show_report
             else // 虹吸
                 d_cur_mean := "无风险收益极高，虹吸一切"
                 d_tactics  := "只有美元现金最安全\n卖出风险资产"
-                d_turn_val := "跌破 RGDP (压力缓解)"
+                d_turn_val := "跌破 RGDP"
                 d_tactics_turn := "虹吸效应结束，配置核心资产\n资金重回股市"
         else if s2 == -0.5 // 杀估值
             d_cur_mean := "实际资金成本过高，压制估值"
             d_tactics  := "买低估值红利股\n规避高估值成长股"
-            d_turn_val := "跌破 0.5 RGDP (估值修复)"
+            d_turn_val := "跌破 0.5 RGDP"
             d_tactics_turn := "估值压制解除，买入成长股\n科技股迎来春天"
         else if s2 == 1.0
             if tips_live < 0 // 负利率
                 d_cur_mean := "实际利率为负，资产泡沫化"
                 d_tactics  := "实物资产/数字黄金抗贬值\n满仓风险资产"
-                d_turn_val := "利率转正 (泡沫退潮)"
+                d_turn_val := "利率转正"
                 d_tactics_turn := "泡沫退潮，卖出黄金/加密\n转入防御性资产"
             else // 健康
                 d_cur_mean := "资金成本适宜，利好股市"
                 d_tactics  := "安心持有成长股\n享受估值溢价"
-                d_turn_val := "突破 0.5 RGDP (压力增大)"
+                d_turn_val := tips_live >= 0.5 * rgdp_val ? "突破 0.5 RGDP（确认中）" : "突破 0.5 RGDP"
                 d_tactics_turn := "实际利率上行，减仓高估值\n切换至价值股"
             
-        d_risk := "估值支撑/压力缓解"
+        if s2 == -1.0
+            if rgdp_val < 0 // 滞胀
+                d_risk := "复苏开启"
+            else // 虹吸
+                d_risk := "压力缓解"
+        else if s2 == -0.5 // 杀估值
+            d_risk := "估值修复"
+        else if s2 == 1.0
+            if tips_live < 0 // 负利率
+                d_risk := "泡沫破裂"
+            else // 健康
+                d_risk := "压力增大"
+        else
+            d_risk := "方向未定"
 
     else if mode == "3. 利差结构"
         d_title := "利差结构\n[10Y-2Y]", d_def := "10年期与2年期美债利差\n10Y看长期(经济前景); 2Y看短期(美联储政策)"
-        d_obs := "20日 (趋势)", d_logic := "🛑 牛陡: 熔断\n🟠 倒挂: <0\n🟡 平坦: ≈0\n🟢 熊陡: 复苏", d_conf := "即时生效(20日趋势)确认"
+        d_obs := "20日 (趋势)", d_logic := "🛑 牛陡: 2Y 跌幅高于 10Y\n🟠 倒挂: 10Y < 2Y\n🟡 平坦: 10Y ≈ 2Y\n🟢 常态: 10Y > 2Y\n🟢 熊陡: 10Y 涨幅高于 2Y", d_conf := "即时生效(20日趋势)确认"
         d_w := w3 > 1.0 ? "x2" : "x1"
         d_cur_stat := t3_s
         d_cur_val := str.tostring(yc_val, "0.00")
@@ -958,15 +1033,24 @@ if barstate.islast and show_report
         else if s3 == 0.5 // 陡峭 (常态)
             d_cur_mean := "经济正向运转，借短贷长获利"
             d_tactics  := "宏观环境无虞，持有风险资产\n只要不是倒挂，安心赚钱"
-            d_turn_val := "重新倒挂 (再次衰退)"
+            d_turn_val := "重新倒挂"
             d_tactics_turn := "再次倒挂，清仓离场\n转入防御"
         else // 熊陡
             d_cur_mean := "经济复苏强劲，预期乐观"
             d_tactics  := "经济复苏，通胀回升\n卖美债，买周期股和大宗商品"
-            d_turn_val := "重新倒挂 (再次衰退)"
+            d_turn_val := "重新倒挂"
             d_tactics_turn := "再次倒挂，清仓离场\n转入防御"
             
-        d_risk := "衰退交易惯性"
+        if s3 == -1.0 // 牛陡
+            d_risk := "恐慌消退"
+        else if s3 == -0.5 // 倒挂
+            d_risk := yc_val >= 0 ? "警报解除 (确认中)" : "警报解除"
+        else if s3 == 0.0 // 平坦
+            d_risk := "复苏确认"
+        else if s3 == 0.5 // 陡峭 (常态)
+            d_risk := yc_val < 0 ? "衰退风险 (确认中)" : "衰退风险"
+        else // 熊陡
+            d_risk := "衰退风险"
 
     else if mode == "4. 信用风险"
         d_title := "信用风险\n[OAS]", d_def := "高收益债期权调整利差。\n银行借钱给烂公司的额外利息(风险保证金)。"
@@ -981,28 +1065,34 @@ if barstate.islast and show_report
             d_tactics  := "信用市场冻结\n仅美元现金/短债安全"
             d_turn_val := "回落至 10% 下 (危机解除)"
             d_tactics_turn := "危机解除，报复性反弹\n买入超跌垃圾债"
+            d_risk := "危机解除"
         else if s4 == -1.0 // 恶化
             d_cur_mean := "融资成本极高，企业失血"
             d_tactics  := "风险过高，下降也不碰\n抛售垃圾债和小盘股"
             d_turn_val := "回落至 6% 下 (流动性恢复)"
             d_tactics_turn := "流动性恢复，买入小盘股\n关注困境反转"
+            d_risk := "流动性恢复"
         else if s4 == -0.5 // 走阔
             d_cur_mean := "银行惜贷，信贷收缩"
             d_tactics  := "虽有压力但未失控\n处于观望期"
             d_turn_val := "趋势向下 (压力缓解)"
             d_tactics_turn := "压力缓解，关注信用债\n配置可转债"
+            d_risk := "压力缓解"
         else if s4 == 0.0 // 压力
             d_cur_mean := "借贷平衡，市场观望"
             d_tactics  := "环境宽松，买入高弹性资产\n如小盘股和垃圾债"
             d_turn_val := "回落至 3.5% 下 (环境宽松)"
             d_tactics_turn := "环境宽松，大胆加杠杆\n全仓进攻"
+            if oas_val < 3.5
+                d_risk := "虚惊一场"
+            else
+                d_risk := "环境宽松"
         else // 收敛
             d_cur_mean := "资金泛滥，融资容易"
             d_tactics  := "风险偏好提升，资金泛滥\n买入垃圾债"
             d_turn_val := "突破 3.5% (环境收紧)"
             d_tactics_turn := "环境收紧，降低杠杆\n卖出垃圾债"
-            
-        d_risk := "违约潮/流动性危机"
+            d_risk := "环境收紧"
 
     else if mode == "5. 流动性"
         if region == "美国"
@@ -1034,7 +1124,14 @@ if barstate.islast and show_report
                 d_turn_val := "跌破 0 轴 (开始抽水)"
                 d_tactics_turn := "放水结束，逐步撤退\n转入防御"
                 
-            d_risk := "资产重估/去杠杆"
+            if s5 == -1.0 // 枯竭
+                d_risk := "止血企稳"
+            else if s5 == -0.5 // 紧缩
+                d_risk := "开始放水"
+            else if s5 == 0.0 // 存量
+                d_risk := "活水注入"
+            else // 扩张
+                d_risk := "开始抽水"
         else
             d_title := "流动性\n[M1-M2]", d_def := "M1增速减M2增速(剪刀差)。\n正: 活水注入; 负: 资金空转(定期化)。"
             d_obs := "12月 (同比)", d_logic := "🔴 严重空转: <-5%\n🟠 空转: <0\n🟢 活化: >0", d_conf := "连续2个月确认"
@@ -1043,7 +1140,7 @@ if barstate.islast and show_report
             d_cur_val := str.tostring(cn_gap, "0.00") + "% | " + fmt_ym(cn_time)
             d_turn_val := s5 > 0 ? "跌破 0 轴" : "突破 0 轴"
             d_cur_mean := s5 > 0 ? "存款搬家进股市" : "躺平吃利息"
-            d_risk := "流动性陷阱"
+            d_risk := s5 < 0 ? "活水注入" : "资金空转"
             d_tactics := (s5 < 0 ? (cn_gap < -5.0 ? "活期存款断崖下跌，现金流枯竭\n现金为王，回避一切风险资产" : "资金定期化，躺平存钱\n回避重资产，关注高股息") : (s5 > 0 ? "存款活期化，流向消费/投资\n挑真正受益于资金活化的板块" : "资金结构稳定，多看少做"))
             d_tactics_turn := "剪刀差收窄是第一步，转正即冲锋"
 
@@ -1087,7 +1184,19 @@ if barstate.islast and show_report
                 d_turn_val := "差值收窄 (利润变薄)"
                 d_tactics_turn := "暴利终结，切换防御资产\n落袋为安"
                 
-            d_risk := "加息杀估值/通缩"
+            if s6 == -1.0 and w6 > 1.0 // 过热
+                d_risk := "通胀降温"
+            else if s6 == -1.0 // 通缩
+                d_risk := "走出通缩"
+            else if s6 == -0.5 // 亏损
+                d_risk := "亏损收窄"
+            else if s6 == 0.0 // 震荡
+                d_risk := "利润释放"
+            else if s6 == 0.5 // 修复
+                d_risk := "利润变薄"
+            else // 躺赚
+                d_risk := "利润变薄"
+                
         else
             d_title := "利润空间\n[CPI-PPI]", d_def := "内需(CPI) - 产能(PPI)。\n中国是制造国，重点看PPI(全球需求)。"
             d_obs := "12月 (同比)", d_logic := "🔴 通缩: PPI<0\n🟢 复苏: PPI涨", d_conf := "连续2个月确认"
@@ -1096,7 +1205,7 @@ if barstate.islast and show_report
             d_cur_val := str.tostring(cn_profit_gap, "0.00") + "%"
             d_turn_val := s6 > 0 ? "重新倒挂" : "亏损收窄"
             d_cur_mean := s6 < 0 ? "亏本甩卖" : "供不应求"
-            d_risk := "产能过剩/价格战"
+            d_risk := s6 < 0 ? "走出通缩" : "利润收缩"
             d_tactics := (s6 < 0 ? (w6 > 1.0 ? "内需过热，物价飞涨。回避高估值，现金为王" : (cn_cpi_yoy<0 ? "全产业链通缩，需求疲软\n远离周期股，关注必选消费" : "出厂价低于成本价\n回避中游制造，关注上游资源")) : (s6 == 1.0 ? "上游降价，下游需求旺\n卖上游资源，买消费/中下游制造" : "最惨时刻已过，亏损减少\n博弈困境反转，左侧建仓"))
             d_tactics_turn := "关注PPI触底反弹，困境反转信号"
 
@@ -1138,7 +1247,18 @@ if barstate.islast and show_report
             d_cur_mean := "供销两旺，实体繁荣"
             d_tactics_turn := "繁荣顶点，清仓离场\n转入避险"
             
-        d_risk := "死猫跳/假突破"
+        if s7 == -1.0 // 崩盘
+            d_risk := "止血企稳"
+        else if s7 == -0.5 
+            if is_fake_recovery // 伪复苏
+                d_risk := "真复苏"
+            else // 衰退
+                d_risk := "企稳反弹"
+        else if s7 == 0.0 // 震荡
+            d_risk := "复苏开启"
+        else // 复苏
+            d_risk := "衰退开始"
+            
         d_tactics := (s7 < 0 ? (is_cg_crash ? "极度恐慌，抛售一切资产\n只有美元和美债最安全" : (is_fake_recovery ? "铜比金强但都在跌，衰退假象\n不要被比值上涨迷惑" : "实体疲软，避险主导\n买黄金/美债，规避强周期")) : (s7 > 0 ? "实体需求旺盛，风险偏好上升\n买周期股、工业大宗商品" : "方向不明，多看少做"))
 
     else if mode == "8. 萨姆规则"
@@ -1172,7 +1292,15 @@ if barstate.islast and show_report
             d_cur_mean := "就业充分，天下太平"
             d_tactics_turn := "衰退预警，清仓避险\n买入美债"
             
-        d_risk := "硬着陆"
+        if s8 == -1.0 and w8 > 1.0 // 熔断
+            d_risk := "警报解除"
+        else if s8 == -1.0 // 预警
+            d_risk := sahm_val < 0.3 ? "风险解除 (确认中)" : "风险解除"
+        else if s8 == -0.5 // ICSA
+            d_risk := "就业改善"
+        else // 健康
+            d_risk := sahm_val >= 0.3 ? "衰退预警 (确认中)" : "衰退预警"
+            
         d_tactics := (s8 < 0 ? (sahm_val >= 0.5 ? "历史准确率100%的衰退信号，必须离场\n买入美债 (TLT) 和黄金 (GLD) 避险" : "衰退概率激增，不再恋战\n清仓股票，转入防御性资产") : "就业市场健康，经济韧性强\n大胆持有风险资产")
 
     // Render Right Table
