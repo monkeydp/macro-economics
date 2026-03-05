@@ -770,25 +770,27 @@ if barstate.islast and show_report
     
     if is_meltdown
         final_res := "【熔断】 " + (s3==-1.0 and w3>1.0 ? "3.牛陡 " : "") + (s4==-1.0 and w4>1.0 ? "4.信用 " : "") + (s8==-1.0 and w8>1.0 ? "8.萨姆" : "")
-        final_sugg := "一键清仓"
+        final_sugg := "清仓，仅留黄金/美债底仓"
         final_bg := c_super_red
         final_txt := c_yellow
-    else if total_score < -6.0
-        final_res := "衰退确认", final_sugg := "撤回现金"
+    else if total_score < -5.0
+        final_res := "危机模式", final_sugg := "风险仓位 < 10%"
         final_bg := c_red
-    else if total_score < -2.0
-        final_res := "风险防守", final_sugg := "70% 避险 / 30% 绩优股"
+        final_txt := c_white
+    else if total_score < -1.5
+        final_res := "衰退预警", final_sugg := "风险仓位 10-30%"
         final_bg := c_orange
-    else if total_score < 2.0
-        final_res := "震荡博弈", final_sugg := "50% 现金 / 50% 红利"
+        final_txt := c_black
+    else if total_score < 1.5
+        final_res := "混沌震荡", final_sugg := "风险仓位 30-50%"
         final_bg := c_yellow
         final_txt := c_black
-    else if total_score <= 6.0
-        final_res := "趋势向好", final_sugg := "70% 进攻 / 30% 防守"
+    else if total_score <= 5.0
+        final_res := "温和增长", final_sugg := "风险仓位 50-80%"
         final_bg := c_lime
         final_txt := c_black
-    else // > 6.0
-        final_res := "全线复苏", final_sugg := "100% 满仓"
+    else // > 5.0
+        final_res := "全面复苏", final_sugg := "风险仓位 80-100%"
         final_bg := c_super_green
 
     table.cell(rpt, 0, 10, "最终诊断", bgcolor = c_bg, text_color = c_white), table.merge_cells(rpt, 0, 10, 1, 10)
