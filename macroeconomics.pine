@@ -631,39 +631,38 @@ else
 
 // 绘制主图曲线
 float plot_val = 0.0
+// 默认颜色根据当前模式的得分
+color dyn_c = c_white
+
 if mode == "1. 基准利率"
     plot_val := effr_live
+    // 修复：基准利率的颜色应该反映“救火”状态
+    // 如果是月线图，且发生了救火降息 (effr_drop_max_22d >= 0.5)，则强制红色
+    bool is_fire_cut_month = timeframe.ismonthly and effr_drop_max_22d >= 0.5
+    dyn_c := is_fire_cut_month ? c_red : get_score_col(s1)
 else if mode == "2. 真实利率"
     plot_val := tips_live
-else if mode == "3. 利差结构"
-    plot_val := yc_val
-else if mode == "4. 信用风险"
-    plot_val := oas_val
-else if mode == "5. 流动性"
-    plot_val := region == "美国" ? us_m2_yoy : cn_gap
-else if mode == "6. 利润空间"
-    plot_val := region == "美国" ? us_profit_gap : cn_profit_gap
-else if mode == "7. 实体热度"
-    plot_val := cg_ratio
-else if mode == "8. 萨姆规则"
-    plot_val := sahm_val
-
-color dyn_c = c_white
-if mode == "1. 基准利率"
-    dyn_c := get_score_col(s1)
-else if mode == "2. 真实利率"
     dyn_c := get_score_col(s2)
 else if mode == "3. 利差结构"
+    plot_val := yc_val
     dyn_c := get_score_col(s3)
 else if mode == "4. 信用风险"
+    plot_val := oas_val
     dyn_c := get_score_col(s4)
 else if mode == "5. 流动性"
+    plot_val := region == "美国" ? us_m2_yoy : cn_gap
     dyn_c := get_score_col(s5)
 else if mode == "6. 利润空间"
+    plot_val := region == "美国" ? us_profit_gap : cn_profit_gap
     dyn_c := get_score_col(s6)
 else if mode == "7. 实体热度"
-    dyn_c := get_score_col(s7)
+    plot_val := cg_ratio
+    // 修复：铜金比颜色应该反映“月内崩盘”状态
+    // 如果是月线图，且发生了崩盘 (was_crash_in_month)，则强制红色
+    bool is_cg_crash_month = timeframe.ismonthly and was_crash_in_month > 0
+    dyn_c := is_cg_crash_month ? c_red : get_score_col(s7)
 else if mode == "8. 萨姆规则"
+    plot_val := sahm_val
     dyn_c := get_score_col(s8)
 
 // --- 综合绘图 (Plotting) ---
