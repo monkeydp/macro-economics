@@ -68,7 +68,8 @@ effr_drop = effr_live[1] - effr_live
 // --- 2. 真实利率 (TIPS) ---
 // 确认时长: 连续 5 日
 [tips_live, tips_time] = request.security("FRED:DFII10", "D", [close, time], gaps = barmerge.gaps_off)
-rgdp_val  = request.security("FRED:A191RL1Q225SBEA", "D", close, gaps = barmerge.gaps_off)
+// 修改: 同时获取 RGDP 的时间戳，用于精准显示数据周期
+[rgdp_val, rgdp_time]  = request.security("FRED:A191RL1Q225SBEA", "D", [close, time], gaps = barmerge.gaps_off)
 
 // --- 3. 利差结构 (10Y-2Y) ---
 // 确认时长: 即时生效 (基于 20 日趋势)
@@ -203,7 +204,9 @@ else
     s1 := 0.0  // 常态震荡
 
 // 2. TIPS
-if tips_live >= rgdp_val
+if rgdp_val < 0
+    s2 := -1.0 // 滞胀/萧条 (负利率陷阱)
+else if tips_live >= rgdp_val
     s2 := -1.0 // 虹吸
 else if tips_live >= 0.5 * rgdp_val
     s2 := -0.5 // 杀估值
@@ -375,7 +378,10 @@ else
 
 string t2_s = "", string t2_a = ""
 if s2 == -1.0
-    t2_s := "虹吸", t2_a := "【避险】 卖出所有资产，买入美元/短债"
+    if rgdp_val < 0
+        t2_s := "滞胀/萧条 (负利率陷阱)", t2_a := "【避险】 卖出所有资产，买入美元/黄金"
+    else
+        t2_s := "虹吸", t2_a := "【避险】 卖出所有资产，买入美元/短债"
 else if s2 == -0.5
     t2_s := "杀估值", t2_a := "【防御】 卖出高估值/加密，买入核心/红利"
 else if s2 == 1.0
@@ -534,9 +540,84 @@ plot(mode == "1. 基准利率" ? plot_val : na, "EFFR", color = dyn_c, linewidth
 plot(mode == "1. 基准利率" ? effr_ema : na, "EFFR EMA", color = color.blue, linewidth = 1)
 
 // 2. 真实利率: TIPS + RGDP + 阈值
+// 优化：RGDP 极端值截断 (仅用于绘图，不影响逻辑)
+// 2020年Q2 GDP 暴跌至 -30%，Q3 暴涨至 +33%，会导致 Y 轴压缩
+// 将绘图用的 RGDP 限制在 -10% 到 +10% 之间，恢复常规波动的可见性
+float rgdp_plot = math.max(math.min(rgdp_val, 10.0), -10.0)
+
 plot(mode == "2. 真实利率" ? plot_val : na, "TIPS", color = dyn_c, linewidth = 2)
-plot(mode == "2. 真实利率" ? rgdp_val : na, "RGDP", color = color.gray, linewidth = 1)
-plot(mode == "2. 真实利率" ? 0.5 * rgdp_val : na, "0.5 RGDP", color = color.new(color.orange, 50), style = plot.style_circles)
+plot(mode == "2. 真实利率" ? rgdp_plot : na, "RGDP", color = color.gray, linewidth = 1, style = plot.style_stepline)
+plot(mode == "2. 真实利率" ? 0.5 * rgdp_plot : na, "0.5 RGDP", color = color.new(color.orange, 50), style = plot.style_circles)
+
+// 添加 RGDP 极端值标签 (显示真实值)
+// 优化：仅在"季度结束"时绘制上一个季度的标签，确保每个季度只有一个标签，彻底解决重叠问题
+// 检测季度变化: 当前季度 != 上一根K线的季度
+int cur_q = math.ceil(month(time) / 3.0)
+int prev_q_idx = math.ceil(month(time[1]) / 3.0)
+bool is_new_quarter = (cur_q != prev_q_idx) or (year(time) != year(time[1]))
+
+// 变量记录上一次绘制的标签数值，用于去重
+var float last_lbl_val = 0.0
+// 始终根据当前 K 线的数据时间更新日期字符串
+// 修正：增加 5 天偏移量，防止时区导致季度首日(10.1)漂移回上月(9.30)而被误判为Q3
+int t_rgdp = rgdp_time + 5 * 86400000
+int y_rgdp = year(t_rgdp)
+int m_rgdp = month(t_rgdp)
+int q_rgdp = math.ceil(m_rgdp / 3.0)
+string rgdp_date_str = " (" + str.tostring(y_rgdp) + " Q" + str.tostring(q_rgdp) + ")"
+
+// 优化：放弃复杂的历史回溯居中算法，改用"数据突变点 + 时间偏移"的物理定位法
+// 仅在 RGDP 数值发生突变 (新季度数据发布) 时绘制
+if mode == "2. 真实利率" and ta.change(rgdp_val) != 0
+    // 获取当前新的 RGDP 值
+    float cur_val = rgdp_val
+    
+    // 只有当当前值是极端值，且与上一次标注的值不同时才画
+    if (cur_val > 10.0 or cur_val < -10.0) and cur_val != last_lbl_val
+        // 计算居中时间：当前时间 + 45天 (季度的一半)
+        // 使用 xloc.bar_time 确保在任意周期图表上都在季度中间
+        int time_mid = time + 45 * 86400000
+        
+        // 重新计算当前的截断值 (用于定位标签Y轴)
+        float plot_y = math.max(math.min(cur_val, 10.0), -10.0)
+        
+        if cur_val > 10.0
+            // 上方截断: 标签在上，箭头向下指
+            label.new(time_mid, plot_y, "▲ " + str.tostring(cur_val, "0.0") + "%", xloc = xloc.bar_time, color = color.red, style = label.style_label_down, textcolor = color.white, size = size.tiny)
+        else
+            // 下方截断: 标签在下，箭头向上指
+            label.new(time_mid, plot_y, "▼ " + str.tostring(cur_val, "0.0") + "%", xloc = xloc.bar_time, color = color.red, style = label.style_label_up, textcolor = color.white, size = size.tiny)
+        
+        // 更新记录
+        last_lbl_val := cur_val
+
+// 处理当前最新的季度 (如果当前是极端值，且还没结束，暂时画在最后)
+if barstate.islast and mode == "2. 真实利率" and (rgdp_val > 10.0 or rgdp_val < -10.0)
+    // 防止重复：如果最后一根K线刚好也是季度第一天，上面的逻辑已经画过了，这里就不画
+    if not is_new_quarter
+        float plot_y_cur = math.max(math.min(rgdp_val, 10.0), -10.0)
+        if rgdp_val > 10.0
+            label.new(bar_index, plot_y_cur, "▲ " + str.tostring(rgdp_val, "0.0") + "%", color = color.red, style = label.style_label_down, textcolor = color.white, size = size.tiny)
+        else
+            label.new(bar_index, plot_y_cur, "▼ " + str.tostring(rgdp_val, "0.0") + "%", color = color.red, style = label.style_label_up, textcolor = color.white, size = size.tiny)
+
+// 添加 RGDP 标签
+if barstate.islast and mode == "2. 真实利率"
+    // RGDP 标签
+    label.new(bar_index, rgdp_plot, "真实美国GDP | RGDP" + rgdp_date_str, 
+              color = color.gray, 
+              style = label.style_label_lower_left, 
+              textcolor = color.white, 
+              size = size.small, 
+              textalign = text.align_left)
+    
+    // 0.5 RGDP 标签
+    label.new(bar_index, 0.5 * rgdp_plot, "0.5 RGDP", 
+              color = color.orange, 
+              style = label.style_label_upper_left, 
+              textcolor = color.white, 
+              size = size.small, 
+              textalign = text.align_left)
 
 // 3. 利差结构: 10Y-2Y
 plot(mode == "3. 利差结构" ? plot_val : na, "10Y-2Y", color = dyn_c, linewidth = 2)
@@ -692,8 +773,8 @@ if barstate.islast and show_report
     string d_title="", string d_def="", string d_obs="", string d_logic="", string d_conf="", string d_w="", string d_cur_stat="", string d_cur_val="", string d_turn_val="", string d_cur_mean="", string d_risk="", string d_tactics="", string d_tactics_turn=""
     
     if mode == "1. 基准利率"
-        d_title := "基准利率\n[EFFR]", d_def := "美联储基准利率，全球资金成本的总阀门。"
-        d_obs := "10月 (EMA)", d_logic := "🔴 救火: ≥50bp\n🟠 加息: >EMA\n🟡 震荡: ≈EMA\n🟢 降息: <EMA", d_conf := "公布日确认"
+        d_title := "基准利率\n[EFFR]", d_def := "美联储联邦基金有效利率\n全球资金成本的总阀门。"
+        d_obs := "10月 (EMA)", d_logic := "🔴 救火: ≥50bp\n🟠 加息: >EMA\n🟡 震荡: ≈EMA\n🟢 降息: <EMA", d_conf := "FOMC公布日确认"
         d_w := w1 > 1.0 ? "x2" : "x1"
         d_cur_stat := t1_s
         d_cur_val := str.tostring(effr_live, "0.00") + "% | " + fmt_ymd(effr_time)
@@ -701,116 +782,125 @@ if barstate.islast and show_report
         d_cur_mean := s1 > 0 ? "闸门开启，水位上涨" : (s1 < 0 ? "闸门关闭/泄洪" : "闸门半开")
         d_risk := s1 < 0 ? "流动性枯竭" : "通胀反弹"
         // 修复：使用 s1 == -1.0 来判断救火状态，而不是当天的 effr_drop
-        d_tactics := "【战术】\n" + (s1 < 0 ? (s1 == -1.0 ? "衰退确信信号，初期伴随暴跌\n此时降息预期极强，买长债对冲股票下跌" : "资金变贵，现金为王\n买短债吃高息，等跌，规避久期敏感资产") : (s1 > 0 ? "资金变便宜，利好利率敏感资产\n布局科技、加密和生物医药" : "政策方向不明朗，观察期，多看少动"))
-        d_tactics_turn := "拐点战术:\n关注EMA10\n >EMA10 即切换攻防"
+        d_tactics := (s1 < 0 ? (s1 == -1.0 ? "衰退确信信号，初期伴随暴跌\n此时降息预期极强，买长债对冲股票下跌" : "资金变贵，现金为王\n买短债吃高息，等跌，规避久期敏感资产") : (s1 > 0 ? "资金变便宜，利好利率敏感资产\n布局科技、加密和生物医药" : "政策方向不明朗，观察期，多看少动"))
+        d_tactics_turn := "关注EMA10\n >EMA10 即切换攻防"
 
     else if mode == "2. 真实利率"
-        d_title := "真实利率\n[TIPS]", d_def := "10年期通胀保值债券收益率。\n买它=把水卖回给水厂(锁定无风险收益)。"
-        d_obs := "日线 (实时)", d_logic := "🔴 虹吸: ≥RGDP\n🟠 杀估值: ≥0.5RGDP\n🟢 健康: <0.5RGDP\n🟢 负利率: <0", d_conf := "连续5日"
+        d_title := "真实利率\n[TIPS]", d_def := "10年期通胀保值债券收益率\nTIPS 上行 = 资金流出风险资产(买美债)\nTIPS 下行 = 资金流入风险资产(买股票)\nTIPS ≥ RGDP，会对风险资产产生‘虹吸效应’"
+        d_obs := "日线 (实时)", d_logic := "🔴 滞胀: RGDP<0\n🔴 虹吸: ≥RGDP\n🟠 杀估值: ≥0.5RGDP\n🟢 健康: <0.5RGDP\n🟢 负利率: <0", d_conf := "连续5日确认"
         d_w := w2 > 1.0 ? "x2" : "x1"
         d_cur_stat := t2_s
         d_cur_val := str.tostring(tips_live, "0.00") + "% | " + fmt_ymd(tips_time)
-        d_turn_val := s2 < 0 ? "跌破 " + str.tostring(0.5*rgdp_val, "0.00") : "突破 " + str.tostring(0.5*rgdp_val, "0.00")
-        d_cur_mean := s2 < 0 ? "养鱼不如卖水" : "水留鱼池"
-        d_risk := s2 < 0 ? "估值崩塌" : "泡沫化"
-        d_tactics := "【战术】\n" + (s2 < 0 ? (tips_live >= rgdp_val ? "无风险收益太高，虹吸一切资产\n只有美元现金最安全" : "估值承压，资金偏好确定性\n买低估值红利股或核心资产") : (tips_live < 0 ? "法币贬值，资产泡沫化\n实物资产和数字黄金是抗贬值首选" : "估值有支撑，安心持有成长股"))
-        d_tactics_turn := "拐点战术:\n紧盯 " + str.tostring(0.5*rgdp_val, "0.00") + "% 阈值，穿越即变盘"
+        
+        // 拐点逻辑修正
+        if s2 < 0 
+            // 滞胀或虹吸 -> 变好
+            d_turn_val := rgdp_val < 0 ? "RGDP 转正" : "跌破 0.5 RGDP"
+            d_risk := "估值支撑/压力缓解" 
+        else
+            // 健康或负利率 -> 变坏
+            d_turn_val := "突破 0.5 RGDP"
+            d_risk := "杀估值/虹吸风险"
+            
+        d_cur_mean := s2 < 0 ? (rgdp_val < 0 ? "鱼池干涸" : "养鱼不如卖水") : "水留鱼池"
+        d_tactics := (s2 < 0 ? (rgdp_val < 0 ? "经济硬着陆，现金为王\n卖出所有资产，买入美元/黄金" : (tips_live >= rgdp_val ? "无风险收益太高，虹吸一切资产\n只有美元现金最安全" : "估值承压，资金偏好确定性\n买低估值红利股或核心资产")) : (tips_live < 0 ? "法币贬值，资产泡沫化\n实物资产和数字黄金是抗贬值首选" : "估值有支撑，安心持有成长股"))
+        d_tactics_turn := "紧盯 " + str.tostring(0.5*rgdp_val, "0.00") + "% 阈值，穿越即变盘"
 
     else if mode == "3. 利差结构"
         d_title := "利差结构\n[10Y-2Y]", d_def := "长债减短债收益率。\n预测未来经济状况的最准指标(天气预报)。"
-        d_obs := "20日 (趋势)", d_logic := "🛑 牛陡: 熔断\n🟠 倒挂: <0\n🟡 平坦: ≈0\n🟢 熊陡: 复苏", d_conf := "熔断锁5日"
+        d_obs := "20日 (趋势)", d_logic := "🛑 牛陡: 熔断\n🟠 倒挂: <0\n🟡 平坦: ≈0\n🟢 熊陡: 复苏", d_conf := "即时生效(20日趋势)确认"
         d_w := w3 > 1.0 ? "x2" : "x1"
         d_cur_stat := t3_s
         d_cur_val := str.tostring(yc_val, "0.00")
         d_turn_val := s3 < 0 ? "重新转正(熊陡)" : "重新倒挂"
         d_cur_mean := s3 < 0 ? (w3>1.0 ? "大家都在赌救命降息" : "不看好长期发展") : (s3>0 ? "看好未来，不存死期" : "看不清")
         d_risk := "衰退交易惯性"
-        d_tactics := "【战术】\n" + (s3 < 0 ? (w3>1.0 ? "最危险时刻，立刻清空股票\n避险资金涌入，买美债(TLT)或黄金(GLD)" : "衰退倒计时，收缩战线\n买防御性资产(红利/必选消费)，避激进投资") : (s3 > 0 ? "经济复苏，通胀回升\n卖美债(TLT)，买周期股(XLE/XLI)和大宗商品" : "倒挂/走阔转换期，方向未定，多看少做"))
-        d_tactics_turn := "拐点战术:\n警惕‘牛陡’陷阱，确认‘熊陡’(双涨)再进攻"
+        d_tactics := (s3 < 0 ? (w3>1.0 ? "最危险时刻，立刻清空股票\n避险资金涌入，买美债(TLT)或黄金(GLD)" : "衰退倒计时，收缩战线\n买防御性资产(红利/必选消费)，避激进投资") : (s3 > 0 ? "经济复苏，通胀回升\n卖美债(TLT)，买周期股(XLE/XLI)和大宗商品" : "倒挂/走阔转换期，方向未定，多看少做"))
+        d_tactics_turn := "警惕‘牛陡’陷阱，确认‘熊陡’(双涨)再进攻"
 
     else if mode == "4. 信用风险"
         d_title := "信用风险\n[OAS]", d_def := "高收益债期权调整利差。\n银行借钱给烂公司的额外利息(风险保证金)。"
-        d_obs := "20日 (趋势)", d_logic := "🛑 危机: >10%或暴涨\n🔴 恶化: >6%\n🟠 走阔: 趋势上\n🟡 压力: 震荡\n🟢 收敛: <3.5%", d_conf := "熔断锁5日"
+        d_obs := "20日 (趋势)", d_logic := "🛑 危机: >10%或暴涨\n🔴 恶化: >6%\n🟠 走阔: 趋势上\n🟡 压力: 震荡\n🟢 收敛: <3.5%", d_conf := "连续3日确认【熔断即时】"
         d_w := w4 > 1.0 ? "x2" : "x1"
         d_cur_stat := t4_s
         d_cur_val := str.tostring(oas_val, "0.2") + "%"
         d_turn_val := s4 < 0 ? "回落至 6% 下" : "突破 3.5%"
         d_cur_mean := s4 < 0 ? "借不到钱，要破产" : "随便借钱，胆子大"
         d_risk := "违约潮/流动性危机"
-        d_tactics := "【战术】\n" + (s4 < 0 ? (w4>1.0 ? "信用市场冻结，融资断裂\n连黄金都可能被抛售，仅美元现金/短债安全" : "风险过高，下降也不碰\n抛售垃圾债和小盘股") : (s4 > 0 ? "风险偏好提升，资金泛滥\n买高弹性资产，如小盘股和垃圾债" : "虽有压力但未失控，或处于观望期"))
-        d_tactics_turn := "拐点战术:\n关注斜率变化，趋势形成难逆转"
+        d_tactics := (s4 < 0 ? (w4>1.0 ? "信用市场冻结，融资断裂\n连黄金都可能被抛售，仅美元现金/短债安全" : "风险过高，下降也不碰\n抛售垃圾债和小盘股") : (s4 > 0 ? "风险偏好提升，资金泛滥\n买高弹性资产，如小盘股和垃圾债" : "虽有压力但未失控，或处于观望期"))
+        d_tactics_turn := "关注斜率变化，趋势形成难逆转"
 
     else if mode == "5. 流动性"
         if region == "美国"
             d_title := "流动性\n[M2 YoY]", d_def := "广义货币供应量同比(剔除通胀)。\n美国印钱=全球水位上涨。"
-            d_obs := "12月 (同比)", d_logic := "🔴 枯竭: <-2%\n🟠 紧缩: <0\n🟡 存量: ≈0\n🟢 扩张: >0", d_conf := "公布日"
+            d_obs := "12月 (同比)", d_logic := "🔴 枯竭: <-2%\n🟠 紧缩: <0\n🟡 存量: ≈0\n🟢 扩张: >0", d_conf := "连续2个月确认"
             d_w := w5 > 1.0 ? "x2" : "x1"
             d_cur_stat := t5_s
             d_cur_val := str.tostring(us_m2_yoy, "0.00") + "% | " + fmt_ym(us_m2_time)
             d_turn_val := s5 > 0 ? "跌破 0 轴" : "突破 0 轴"
             d_cur_mean := s5 > 0 ? "水漫金山" : "旱灾/蒸发"
             d_risk := "资产重估/去杠杆"
-            d_tactics := "【战术】\n" + (s5 < 0 ? (us_m2_yoy < -2.0 ? "历史级货币收缩，资产重估\n极度危险，必须离场" : "实际货币供应收缩，资金枯竭\n空仓或持有现金") : (s5 > 0 ? "资金充裕，美国放水\n全球‘水漫金山’，闭眼买" : "存量博弈，多看少做"))
-            d_tactics_turn := "拐点战术:\n紧盯0轴，由负转正时右侧建仓"
+            d_tactics := (s5 < 0 ? (us_m2_yoy < -2.0 ? "历史级货币收缩，资产重估\n极度危险，必须离场" : "实际货币供应收缩，资金枯竭\n空仓或持有现金") : (s5 > 0 ? "资金充裕，美国放水\n全球‘水漫金山’，闭眼买" : "存量博弈，多看少做"))
+            d_tactics_turn := "紧盯0轴，由负转正时右侧建仓"
         else
             d_title := "流动性\n[M1-M2]", d_def := "M1增速减M2增速(剪刀差)。\n正: 活水注入; 负: 资金空转(定期化)。"
-            d_obs := "12月 (同比)", d_logic := "🔴 严重空转: <-5%\n🟠 空转: <0\n🟢 活化: >0", d_conf := "公布日"
+            d_obs := "12月 (同比)", d_logic := "🔴 严重空转: <-5%\n🟠 空转: <0\n🟢 活化: >0", d_conf := "连续2个月确认"
             d_w := w5 > 1.0 ? "x2" : "x1"
             d_cur_stat := t5_s
             d_cur_val := str.tostring(cn_gap, "0.00") + "% | " + fmt_ym(cn_time)
             d_turn_val := s5 > 0 ? "跌破 0 轴" : "突破 0 轴"
             d_cur_mean := s5 > 0 ? "存款搬家进股市" : "躺平吃利息"
             d_risk := "流动性陷阱"
-            d_tactics := "【战术】\n" + (s5 < 0 ? (cn_gap < -5.0 ? "活期存款断崖下跌，现金流枯竭\n现金为王，回避一切风险资产" : "资金定期化，躺平存钱\n回避重资产，关注高股息") : (s5 > 0 ? "存款活期化，流向消费/投资\n挑真正受益于资金活化的板块" : "资金结构稳定，多看少做"))
-            d_tactics_turn := "拐点战术:\n剪刀差收窄是第一步，转正即冲锋"
+            d_tactics := (s5 < 0 ? (cn_gap < -5.0 ? "活期存款断崖下跌，现金流枯竭\n现金为王，回避一切风险资产" : "资金定期化，躺平存钱\n回避重资产，关注高股息") : (s5 > 0 ? "存款活期化，流向消费/投资\n挑真正受益于资金活化的板块" : "资金结构稳定，多看少做"))
+            d_tactics_turn := "剪刀差收窄是第一步，转正即冲锋"
 
     else if mode == "6. 利润空间"
         if region == "美国"
             d_title := "利润空间\n[CPI-PPI]", d_def := "售价(CPI) - 成本(PPI)。\n差值走阔=企业赚钱容易。"
-            d_obs := "12月 (同比)", d_logic := "🔴 过热: CPI>3%\n🔴 通缩: 双负\n🟠 亏损: <0\n🟡 震荡: ≈0\n🟢 修复: 收窄\n🟢 躺赚: 走阔", d_conf := "公布日"
+            d_obs := "12月 (同比)", d_logic := "🔴 过热: CPI>3%\n🔴 通缩: 双负\n🟠 亏损: <0\n🟡 震荡: ≈0\n🟢 修复: 收窄\n🟢 躺赚: 走阔", d_conf := "连续2个月确认"
             d_w := w6 > 1.0 ? "x2" : "x1"
             d_cur_stat := t6_s
             d_cur_val := str.tostring(us_profit_gap, "0.00") + "% | " + fmt_ym(us_prof_time)
             d_turn_val := s6 == 1.0 ? "差值收窄" : "差值走阔"
             d_cur_mean := s6 == 1.0 ? "两头赚" : (s6 < 0 ? "卖一条亏一条" : "薄利多销")
             d_risk := "加息杀估值/通缩"
-            d_tactics := "【战术】\n" + (s6 < 0 ? (w6 > 1.0 ? "通胀失控，必须刹车\n回避高估值，现金为王，拥抱抗通胀资产" : (us_cpi_yoy<0 ? "成本降因经济崩，全线通缩\n现金为王" : "成本高于售价，卖多亏多\n规避中下游制造业")) : (s6 == 1.0 ? "售价涨幅 > 成本涨幅，利润暴增\n积极买入成长股" : "虽利润变薄，但还在赚钱\n不激进追高，但可安心拿住"))
-            d_tactics_turn := "拐点战术:\n利润走阔重仓成长，收窄切换绩优"
+            d_tactics := (s6 < 0 ? (w6 > 1.0 ? "通胀失控，必须刹车\n回避高估值，现金为王，拥抱抗通胀资产" : (us_cpi_yoy<0 ? "成本降因经济崩，全线通缩\n现金为王" : "成本高于售价，卖多亏多\n规避中下游制造业")) : (s6 == 1.0 ? "售价涨幅 > 成本涨幅，利润暴增\n积极买入成长股" : "虽利润变薄，但还在赚钱\n不激进追高，但可安心拿住"))
+            d_tactics_turn := "利润走阔重仓成长，收窄切换绩优"
         else
             d_title := "利润空间\n[CPI-PPI]", d_def := "内需(CPI) - 产能(PPI)。\n中国是制造国，重点看PPI(全球需求)。"
-            d_obs := "12月 (同比)", d_logic := "🔴 通缩: PPI<0\n🟢 复苏: PPI涨", d_conf := "公布日"
+            d_obs := "12月 (同比)", d_logic := "🔴 通缩: PPI<0\n🟢 复苏: PPI涨", d_conf := "连续2个月确认"
             d_w := w6 > 1.0 ? "x2" : "x1"
             d_cur_stat := t6_s
             d_cur_val := str.tostring(cn_profit_gap, "0.00") + "%"
             d_turn_val := s6 > 0 ? "重新倒挂" : "亏损收窄"
             d_cur_mean := s6 < 0 ? "亏本甩卖" : "供不应求"
             d_risk := "产能过剩/价格战"
-            d_tactics := "【战术】\n" + (s6 < 0 ? (w6 > 1.0 ? "内需过热，物价飞涨。回避高估值，现金为王" : (cn_cpi_yoy<0 ? "全产业链通缩，需求疲软\n远离周期股，关注必选消费" : "出厂价低于成本价\n回避中游制造，关注上游资源")) : (s6 == 1.0 ? "上游降价，下游需求旺\n卖上游资源，买消费/中下游制造" : "最惨时刻已过，亏损减少\n博弈困境反转，左侧建仓"))
-            d_tactics_turn := "拐点战术:\n关注PPI触底反弹，困境反转信号"
+            d_tactics := (s6 < 0 ? (w6 > 1.0 ? "内需过热，物价飞涨。回避高估值，现金为王" : (cn_cpi_yoy<0 ? "全产业链通缩，需求疲软\n远离周期股，关注必选消费" : "出厂价低于成本价\n回避中游制造，关注上游资源")) : (s6 == 1.0 ? "上游降价，下游需求旺\n卖上游资源，买消费/中下游制造" : "最惨时刻已过，亏损减少\n博弈困境反转，左侧建仓"))
+            d_tactics_turn := "关注PPI触底反弹，困境反转信号"
 
     else if mode == "7. 实体热度"
         d_title := "实体热度\n[铜金比]", d_def := "铜(工业) / 金(避险)。\n比值涨=复苏; 比值跌=衰退。"
-        d_obs := "20日 (趋势)", d_logic := "🔴 崩盘: 单日跌>3%\n🟠 衰退: 跌\n🟠 伪复苏: 铜跌\n🟡 震荡: 平\n🟢 复苏: 双涨", d_conf := "崩盘锁3日"
+        d_obs := "20日 (趋势)", d_logic := "🔴 崩盘: 单日跌>3%\n🟠 衰退: 跌\n🟠 伪复苏: 铜跌\n🟡 震荡: 平\n🟢 复苏: 双涨", d_conf := "连续5日确认"
         d_w := w7 > 1.0 ? "x2" : "x1"
         d_cur_stat := t7_s
         d_cur_val := str.tostring(cg_ratio, "0.00")
         d_turn_val := s7 > 0 ? "转跌" : "转涨(双涨)"
         d_cur_mean := s7 > 0 ? "修鱼池" : "藏金子"
         d_risk := "死猫跳/假突破"
-        d_tactics := "【战术】\n" + (s7 < 0 ? (is_cg_crash ? "极度恐慌，抛售一切资产\n只有美元和美债最安全" : (is_fake_recovery ? "铜比金强但都在跌，衰退假象\n不要被比值上涨迷惑" : "实体疲软，避险主导\n买黄金/美债，规避强周期")) : (s7 > 0 ? "实体需求旺盛，风险偏好上升\n买周期股、工业大宗商品" : "方向不明，多看少做"))
-        d_tactics_turn := "拐点战术:\n确认‘铜价’也在涨，才是真复苏"
+        d_tactics := (s7 < 0 ? (is_cg_crash ? "极度恐慌，抛售一切资产\n只有美元和美债最安全" : (is_fake_recovery ? "铜比金强但都在跌，衰退假象\n不要被比值上涨迷惑" : "实体疲软，避险主导\n买黄金/美债，规避强周期")) : (s7 > 0 ? "实体需求旺盛，风险偏好上升\n买周期股、工业大宗商品" : "方向不明，多看少做"))
+        d_tactics_turn := "确认‘铜价’也在涨，才是真复苏"
 
     else if mode == "8. 萨姆规则"
         d_title := "衰退预警\n[Sahm]", d_def := "失业率3月均值 - 12月低点。\n死神信号，100%准确率。"
-        d_obs := "12月 (低点)", d_logic := "🛑 衰退: ≥0.5%\n🔴 预警: ≥0.3%\n🟠 预警: ICSA>15%\n🟢 健康: <0.3%", d_conf := "公布日"
+        d_obs := "12月 (低点)", d_logic := "🛑 衰退: ≥0.5%\n🔴 预警: ≥0.3%\n🟠 预警: ICSA>15%\n🟢 健康: <0.3%", d_conf := "非农发布日确认"
         d_w := w8 > 1.0 ? "x2" : "x1"
         d_cur_stat := t8_s
         d_cur_val := str.tostring(sahm_val, "0.00") + "% | " + fmt_ym(sahm_time)
         d_turn_val := s8 < 0 ? "回落至 0.3% 下" : "突破 0.3% / 0.5%"
         d_cur_mean := s8 < 0 ? "失业潮来袭" : "就业充分"
         d_risk := "硬着陆"
-        d_tactics := "【战术】\n" + (s8 < 0 ? (sahm_val >= 0.5 ? "历史准确率100%的衰退信号，必须离场\n买入美债 (TLT) 和黄金 (GLD) 避险" : "衰退概率激增，不再恋战\n清仓股票，转入防御性资产") : "就业市场健康，经济韧性强\n大胆持有风险资产")
-        d_tactics_turn := "拐点战术:\n一旦突破0.5%，立即清仓，没有任何侥幸"
+        d_tactics := (s8 < 0 ? (sahm_val >= 0.5 ? "历史准确率100%的衰退信号，必须离场\n买入美债 (TLT) 和黄金 (GLD) 避险" : "衰退概率激增，不再恋战\n清仓股票，转入防御性资产") : "就业市场健康，经济韧性强\n大胆持有风险资产")
+        d_tactics_turn := "一旦突破0.5%，立即清仓，没有任何侥幸"
 
     // Render Right Table
     // Row 0
@@ -880,6 +970,6 @@ if barstate.islast and show_report
     // 修改：移除 "【战术】\n" 前缀，移除 size.small
     string clean_tactics = str.replace(d_tactics, "【战术】\n", "")
     table.cell(info, 1, 5, clean_tactics, bgcolor = c_bg, text_color = c_white, text_halign = text.align_left), table.merge_cells(info, 1, 5, 2, 5)
-    // 修改：移除 "拐点战术:\n" 前缀，移除 size.small
-    string clean_tactics_turn = str.replace(d_tactics_turn, "拐点战术:\n", "")
+    // 修改：移除 "" 前缀，移除 size.small
+    string clean_tactics_turn = str.replace(d_tactics_turn, "", "")
     table.cell(info, 3, 5, clean_tactics_turn, bgcolor = c_bg, text_color = c_white, text_halign = text.align_left)
