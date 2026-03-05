@@ -80,9 +80,9 @@ float sec_per_day = 86400
 // 修改：使用月线 EMA 以匹配长期趋势 (10月EMA)
 effr_ema  = request.security("FRED:EFFR", "M", ta.ema(close, effr_ema_len), gaps = barmerge.gaps_off)
 
-// 核心修正：如果当前是月线图，使用过去22天内的最大降幅
-bool is_monthly_tf_effr = sec_per_bar >= 2000000
-effr_drop = is_monthly_tf_effr ? effr_drop_max_22d : effr_chg
+// 核心修正：如果当前是月线或周线图，使用过去22天内的最大降幅
+bool is_high_tf_effr = timeframe.isweekly or timeframe.ismonthly
+effr_drop = is_high_tf_effr ? effr_drop_max_22d : effr_chg
 
 // --- 2. 真实利率 (TIPS) ---
 // 确认时长: 连续 5 日
@@ -102,10 +102,11 @@ y2_chg  = y2_chg_d
 // 牛陡判定 (日线逻辑): 长跌且短跌，且短跌 > 长跌 (且短跌跌幅显著 > 阈值)
 bool is_bull_steep_daily = y10_chg < 0 and y2_chg < -th_yc_bull_steep and y2_chg < y10_chg
 
-// 月线图适配：使用 request.security_lower_tf 捕捉月内牛陡
-// 仅在月线图启用，节省性能
-bool is_bull_steep_month = false
-if timeframe.ismonthly
+// 月线/周线图适配：使用 request.security_lower_tf 捕捉月内/周内牛陡
+// 仅在月线/周线图启用，节省性能
+bool is_bull_steep_htf = false
+bool is_high_tf_yc = timeframe.isweekly or timeframe.ismonthly
+if is_high_tf_yc
     float[] y10_diffs_m = request.security_lower_tf("FRED:GS10", "D", close - close[1])
     float[] y2_diffs_m  = request.security_lower_tf("FRED:GS2", "D", close - close[1])
     if array.size(y10_diffs_m) > 0 and array.size(y2_diffs_m) > 0
@@ -114,10 +115,10 @@ if timeframe.ismonthly
             float d10 = array.get(y10_diffs_m, i)
             float d2  = array.get(y2_diffs_m, i)
             if d10 < 0 and d2 < -th_yc_bull_steep and d2 < d10
-                is_bull_steep_month := true
+                is_bull_steep_htf := true
                 break
 
-is_bull_steep_trigger = timeframe.ismonthly ? is_bull_steep_month : is_bull_steep_daily
+is_bull_steep_trigger = is_high_tf_yc ? is_bull_steep_htf : is_bull_steep_daily
 
 // 锁定 10 日 (默认)
 // 修正：将天数转换为 Bar 数，防止在月线图上锁定 10 个月
@@ -137,10 +138,10 @@ is_bull_steep = bull_steep_cnt > 0
 [oas_val, oas_slope, oas_chg_5d_pct, oas_crash_flag] = request.security("FRED:BAMLH0A0HYM2", "D", [close, calc_slope_linreg(close, slope_len), (close / close[5] - 1) * 100, ta.highest((close > 10.0 or (close > 6.0 and (close / close[5] - 1) * 100 > 20.0)) ? 1.0 : 0.0, 22)], gaps = barmerge.gaps_off)
 
 // 熔断检测
-// 月线图: 只要月内有过熔断 (oas_crash_flag > 0) 即触发
+// 月线/周线图: 只要区间内有过熔断 (oas_crash_flag > 0) 即触发
 // 日线图: 实时检测
-bool is_monthly_tf_oas = timeframe.ismonthly
-is_oas_crash_trigger = is_monthly_tf_oas ? (oas_crash_flag > 0) : (oas_val > 10.0 or (oas_val > 6.0 and oas_chg_5d_pct > 20.0))
+bool is_high_tf_oas = timeframe.isweekly or timeframe.ismonthly
+is_oas_crash_trigger = is_high_tf_oas ? (oas_crash_flag > 0) : (oas_val > 10.0 or (oas_val > 6.0 and oas_chg_5d_pct > 20.0))
 
 // 锁定 10 日 (默认)
 // 修正：将天数转换为 Bar 数
@@ -181,10 +182,10 @@ cn_profit_gap = cn_cpi_yoy - cn_ppi_yoy
 [cg_ratio_d, cg_chg_pct_d, was_crash_in_month] = request.security("COMEX:HG1! / COMEX:GC1! * 1000", "D", [close, (close / close[1] - 1) * 100, ta.highest((close / close[1] - 1) * 100 < -3.0 ? 1.0 : 0.0, 22)], gaps = barmerge.gaps_off)
 
 // 崩盘检测: 单日跌幅 > 3% (强制使用日度数据)
-// 修复：如果当前是月线图 (sec_per_bar >= 2000000)，使用 was_crash_in_month 回溯检测
+// 修复：如果当前是月线/周线图，使用 was_crash_in_month 回溯检测
 // 如果是日线图，直接用 cg_chg_pct_d
-bool is_monthly_tf = sec_per_bar >= 2000000 // 粗略判断月线 (2592000)
-is_cg_crash_trigger = is_monthly_tf ? (was_crash_in_month > 0) : (cg_chg_pct_d < -3.0)
+bool is_high_tf_cg = timeframe.isweekly or timeframe.ismonthly
+is_cg_crash_trigger = is_high_tf_cg ? (was_crash_in_month > 0) : (cg_chg_pct_d < -3.0)
 
 // 锁定 5 日 (默认)
 // 修正：将天数转换为 Bar 数
@@ -662,9 +663,9 @@ color dyn_c = c_white
 if mode == "1. 基准利率"
     plot_val := effr_live
     // 修复：基准利率的颜色应该反映“救火”状态
-    // 如果是月线图，且发生了救火降息 (effr_drop_max_22d >= 0.5)，则强制红色
-    bool is_fire_cut_month = timeframe.ismonthly and effr_drop_max_22d >= 0.5
-    dyn_c := is_fire_cut_month ? c_red : get_score_col(s1)
+    // 如果是月线/周线图，且发生了救火降息 (effr_drop_max_22d >= 0.5)，则强制红色
+    bool is_fire_cut_htf = (timeframe.isweekly or timeframe.ismonthly) and effr_drop_max_22d >= 0.5
+    dyn_c := is_fire_cut_htf ? c_red : get_score_col(s1)
 else if mode == "2. 真实利率"
     plot_val := tips_live
     dyn_c := get_score_col(s2)
@@ -683,9 +684,9 @@ else if mode == "6. 利润空间"
 else if mode == "7. 实体热度"
     plot_val := cg_ratio
     // 修复：铜金比颜色应该反映“月内崩盘”状态
-    // 如果是月线图，且发生了崩盘 (was_crash_in_month)，则强制红色
-    bool is_cg_crash_month = timeframe.ismonthly and was_crash_in_month > 0
-    dyn_c := is_cg_crash_month ? c_red : get_score_col(s7)
+    // 如果是月线/周线图，且发生了崩盘 (was_crash_in_month)，则强制红色
+    bool is_cg_crash_htf = (timeframe.isweekly or timeframe.ismonthly) and was_crash_in_month > 0
+    dyn_c := is_cg_crash_htf ? c_red : get_score_col(s7)
 else if mode == "8. 萨姆规则"
     plot_val := sahm_val
     dyn_c := get_score_col(s8)
