@@ -583,10 +583,10 @@ if mode == "2. 真实利率" and ta.change(rgdp_val) != 0
         
         if cur_val > 10.0
             // 上方截断: 标签在上，箭头向下指
-            label.new(time_mid, plot_y, "▲ " + str.tostring(cur_val, "0.0") + "%", xloc = xloc.bar_time, color = color.red, style = label.style_label_down, textcolor = color.white, size = size.tiny)
+            label.new(time_mid, plot_y, "▲ " + str.tostring(cur_val, "0.0") + "%", xloc = xloc.bar_time, color = c_lime, style = label.style_label_down, textcolor = c_white, size = size.tiny)
         else
             // 下方截断: 标签在下，箭头向上指
-            label.new(time_mid, plot_y, "▼ " + str.tostring(cur_val, "0.0") + "%", xloc = xloc.bar_time, color = color.red, style = label.style_label_up, textcolor = color.white, size = size.tiny)
+            label.new(time_mid, plot_y, "▼ " + str.tostring(cur_val, "0.0") + "%", xloc = xloc.bar_time, color = c_red, style = label.style_label_up, textcolor = c_white, size = size.tiny)
         
         // 更新记录
         last_lbl_val := cur_val
@@ -597,9 +597,9 @@ if barstate.islast and mode == "2. 真实利率" and (rgdp_val > 10.0 or rgdp_va
     if not is_new_quarter
         float plot_y_cur = math.max(math.min(rgdp_val, 10.0), -10.0)
         if rgdp_val > 10.0
-            label.new(bar_index, plot_y_cur, "▲ " + str.tostring(rgdp_val, "0.0") + "%", color = color.red, style = label.style_label_down, textcolor = color.white, size = size.tiny)
+            label.new(bar_index, plot_y_cur, "▲ " + str.tostring(rgdp_val, "0.0") + "%", color = c_lime, style = label.style_label_down, textcolor = c_white, size = size.tiny)
         else
-            label.new(bar_index, plot_y_cur, "▼ " + str.tostring(rgdp_val, "0.0") + "%", color = color.red, style = label.style_label_up, textcolor = color.white, size = size.tiny)
+            label.new(bar_index, plot_y_cur, "▼ " + str.tostring(rgdp_val, "0.0") + "%", color = c_red, style = label.style_label_up, textcolor = c_white, size = size.tiny)
 
 // 添加 RGDP 标签
 if barstate.islast and mode == "2. 真实利率"
@@ -607,7 +607,7 @@ if barstate.islast and mode == "2. 真实利率"
     label.new(bar_index, rgdp_plot, "真实美国GDP | RGDP" + rgdp_date_str, 
               color = color.gray, 
               style = label.style_label_lower_left, 
-              textcolor = color.white, 
+              textcolor = c_white, 
               size = size.small, 
               textalign = text.align_left)
     
@@ -615,7 +615,7 @@ if barstate.islast and mode == "2. 真实利率"
     label.new(bar_index, 0.5 * rgdp_plot, "0.5 RGDP", 
               color = color.orange, 
               style = label.style_label_upper_left, 
-              textcolor = color.white, 
+              textcolor = c_white, 
               size = size.small, 
               textalign = text.align_left)
 
