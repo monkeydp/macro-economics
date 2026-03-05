@@ -96,11 +96,29 @@ effr_drop = is_monthly_tf_effr ? effr_drop_max_22d : effr_chg
 [y10, y10_chg_d] = request.security("FRED:GS10", "D", [close, close - close[1]], gaps = barmerge.gaps_off)
 [y2, y2_chg_d]   = request.security("FRED:GS2", "D", [close, close - close[1]], gaps = barmerge.gaps_off)
 yc_val = y10 - y2
-// 熔断检测: 双跌且短债跌幅 > 长债跌幅
 y10_chg = y10_chg_d
 y2_chg  = y2_chg_d
-// 牛陡判定: 长跌且短跌，且短跌 > 长跌 (且短跌跌幅显著 > 阈值)
-is_bull_steep_trigger = y10_chg < 0 and y2_chg < -th_yc_bull_steep and y2_chg < y10_chg
+
+// 牛陡判定 (日线逻辑): 长跌且短跌，且短跌 > 长跌 (且短跌跌幅显著 > 阈值)
+bool is_bull_steep_daily = y10_chg < 0 and y2_chg < -th_yc_bull_steep and y2_chg < y10_chg
+
+// 月线图适配：使用 request.security_lower_tf 捕捉月内牛陡
+// 仅在月线图启用，节省性能
+bool is_bull_steep_month = false
+if timeframe.ismonthly
+    float[] y10_diffs_m = request.security_lower_tf("FRED:GS10", "D", close - close[1])
+    float[] y2_diffs_m  = request.security_lower_tf("FRED:GS2", "D", close - close[1])
+    if array.size(y10_diffs_m) > 0 and array.size(y2_diffs_m) > 0
+        int len = math.min(array.size(y10_diffs_m), array.size(y2_diffs_m))
+        for i = 0 to len - 1
+            float d10 = array.get(y10_diffs_m, i)
+            float d2  = array.get(y2_diffs_m, i)
+            if d10 < 0 and d2 < -th_yc_bull_steep and d2 < d10
+                is_bull_steep_month := true
+                break
+
+is_bull_steep_trigger = timeframe.ismonthly ? is_bull_steep_month : is_bull_steep_daily
+
 // 锁定 10 日 (默认)
 // 修正：将天数转换为 Bar 数，防止在月线图上锁定 10 个月
 int bars_lock_bull = math.max(1, math.ceil(lock_bull_steep * sec_per_day / sec_per_bar))
@@ -114,9 +132,16 @@ is_bull_steep = bull_steep_cnt > 0
 // --- 4. 信用风险 (OAS) ---
 // 确认时长: 连续 3 日; 熔断即时
 // 修复：强制在 Daily 级别计算 5日涨幅，防止月线图误判
-[oas_val, oas_slope, oas_chg_5d_pct] = request.security("FRED:BAMLH0A0HYM2", "D", [close, calc_slope_linreg(close, slope_len), (close / close[5] - 1) * 100], gaps = barmerge.gaps_off)
-// 熔断检测: >10% 或 (>6% 且 5日涨幅 > 20%)
-is_oas_crash_trigger = oas_val > 10.0 or (oas_val > 6.0 and oas_chg_5d_pct > 20.0)
+// 增加 oas_crash_flag: 在日线级别计算是否触发熔断 (OAS > 10% 或 (OAS > 6.0% 且 5日涨幅 > 20%))
+// 然后取过去 22 天的最高值，只要有一天触发，月线图就显示熔断
+[oas_val, oas_slope, oas_chg_5d_pct, oas_crash_flag] = request.security("FRED:BAMLH0A0HYM2", "D", [close, calc_slope_linreg(close, slope_len), (close / close[5] - 1) * 100, ta.highest((close > 10.0 or (close > 6.0 and (close / close[5] - 1) * 100 > 20.0)) ? 1.0 : 0.0, 22)], gaps = barmerge.gaps_off)
+
+// 熔断检测
+// 月线图: 只要月内有过熔断 (oas_crash_flag > 0) 即触发
+// 日线图: 实时检测
+bool is_monthly_tf_oas = timeframe.ismonthly
+is_oas_crash_trigger = is_monthly_tf_oas ? (oas_crash_flag > 0) : (oas_val > 10.0 or (oas_val > 6.0 and oas_chg_5d_pct > 20.0))
+
 // 锁定 10 日 (默认)
 // 修正：将天数转换为 Bar 数
 int bars_lock_credit = math.max(1, math.ceil(lock_credit_crash * sec_per_day / sec_per_bar))
