@@ -14,18 +14,18 @@ region = input.string("美国", "监控地区", options=["美国", "中国"], gr
 // 参数设置
 effr_ema_len = input.int(10, "基准利率 EMA 周期", minval=1, group="周期参数设置", tooltip="仅影响: 1.基准利率")
 yoy_len = input.int(12, "增速同比周期", minval=1, group="周期参数设置", tooltip="仅影响: 5.流动性 / 6.利润空间")
-slope_len = input.int(20, "斜率观测周期", minval=1, group="周期参数设置", tooltip="仅影响: 3.利差结构 / 4.信用风险 / 7.实体热度")
+slope_len = input.int(60, "斜率观测周期", minval=1, group="周期参数设置", tooltip="仅影响: 3.利差结构 / 4.信用风险 / 7.实体热度")
 
 // 震荡过滤阈值
 grp_noise = "震荡过滤阈值"
 th_effr_noise   = input.float(0.05, "基准利率震荡", minval=0.0, group=grp_noise)
 th_yc_noise     = input.float(0.15, "利差结构震荡",   minval=0.0, group=grp_noise)
-th_yc_bull_steep= input.float(0.10, "利差牛陡容差",   minval=0.0, group=grp_noise)
-th_yc_bear_steep= input.float(0.10, "利差熊陡容差",   minval=0.0, group=grp_noise)
+th_yc_bull_steep= input.float(0.15, "利差牛陡容差",   minval=0.0, group=grp_noise)
+th_yc_bear_steep= input.float(0.15, "利差熊陡容差",   minval=0.0, group=grp_noise)
 th_oas_noise    = input.float(0.01, "信用风险斜率",  minval=0.0, group=grp_noise)
-th_liq_us_noise = input.float(0.20, "美国流动性",     minval=0.0, group=grp_noise)
+th_liq_us_noise = input.float(0.50, "美国流动性",     minval=0.0, group=grp_noise)
 th_liq_cn_noise = input.float(0.50, "中国流动性",  minval=0.0, group=grp_noise)
-th_prof_noise   = input.float(0.10, "利润空间",   minval=0.0, group=grp_noise)
+th_prof_noise   = input.float(0.20, "利润空间",   minval=0.0, group=grp_noise)
 th_cg_noise     = input.float(0.05, "铜金比斜率",     minval=0.0, group=grp_noise)
 
 // 颜色定义
