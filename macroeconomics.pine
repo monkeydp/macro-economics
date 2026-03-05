@@ -28,6 +28,17 @@ th_liq_cn_noise = input.float(0.50, "中国流动性",  minval=0.0, group=grp_no
 th_prof_noise   = input.float(0.20, "利润空间",   minval=0.0, group=grp_noise)
 th_cg_noise     = input.float(0.05, "铜金比斜率",     minval=0.0, group=grp_noise)
 
+// 信号锁定周期 (Lock-in)
+grp_lock = "信号锁定与确认周期 (Timeframe)"
+lock_bull_steep   = input.int(10, "牛陡熔断锁定 (日)", minval=1, group=grp_lock, tooltip="交易日。10日 ≈ 2周")
+dur_yc_bear_conf  = input.int(5,  "熊陡确认 (日)",     minval=1, group=grp_lock, tooltip="交易日。5日 ≈ 1周")
+lock_credit_crash = input.int(10, "信用熔断锁定 (日)", minval=1, group=grp_lock, tooltip="交易日。10日 ≈ 2周")
+lock_cg_crash     = input.int(5,  "铜金崩盘锁定 (日)", minval=1, group=grp_lock, tooltip="交易日。5日 ≈ 1周")
+dur_tips_conf     = input.int(5,  "真实利率确认 (日)", minval=1, group=grp_lock)
+dur_liq_conf      = input.int(2,  "流动性确认 (月)",   minval=1, group=grp_lock)
+dur_prof_conf     = input.int(2,  "利润空间确认 (月)", minval=1, group=grp_lock)
+dur_sahm_panic    = input.int(90, "救火降息有效期 (日)", minval=1, group=grp_lock, tooltip="自然日。90日 ≈ 1季度")
+
 // 颜色定义
 c_red          = color.red      // 🔴 红色 (得分 -1.0)
 c_orange       = color.orange   // 🟠 橙色 (得分 -0.5)
@@ -83,10 +94,10 @@ y10_chg = y10 - y10_prev
 y2_chg  = y2 - y2_prev
 // 牛陡判定: 长跌且短跌，且短跌 > 长跌 (且短跌跌幅显著 > 阈值)
 is_bull_steep_trigger = y10_chg < 0 and y2_chg < -th_yc_bull_steep and y2_chg < y10_chg
-// 锁定 5 日
+// 锁定 10 日 (默认)
 var int bull_steep_cnt = 0
 if is_bull_steep_trigger
-    bull_steep_cnt := 5
+    bull_steep_cnt := lock_bull_steep
 else if bull_steep_cnt > 0
     bull_steep_cnt := bull_steep_cnt - 1
 is_bull_steep = bull_steep_cnt > 0
@@ -96,10 +107,10 @@ is_bull_steep = bull_steep_cnt > 0
 [oas_val, oas_slope, oas_chg_5d_pct] = request.security("FRED:BAMLH0A0HYM2", "D", [close, calc_slope_linreg(close, slope_len), (close / close[5] - 1) * 100], gaps = barmerge.gaps_off)
 // 熔断检测: >10% 或 (>6% 且 5日涨幅 > 20%)
 is_oas_crash_trigger = oas_val > 10.0 or (oas_val > 6.0 and oas_chg_5d_pct > 20.0)
-// 锁定 5 日
+// 锁定 10 日 (默认)
 var int oas_crash_cnt = 0
 if is_oas_crash_trigger
-    oas_crash_cnt := 5
+    oas_crash_cnt := lock_credit_crash
 else if oas_crash_cnt > 0
     oas_crash_cnt := oas_crash_cnt - 1
 is_oas_crash = oas_crash_cnt > 0
@@ -130,10 +141,10 @@ cg_ratio = (copper / gold) * 1000
 cg_ratio_prev = (copper_prev / gold_prev) * 1000
 // 崩盘检测: 单日跌幅 > 3%
 is_cg_crash_trigger = (cg_ratio / cg_ratio_prev - 1) * 100 < -3.0
-// 锁定 3 日
+// 锁定 5 日 (默认)
 var int cg_crash_cnt = 0
 if is_cg_crash_trigger
-    cg_crash_cnt := 3
+    cg_crash_cnt := lock_cg_crash
 else if cg_crash_cnt > 0
     cg_crash_cnt := cg_crash_cnt - 1
 is_cg_crash = cg_crash_cnt > 0
@@ -195,7 +206,7 @@ if not na(bars_since_panic)
     // 获取上次触发时的时间
     // 注意：ta.valuewhen(condition, source, occurrence)
     int time_of_panic = ta.valuewhen(is_panic_drop, time, 0)
-    if time - time_of_panic < 90 * 86400000 // 90天有效期 (一个季度)
+    if time - time_of_panic < dur_sahm_panic * 86400000 // 90天有效期 (一个季度)
         in_panic_window := true
 
 // 评分逻辑
@@ -209,13 +220,20 @@ else
     s1 := 0.0  // 常态震荡
 
 // 2. TIPS
-if rgdp_val < 0
-    s2 := -1.0 // 滞胀/萧条 (负利率陷阱)
-else if tips_live >= rgdp_val
+// 确认时长: 连续 dur_tips_conf 日
+// 注意：Pine Script 中无法直接回溯变量满足条件的次数，需手动计算
+// 这里使用 ta.barssince() 变体或 sum() 变体
+// 简化逻辑：所有 TIPS 判定需满足连续 N 天
+// 辅助函数：连续满足
+is_sustained(cond, len) => math.sum(cond ? 1 : 0, len) == len
+
+if is_sustained(rgdp_val < 0, dur_tips_conf)
+    s2 := -1.0 // 滞胀/萧条
+else if is_sustained(tips_live >= rgdp_val, dur_tips_conf)
     s2 := -1.0 // 虹吸
-else if tips_live >= 0.5 * rgdp_val
+else if is_sustained(tips_live >= 0.5 * rgdp_val, dur_tips_conf)
     s2 := -0.5 // 杀估值
-else if tips_live < 0
+else if is_sustained(tips_live < 0, dur_tips_conf)
     s2 := 1.0  // 负利率
 else
     s2 := 1.0  // 健康支撑
@@ -230,7 +248,9 @@ else if math.abs(yc_val) <= th_yc_noise
     s3 := 0.0  // 平坦
 else
     // 熊陡: 双涨且长债涨幅 > 短债涨幅 (且长债涨幅显著 > 阈值)
-    bool is_bear_steep = y10_chg > th_yc_bear_steep and y2_chg > 0 and y10_chg > y2_chg
+    // 增加确认期: 连续 N 日满足条件
+    bool is_bear_steep_raw = y10_chg > th_yc_bear_steep and y2_chg > 0 and y10_chg > y2_chg
+    bool is_bear_steep = is_sustained(is_bear_steep_raw, dur_yc_bear_conf)
     s3 := is_bear_steep ? 1.0 : 0.5 // 熊陡+1.0, 普通陡峭+0.5
 
 // 4. OAS
@@ -254,14 +274,29 @@ else // < 3.5
 
 // 5. Liquidity
 if region == "美国"
-    // 枯竭: <-2.0% (连续2月)
-    if us_m2_yoy < -2.0 and us_m2_yoy[1] < -2.0
+    // 枯竭: <-2.0% (连续 N 月)
+    // us_m2_yoy 是月线数据，[1] 代表上个月
+    // 通用化：连续 dur_liq_conf 个月
+    // 注意：月线数据的 [1] 就是上个月，无需 sum
+    bool is_liq_crash = true
+    for i = 0 to dur_liq_conf - 1
+        if us_m2_yoy[i] >= -2.0
+            is_liq_crash := false
+            break
+            
+    bool is_liq_expand = true
+    for i = 0 to dur_liq_conf - 1
+        if us_m2_yoy[i] <= th_liq_us_noise
+            is_liq_expand := false
+            break
+
+    if is_liq_crash
         s5 := -1.0 // 枯竭
     // 紧缩: <阈值 (即时)
     else if us_m2_yoy < -th_liq_us_noise
         s5 := -0.5 // 紧缩
-    // 扩张: >阈值 (连续2月)
-    else if us_m2_yoy > th_liq_us_noise and us_m2_yoy[1] > th_liq_us_noise
+    // 扩张: >阈值 (连续 N 月)
+    else if is_liq_expand
         s5 := 1.0  // 扩张
     else
         s5 := 0.0  // 存量博弈
@@ -277,12 +312,25 @@ else // CN
 
 // 6. Profit
 if region == "美国"
-    // 过热: >3% (连续2月)
-    if us_cpi_yoy > 3.0 and us_cpi_yoy[1] > 3.0
+    // 通用化：连续 dur_prof_conf 个月
+    bool is_prof_heat = true
+    for i = 0 to dur_prof_conf - 1
+        if us_cpi_yoy[i] <= 3.0
+            is_prof_heat := false
+            break
+            
+    bool is_prof_deflation = true
+    for i = 0 to dur_prof_conf - 1
+        if us_cpi_yoy[i] >= 0 or us_ppi_yoy[i] >= 0
+            is_prof_deflation := false
+            break
+
+    // 过热: >3% (连续 N 月)
+    if is_prof_heat
         s6 := -1.0 // 通胀过热 (配合权重x2)
         w6 := 2.0
-    // 通缩幻觉: 双负 (连续2月)
-    else if us_cpi_yoy < 0 and us_ppi_yoy < 0 and us_cpi_yoy[1] < 0
+    // 通缩幻觉: 双负 (连续 N 月)
+    else if is_prof_deflation
         s6 := -1.0 // 通缩幻觉
     else if us_profit_gap < -th_prof_noise
         s6 := -0.5 // 亏损
@@ -375,18 +423,41 @@ a_hyg      = "垃圾债/股票"
 a_core     = "核心/红利"
 a_cycle    = "周期/大宗"
 
-// 状态描述与建议 (Strictly from README)
+
+
+// --- 颜色辅助函数 ---
+get_score_col(s) =>
+    if s == -1.0
+        c_red
+    else if s == -0.5
+        c_orange
+    else if s == 0.0
+        c_yellow
+    else
+        c_lime // +0.5 or +1.0
+
+// --- 全局文案生成 (Global Text Generation) ---
+// 将文案逻辑从绘图逻辑中剥离，确保左表(Report)始终正确显示
 string t1_s = "", string t1_a = ""
+string t2_s = "", string t2_a = ""
+string t3_s = "", string t3_a = ""
+string t4_s = "", string t4_a = ""
+string t5_s = "", string t5_a = ""
+string t6_s = "", string t6_a = ""
+string t7_s = "", string t7_a = ""
+string t8_s = "", string t8_a = ""
+
+// 1. 基准利率
 if s1 == -1.0
     t1_s := "救火降息 (衰退)", t1_a := "【避险】 卖出科技/顺周期，买入黄金/长债"
 else if s1 == -0.5
     t1_s := "加息周期 (抽水)", t1_a := "【防御】 卖出长债/成长，买入短债/美元"
-else if s1 == 1.0
-    t1_s := "降息周期 (放水)", t1_a := "【进攻】 卖出美元/短债，买入科技/长债"
+else if s1 == 0.0
+    t1_s := "常态震荡", t1_a := "【观察】 多看少做"
 else
-    t1_s := "常态震荡", t1_a := "【观察】 多看少动"
+    t1_s := "降息周期 (放水)", t1_a := "【进攻】 卖出美元/短债，买入科技/长债"
 
-string t2_s = "", string t2_a = ""
+// 2. 真实利率
 if s2 == -1.0
     if rgdp_val < 0
         t2_s := "滞胀/萧条 (负利率陷阱)", t2_a := "【避险】 卖出所有资产，买入美元/黄金"
@@ -400,112 +471,98 @@ else if s2 == 1.0
     else
         t2_s := "健康支撑", t2_a := "【进攻】 卖出美元，买入科技/成长"
 
-string t3_s = "", string t3_a = ""
-if s3 == -1.0 and w3 > 1.0
+// 3. 利差结构
+if s3 == -1.0
     t3_s := "牛陡 (熔断)", t3_a := "【清仓】 卖出风险资产/大宗，买入美债/黄金"
 else if s3 == -0.5
     t3_s := "倒挂 (警报)", t3_a := "【防御】 卖出成长股，买入现金/红利"
-else if s3 == 1.0
-    t3_s := "熊陡 (复苏)", t3_a := "【进攻】 卖出美债，买入周期/大宗"
-else
+else if s3 == 0.0
     t3_s := "平坦 (震荡)", t3_a := "【观察】 多看少做"
+else if s3 == 0.5
+    t3_s := "陡峭 (常态)", t3_a := "【进攻】 卖出防御资产，买入风险资产"
+else
+    t3_s := "熊陡 (复苏)", t3_a := "【进攻】 卖出美债，买入周期股/大宗"
 
-string t4_s = "", string t4_a = ""
+// 4. 信用风险
 if s4 == -1.0 and w4 > 1.0
     t4_s := "危机 (熔断)", t4_a := "【清仓】 卖出垃圾债/股票，买入美元/短债"
 else if s4 == -1.0
     t4_s := "严重恶化 (信用枯竭)", t4_a := "【避险】 卖出垃圾债/小盘，买入美元/短债"
 else if s4 == -0.5
-    t4_s := "风险走阔 (信用收缩)", t4_a := "【防御】 卖出垃圾债/小盘，买入核心/红利"
-else if s4 == 1.0
-    t4_s := "风险收敛 (信用扩张)", t4_a := "【进攻】 卖出美元，买入垃圾债/小盘"
-else
+    t4_s := "风险走阔 (信用收缩)", t4_a := "【防御】 卖出垃圾债/小盘，买入美债"
+else if s4 == 0.0
     if oas_val < 3.5
         t4_s := "底部回升 (关注)", t4_a := "【观察】 环境依然宽松，保持关注"
     else
         t4_s := "局部压力 (信用摇摆)", t4_a := "【观察】 多看少做"
+else
+    t4_s := "风险收敛 (信用扩张)", t4_a := "【进攻】 卖出美元，买入垃圾债/小盘"
 
-string t5_s = "", string t5_a = ""
+// 5. 流动性
 if region == "美国"
     if s5 == -1.0
-        t5_s := "枯竭 (休克)", t5_a := "【避险】 卖出所有资产，买入美元现金"
+        t5_s := "枯竭 (休克)", t5_a := "【避险】 卖出所有资产，买入美元"
     else if s5 == -0.5
         t5_s := "紧缩 (水位下降)", t5_a := "【防御】 卖出风险资产，买入现金"
-    else if s5 == 1.0
+    else if s5 == 0.0
+        t5_s := "存量博弈 (水位不定)", t5_a := "【观察】 结构性行情，精选个股"
+    else
         t5_s := "扩张 (水位上涨)", t5_a := "【进攻】 卖出美元，买入科技/成长"
-    else
-        t5_s := "存量博弈 (水位不定)", t5_a := "【观察】 多看少做"
 else
-    if cn_gap < -5.0
-        t5_s := "严重空转 (活水稀缺)", t5_a := "【避险】 卖出所有资产，买入现金"
-    else if s5 == -0.5
-        t5_s := "资金空转 (活水变少)", t5_a := "【防御】 卖出重资产，买入高股息"
-    else if s5 == 1.0
-        t5_s := "活化 (活水变多)", t5_a := "【进攻】 卖出防御资产，买入科技/成长"
+    if s5 < 0
+        if cn_gap < -5.0
+            t5_s := "严重空转 (流动性陷阱)", t5_a := "【避险】 卖出所有资产，买入现金"
+        else
+            t5_s := "空转 (定期化)", t5_a := "【防御】 卖出重资产，买入高股息"
     else
-        t5_s := "结构震荡", t5_a := "【观察】 多看少做"
+        t5_s := "活化 (活水注入)", t5_a := "【进攻】 卖出防御资产，买入科技/成长"
 
-string t6_s = "", string t6_a = ""
+// 6. 利润空间
 if region == "美国"
     if s6 == -1.0 and w6 > 1.0
-        t6_s := "通胀过热", t6_a := "【避险】 卖出成长股，买入现金/能源"
+        t6_s := "通胀过热", t6_a := "【避险】 卖出成长股，买入能源/黄金"
     else if s6 == -1.0
         t6_s := "通缩幻觉 (双负)", t6_a := "【避险】 卖出所有资产，买入美元现金"
     else if s6 == -0.5
-        t6_s := "亏损 (成本倒挂)", t6_a := "【防御】 卖出中下游制造，买入防御资产"
-    else if s6 == 0.5
-        t6_s := "修复 (利润变薄)", t6_a := "【进攻】 卖出投机股，买入绩优股"
-    else if s6 == 1.0
-        t6_s := "躺赚 (利润变厚)", t6_a := "【进攻】 卖出低效资产，买入成长股"
-    else
+        t6_s := "亏损 (成本倒挂)", t6_a := "【防御】 卖出中下游制造，买入防御/红利"
+    else if s6 == 0.0
         t6_s := "震荡", t6_a := "【观察】 多看少做"
+    else if s6 == 0.5
+        t6_s := "修复 (利润变薄)", t6_a := "【进攻】 卖出高估值，买入绩优股/核心"
+    else
+        t6_s := "躺赚 (利润变厚)", t6_a := "【进攻】 卖出低效资产，买入科技/成长"
 else
-    if s6 == -1.0 and w6 > 1.0
-        t6_s := "通胀过热", t6_a := "【避险】 卖出成长股，买入现金/能源"
-    else if s6 == -1.0
-        t6_s := "深度通缩 (双负)", t6_a := "【避险】 卖出周期股，买入必选消费"
+    if s6 == -1.0
+        t6_s := "通缩 (双负)", t6_a := "【避险】 卖出周期股，买入必选消费"
     else if s6 == -0.5
-        t6_s := "亏损 (成本倒挂)", t6_a := "【防御】 卖出中游制造，买入上游资源"
+        t6_s := "亏损 (倒挂)", t6_a := "【防御】 卖出中游制造，买入上游资源"
     else if s6 == 0.0
         t6_s := "内卷 (利润压缩)", t6_a := "【观察】 回避同质化竞争，只看龙头"
-    else if s6 == 0.5
-        t6_s := "修复 (困境反转)", t6_a := "【进攻】 卖出防御股，买入反转股"
-    else if s6 == 1.0
-        t6_s := "躺赚 (利润释放)", t6_a := "【进攻】 卖出上游资源，买入消费/中下游"
+    else
+        t6_s := "修复 (改善)", t6_a := "【进攻】 卖出防御股，买入反转股"
 
-string t7_s = "", string t7_a = ""
+// 7. 实体热度
 if s7 == -1.0
     t7_s := "崩盘 (信心崩溃)", t7_a := "【避险】 卖出所有资产，买入美元/美债"
 else if s7 == -0.5
     if is_fake_recovery
-        t7_s := "伪复苏", t7_a := "【防御】 卖出铜/工业品，买入黄金/美债"
+        t7_s := "伪复苏", t7_a := "【防御】 卖出工业品/铜，买入黄金/美债"
     else
         t7_s := "衰退 (弃修鱼池)", t7_a := "【防御】 卖出强周期板块，买入黄金/美债"
-else if s7 == 1.0
-    t7_s := "复苏 (扩建鱼池)", t7_a := "【进攻】 卖出避险资产，买入周期/大宗"
-else
+else if s7 == 0.0
     t7_s := "震荡", t7_a := "【观察】 多看少做"
+else
+    t7_s := "复苏 (扩建鱼池)", t7_a := "【进攻】 卖出避险资产，买入周期股/工业品"
 
-string t8_s = "", string t8_a = ""
+// 8. 萨姆规则
 if s8 == -1.0 and w8 > 1.0
     t8_s := "衰退熔断", t8_a := "【清仓】 卖出风险资产，买入美债/黄金"
 else if s8 == -1.0
-    t8_s := "衰退预警", t8_a := "【避险】 卖出风险资产，买入美债/黄金"
+    t8_s := "衰退预警", t8_a := "【避险】 卖出风险资产，买入美债"
 else if s8 == -0.5
     t8_s := "ICSA 提前预警", t8_a := "【防御】 卖出风险资产，买入现金/红利"
 else
     t8_s := "就业健康", t8_a := "【进攻】 卖出避险资产，买入科技/消费"
-
-// --- 颜色辅助函数 ---
-get_score_col(s) =>
-    if s == -1.0
-        c_red
-    else if s == -0.5
-        c_orange
-    else if s == 0.0
-        c_yellow
-    else
-        c_lime // +0.5 or +1.0
 
 // 绘制主图曲线
 float plot_val = 0.0
@@ -677,7 +734,7 @@ var table rpt = table.new(position.middle_left, 7, 11, bgcolor = c_bg, border_wi
 var table info = table.new(position.middle_right, 4, 6, bgcolor = c_bg, border_width = 1, border_color = color.gray)
 
 // Helper to fill row
-fill_row(r, name, val_str, s, w, meta, status, action) =>
+fill_row(r, name, val_str, s, w, meta, status, action, is_melt) =>
     c_s = get_score_col(s)
     w_str = w > 1.0 ? "x2" : ""
     // 修正分数显示格式：移除多余符号，确保正数带+，负数带-，0不带
@@ -685,7 +742,7 @@ fill_row(r, name, val_str, s, w, meta, status, action) =>
     string s_str = final_s > 0 ? "+" + str.tostring(final_s, "#.#") : (final_s == 0 ? "0" : str.tostring(final_s, "#.#"))
     
     // 熔断检测: 仅针对 "数值" 和 "现状含义" 修改背景色 (深红 + 黄字)
-    bool is_meltdown_row = w > 1.0 and s < 0
+    bool is_meltdown_row = is_melt
     color bg_hlt = is_meltdown_row ? c_super_red : c_bg
     color txt_hlt_val = is_meltdown_row ? c_yellow : c_s
     color txt_hlt_stat = is_meltdown_row ? c_yellow : c_white
@@ -709,19 +766,19 @@ if barstate.islast and show_report
     table.cell(rpt, 5, 0, "现状含义", text_color = c_white, bgcolor = c_header)
     table.cell(rpt, 6, 0, "建议操作逻辑", text_color = c_white, bgcolor = c_header)
 
-    fill_row(1, "1.基准利率", str.tostring(effr_live, "0.00")+"%", s1, w1, "总水坝闸门", t1_s, t1_a)
-    fill_row(2, "2.真实利率", str.tostring(tips_live, "0.00")+"%", s2, w2, "水厂回购价", t2_s, t2_a)
-    fill_row(3, "3.利差结构", str.tostring(yc_val, "0.00"), s3, w3, "天气预报", t3_s, t3_a)
-    fill_row(4, "4.信用风险", str.tostring(oas_val, "0.2")+"%", s4, w4, "风险保证金", t4_s, t4_a)
+    fill_row(1, "1.基准利率", str.tostring(effr_live, "0.00")+"%", s1, w1, "总水坝闸门", t1_s, t1_a, false)
+    fill_row(2, "2.真实利率", str.tostring(tips_live, "0.00")+"%", s2, w2, "水厂回购价", t2_s, t2_a, false)
+    fill_row(3, "3.利差结构", str.tostring(yc_val, "0.00"), s3, w3, "天气预报", t3_s, t3_a, s3 == -1.0 and w3 > 1.0)
+    fill_row(4, "4.信用风险", str.tostring(oas_val, "0.2")+"%", s4, w4, "风险保证金", t4_s, t4_a, s4 == -1.0 and w4 > 1.0)
     
     string l5_v = region == "美国 (US)" ? str.tostring(us_m2_yoy, "0.00")+"%" : str.tostring(cn_gap, "0.00")+"%"
-    fill_row(5, "5.流动性", l5_v, s5, w5, "鱼池活水率", t5_s, t5_a)
+    fill_row(5, "5.流动性", l5_v, s5, w5, "鱼池活水率", t5_s, t5_a, false)
     
     string l6_v = region == "美国 (US)" ? str.tostring(us_profit_gap, "0.00")+"%" : str.tostring(cn_profit_gap, "0.00")+"%"
-    fill_row(6, "6.利润空间", l6_v, s6, w6, "养鱼账本", t6_s, t6_a)
+    fill_row(6, "6.利润空间", l6_v, s6, w6, "养鱼账本", t6_s, t6_a, false)
     
-    fill_row(7, "7.实体热度", str.tostring(cg_ratio, "0.00"), s7, w7, "铜金比", t7_s, t7_a)
-    fill_row(8, "8.萨姆规则", str.tostring(sahm_val, "0.2")+"%", s8, w8, "死神信号", t8_s, t8_a)
+    fill_row(7, "7.实体热度", str.tostring(cg_ratio, "0.00"), s7, w7, "铜金比", t7_s, t7_a, false)
+    fill_row(8, "8.萨姆规则", str.tostring(sahm_val, "0.2")+"%", s8, w8, "死神信号", t8_s, t8_a, s8 == -1.0 and w8 > 1.0)
 
     // Row 9: Macro Hedge Strategy
     // Logic: US (Liquidity + Rate), CN (Liquidity)
