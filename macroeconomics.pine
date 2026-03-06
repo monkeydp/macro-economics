@@ -28,16 +28,18 @@ dur_tips_conf   = input.int(5, "确认时长 (日)", minval=1, group=grp_2, disp
 grp_3 = "3. 利差结构 (10Y-2Y)"
 sym_us_10y      = input.symbol("FRED:GS10", "数据源 (10Y)", group=grp_3, display=display.none)
 sym_us_2y       = input.symbol("FRED:GS2", "数据源 (2Y)", group=grp_3, display=display.none)
+dur_yc_bear_conf= input.int(5, "熊陡确认时长 (日)", minval=1, group=grp_3, display=display.none)
 th_yc_noise     = input.float(0.15, "震荡阈值", minval=0.0, step=0.01, group=grp_3, display=display.none)
 th_yc_bull_steep= input.float(0.15, "牛陡容差", minval=0.0, step=0.01, group=grp_3, display=display.none)
 th_yc_bear_steep= input.float(0.15, "熊陡容差", minval=0.0, step=0.01, group=grp_3, display=display.none)
 lock_bull_steep = input.int(10, "牛陡熔断锁定 (日)", minval=1, group=grp_3, display=display.none)
-dur_yc_bear_conf= input.int(5, "熊陡确认时长 (日)", minval=1, group=grp_3, display=display.none)
+
 
 // --- 4. 信用风险 (OAS) ---
 grp_4 = "4. 信用风险 (OAS)"
 sym_oas         = input.symbol("FRED:BAMLH0A0HYM2", "数据源 (OAS)", group=grp_4, display=display.none)
 oas_slope_len   = input.int(60, "斜率观测周期", minval=1, group=grp_4, display=display.none)
+dur_oas_conf    = input.int(3, "状态确认时长 (日)", minval=1, group=grp_4, display=display.none)
 th_oas_noise    = input.float(0.01, "斜率震荡阈值", minval=0.0, step=0.01, group=grp_4, display=display.none)
 lock_credit_crash = input.int(10, "熔断锁定 (日)", minval=1, group=grp_4, display=display.none)
 
@@ -47,11 +49,11 @@ sym_us_m2       = input.symbol("FRED:M2REAL", "数据源 (美国M2)", group=grp_
 sym_cn_m1       = input.symbol("ECONOMICS:CNM1", "数据源 (中国M1)", group=grp_5, display=display.none)
 sym_cn_m2       = input.symbol("ECONOMICS:CNM2", "数据源 (中国M2)", group=grp_5, display=display.none)
 liq_yoy_len     = input.int(12, "同比周期 (月)", minval=1, group=grp_5, display=display.none)
+dur_liq_conf    = input.int(2, "确认时长 (月)", minval=1, group=grp_5, display=display.none)
 th_liq_us_noise = input.float(0.50, "美国震荡阈值 (M2)", minval=0.0, step=0.1, group=grp_5, display=display.none)
 th_liq_us_crash = input.float(-2.0, "美国枯竭阈值 (M2)", step=0.1, group=grp_5, display=display.none)
 th_liq_cn_noise = input.float(0.50, "中国震荡阈值 (M1-M2)", minval=0.0, step=0.1, group=grp_5, display=display.none)
 th_liq_cn_crash = input.float(-5.0, "中国空转阈值 (M1-M2)", step=0.1, group=grp_5, display=display.none)
-dur_liq_conf    = input.int(2, "确认时长 (月)", minval=1, group=grp_5, display=display.none)
 lock_liq_crash  = input.int(3, "熔断锁定 (月)", minval=1, group=grp_5, display=display.none)
 
 // --- 6. 利润空间 (Profit) ---
@@ -61,9 +63,10 @@ sym_us_ppi      = input.symbol("FRED:PPIACO", "数据源 (美国PPI)", group=grp
 sym_cn_cpi      = input.symbol("ECONOMICS:CNCPI", "数据源 (中国CPI)", group=grp_6, display=display.none)
 sym_cn_ppi      = input.symbol("ECONOMICS:CNPPI", "数据源 (中国PPI)", group=grp_6, display=display.none)
 prof_yoy_len    = input.int(12, "同比周期 (月)", minval=1, group=grp_6, display=display.none)
-th_prof_noise   = input.float(0.20, "震荡阈值", minval=0.0, step=0.1, group=grp_6, display=display.none)
 dur_prof_state  = input.int(2, "状态确认时长 (月)", minval=1, group=grp_6, display=display.none)
 dur_prof_trend  = input.int(3, "趋势确认时长 (月)", minval=2, group=grp_6, display=display.none)
+th_prof_noise   = input.float(0.20, "震荡阈值", minval=0.0, step=0.1, group=grp_6, display=display.none)
+
 
 // --- 7. 实体热度 (Copper/Gold) ---
 grp_7 = "7. 实体热度 (铜金比)"
@@ -484,6 +487,8 @@ if is_panic_era and s3 < 0
     w3 := 2.0
 
 // 4. 信用风险
+int bars_oas_conf = math.max(1, math.ceil(dur_oas_conf * sec_per_day / sec_per_bar))
+
 if is_oas_crash
     s4 := -1.0 
     w4 := 2.0
@@ -491,13 +496,13 @@ else if oas_val > 6.0
     s4 := -1.0 
 else if oas_val >= 3.5
     // 风险走阔: 趋势向上
-    if oas_slope > th_oas_noise
+    if is_sustained(oas_slope > th_oas_noise, bars_oas_conf)
         s4 := -0.5
     else
         s4 := 0.0 // 局部压力
 else // < 3.5
     // 底部回升: 趋势向上
-    if oas_slope > th_oas_noise
+    if is_sustained(oas_slope > th_oas_noise, bars_oas_conf)
         s4 := 0.0
     else
         s4 := 1.0 // 风险收敛
@@ -1342,7 +1347,7 @@ if barstate.islast and show_report
 
     else if mode == "4. 信用风险"
         d_title := "信用风险\n[OAS]", d_def := "高收益企业债期权调整利差\n银行借钱给烂公司的额外利息(风险保证金)\n趋势向上 = 银行惜贷，信用收缩\n趋势向下 = 市场风险偏好下降，融资成本上升"
-        d_obs := "20日 (趋势)", d_logic := "🛑 危机: >10%或暴涨\n🔴 恶化: >6%\n🟠 走阔: 趋势上\n🟡 压力: 震荡\n🟡 底部回升：< 3.5% 但趋势向上\n🟢 收敛: <3.5%", d_conf := "连续3日确认【熔断即时】"
+        d_obs := "20日 (趋势)", d_logic := "🛑 危机: >10%或暴涨\n🔴 恶化: >6%\n🟠 走阔: 趋势上\n🟡 压力: 震荡\n🟡 底部回升：< 3.5% 但趋势向上\n🟢 收敛: <3.5%", d_conf := "连续3日确认\n【熔断/严重恶化即时】"
         d_w := w4 > 1.0 ? "x2" : "x1"
         d_cur_stat := t4_s
         // 修复：使用正确的格式化字符串 "0.00" 并添加时间戳，与左表对齐
