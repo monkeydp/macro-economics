@@ -1348,7 +1348,7 @@ if barstate.islast and show_report
         // 2. 真实利率含义与战术
         if s2 == -1.0
             if rgdp_val < 0 // 滞胀
-                d_cur_mean := "经济停滞，物价飞涨"
+                d_cur_mean := "经济停滞，物价飞涨\n(负利率陷阱)"
                 d_tactics  := "现金为王，卖出所有资产\n买入美元/黄金"
                 d_turn_val := "RGDP 转正 (经济复苏)"
                 d_tactics_turn := "经济复苏，重仓股票\n关注周期反转"
@@ -1450,32 +1450,32 @@ if barstate.islast and show_report
             d_tactics_turn := "危机解除，报复性反弹\n买入超跌垃圾债"
             d_risk := "危机解除"
         else if s4 == -1.0 // 恶化
-            d_cur_mean := "融资成本极高，企业失血"
+            d_cur_mean := "融资成本极高，企业失血\n(信用枯竭)"
             d_tactics  := "绝对风险过高，下降也不碰\n抛售垃圾债和小盘股"
             d_turn_val := "回落至 6% 下 (流动性恢复)"
             d_tactics_turn := "流动性恢复，买入小盘股\n关注困境反转"
             d_risk := "流动性恢复"
         else if s4 == -0.5 // 走阔
-            d_cur_mean := "避险升温，资金嫌贫爱富"
+            d_cur_mean := "避险升温，资金嫌贫爱富\n(信用收缩)"
             d_tactics  := "减少风险资产配置\n退守大盘股或美债"
             d_turn_val := "趋势向下 (压力缓解)"
             d_tactics_turn := "压力缓解，关注信用债\n配置可转债"
             d_risk := "压力缓解"
         else if s4 == 0.0 // 压力/底部回升
             if oas_val < 3.5 // 底部回升
-                d_cur_mean := "虽在变差，但环境仍宽松"
+                d_cur_mean := "虽在变差，但环境仍宽松\n(关注)"
                 d_tactics  := "环境宽松，无需过度紧张\n保持关注"
                 d_turn_val := "趋势向下 (虚惊一场)"
                 d_tactics_turn := "虚惊一场，继续奏乐\n维持进攻"
                 d_risk := "虚惊一场"
             else // 局部压力
-                d_cur_mean := "虽有压力但未失控"
-                d_tactics  := "金融环境尚可\n多看少做"
+                d_cur_mean := "虽有压力但未失控\n(信用摇摆)"
+                d_tactics  := "金融环境尚可\n(多看少做)"
                 d_turn_val := "回落至 3.5% 下 (环境宽松)"
                 d_tactics_turn := "环境宽松，大胆加杠杆\n全仓进攻"
                 d_risk := "环境宽松"
         else // 收敛
-            d_cur_mean := "资金泛滥，融资容易"
+            d_cur_mean := "资金泛滥，融资容易\n(信用扩张)"
             d_tactics  := "风险偏好提升，资金泛滥\n买入垃圾债"
             d_turn_val := "突破 3.5% (环境收紧)"
             d_tactics_turn := "环境收紧，降低杠杆\n卖出垃圾债"
@@ -1491,7 +1491,7 @@ if barstate.islast and show_report
             
             // 5. 流动性含义与战术
             if s5 == -1.0 // 枯竭
-                d_cur_mean := "极度紧缩，资产崩盘"
+                d_cur_mean := "极度紧缩，资产崩盘\n(水位见底)"
                 d_tactics  := "历史级货币收缩，资产重估\n极度危险，必须离场"
                 d_turn_val := "跌幅收窄 (止血)"
                 d_tactics_turn := "悲观修正，尝试性建仓\n布局错杀资产"
@@ -1501,12 +1501,12 @@ if barstate.islast and show_report
                 d_turn_val := "突破 0 轴 (开始放水)"
                 d_tactics_turn := "放水开启，全仓买入\n普涨行情起点"
             else if s5 == 0.0 // 存量
-                d_cur_mean := "存量博弈，结构行情"
+                d_cur_mean := "存量博弈，结构行情\n(水位震荡)"
                 d_tactics  := "资金无明显增量\n多看少做"
                 d_turn_val := "突破 0 轴 (活水注入)"
                 d_tactics_turn := "活水注入，加仓核心资产\n享受贝塔收益"
             else // 扩张
-                d_cur_mean := "流动性泛滥，万物普涨"
+                d_cur_mean := "流动性泛滥，万物普涨\n(水位上涨)"
                 d_tactics  := "资金充裕，美国放水\n闭眼买核心资产"
                 d_turn_val := "跌破 0 轴 (开始抽水)"
                 d_tactics_turn := "放水结束，逐步撤退\n转入防御"
@@ -1541,32 +1541,32 @@ if barstate.islast and show_report
             
             // 6. 利润含义与战术 (US)
             if s6 == -1.0 and w6 > 1.0 // 过热
-                d_cur_mean := "物价飞涨，通胀失控"
+                d_cur_mean := "物价飞涨，通胀失控\n(政策收紧)"
                 d_tactics  := "通胀失控，必须刹车\n拥抱抗通胀资产"
                 d_turn_val := "CPI 回落 (通胀降温)"
                 d_tactics_turn := "通胀降温，加仓成长股\n利好科技"
             else if s6 == -1.0 // 通缩
-                d_cur_mean := "需求冰封，全线通缩"
+                d_cur_mean := "需求冰封，全线通缩\n(需求崩塌)"
                 d_tactics  := "成本降因经济崩\n现金为王"
                 d_turn_val := "CPI/PPI 转正 (走出通缩)"
                 d_tactics_turn := "走出通缩，买入消费股\n经济复苏"
             else if s6 == -0.5 // 亏损
-                d_cur_mean := "成本倒挂，卖多亏多"
+                d_cur_mean := "成本倒挂，卖多亏多\n(成本倒挂)"
                 d_tactics  := "成本高于售价，亏损扩大\n规避中下游制造业"
                 d_turn_val := "趋势走阔 (亏损收窄)"
                 d_tactics_turn := "困境反转，关注行业龙头\n抢反弹"
             else if s6 == 0.0 // 承压
-                d_cur_mean := "利润微薄，存量竞争"
+                d_cur_mean := "利润微薄，存量竞争\n(增长停滞)"
                 d_tactics  := "利润空间有限\n多看少做"
                 d_turn_val := "趋势走阔 (利润释放)"
                 d_tactics_turn := "利润释放，加仓成长股\n业绩驱动"
             else if s6 == 0.5 // 修复
-                d_cur_mean := "利润修复，困境反转"
+                d_cur_mean := "利润修复，困境反转\n(亏损收窄)"
                 d_tactics  := "虽利润变薄，但还在赚钱\n不激进追高"
                 d_turn_val := "趋势收窄 (持续变薄)"
                 d_tactics_turn := "利润变薄，去弱留强\n切换防御"
             else // 躺赚
-                d_cur_mean := "躺着赚钱，利润暴增"
+                d_cur_mean := "躺着赚钱，利润暴增\n(躺赚时刻)"
                 d_tactics  := "售价涨幅大于成本\n积极买入成长股"
                 d_turn_val := "趋势收窄 (利润变薄)"
                 d_tactics_turn := "暴利终结，切换防御资产\n落袋为安"
@@ -1589,31 +1589,31 @@ if barstate.islast and show_report
             
             // 6. 利润含义与战术 (中国)
             if s6 == -1.0 // 通缩
-                d_cur_mean := "需求冰封，全线通缩"
+                d_cur_mean := "需求冰封，全线通缩\n(需求崩塌)"
                 d_tactics  := "全产业链通缩，需求疲软\n远离周期股，关注必选消费"
                 d_turn_val := "CPI/PPI 转正 (走出通缩)"
                 d_tactics_turn := "走出通缩，买入消费股\n经济复苏"
                 d_risk := "走出通缩"
             else if s6 == -0.5 // 亏损
-                d_cur_mean := "成本倒挂，卖多亏多"
+                d_cur_mean := "成本倒挂，卖多亏多\n(成本倒挂)"
                 d_tactics  := "出厂价低于成本价\n回避中游制造，关注上游资源"
                 d_turn_val := "差值走阔 (亏损收窄)"
                 d_tactics_turn := "困境反转，关注行业龙头\n抢反弹"
                 d_risk := "亏损收窄"
             else if s6 == 0.0 // 震荡/内卷
-                d_cur_mean := "上游涨价，下游卖不动"
+                d_cur_mean := "上游涨价，下游卖不动\n(增长停滞)"
                 d_tactics  := "利润压缩，内卷严重\n回避同质化竞争，只看龙头"
                 d_turn_val := "差值走阔 (利润释放)"
                 d_tactics_turn := "利润释放，加仓成长股\n业绩驱动"
                 d_risk := "利润释放"
             else if s6 == 0.5 // 修复
-                d_cur_mean := "亏损减少，困境反转"
+                d_cur_mean := "亏损减少，困境反转\n(亏损收窄)"
                 d_tactics  := "最惨时刻已过\n博弈困境反转，左侧建仓"
                 d_turn_val := "差值收窄 (持续变薄)"
                 d_tactics_turn := "利润变薄，去弱留强\n切换防御"
                 d_risk := "利润变薄"
             else // 躺赚
-                d_cur_mean := "躺着赚钱，利润暴增"
+                d_cur_mean := "躺着赚钱，利润暴增\n(躺赚时刻)"
                 d_tactics  := "上游降价，下游需求旺\n卖上游资源，买消费/中下游制造"
                 d_turn_val := "差值收窄 (利润变薄)"
                 d_tactics_turn := "暴利终结，切换防御资产\n落袋为安"
