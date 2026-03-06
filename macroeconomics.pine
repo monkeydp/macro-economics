@@ -1400,7 +1400,7 @@ if barstate.islast and show_report
 
     else if mode == "6. 利润空间"
         if region == "美国"
-            d_title := "利润空间\n[CPI-PPI]", d_def := "CPI(售价) - PPI(成本) \n美国是全球最大制造国，重点看CPI(本国需求)"
+            d_title := "利润空间\n[CPI-PPI]", d_def := "CPI(售价) - PPI(成本) \n美国是全球最大消费国，重点看CPI(本国需求)"
             d_obs := "12月 (同比)", d_logic := "🔴 过热: CPI>3%\n🔴 通缩: 双负\n🟠 亏损: <0\n🟡 震荡: ≈0\n🟢 修复: 收窄\n🟢 躺赚: 走阔", d_conf := "连续2个月确认"
             d_w := w6 > 1.0 ? "x2" : "x1"
             d_cur_stat := t6_s
