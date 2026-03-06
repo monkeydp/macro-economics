@@ -898,6 +898,12 @@ plot(mode == "4. 信用风险" ? 10.0 : na, "OAS 10", color = c_super_red, style
 plot(mode == "4. 信用风险" ? 6.0 : na, "OAS 6", color = c_red)
 plot(mode == "4. 信用风险" ? 3.5 : na, "OAS 3.5", color = c_lime)
 
+if barstate.islast and mode == "4. 信用风险"
+    label.new(bar_index, 10.0, " 熔断 (10%)", color = c_super_red, style = label.style_label_left, textcolor = c_white, size = size.small)
+    label.new(bar_index, 6.0, " 恶化 (6%)", color = c_red, style = label.style_label_left, textcolor = c_white, size = size.small)
+    label.new(bar_index, 3.5, " 压力 (3.5%)", color = c_lime, style = label.style_label_left, textcolor = c_black, size = size.small)
+
+
 // 5. 流动性: M2 YoY + 阈值
 plot(mode == "5. 流动性" ? plot_val : na, "Liquidity", color = dyn_c, linewidth = 2)
 plot(mode == "5. 流动性" and region == "美国" ? -2.0 : na, "M2 -2", color = c_red)
