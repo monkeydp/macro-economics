@@ -70,6 +70,7 @@ grp_7 = "7. 实体热度 (铜金比)"
 sym_copper      = input.symbol("COMEX:HG1!", "数据源 (铜)", group=grp_7, display=display.none)
 sym_gold        = input.symbol("COMEX:GC1!", "数据源 (金)", group=grp_7, display=display.none)
 cg_slope_len    = input.int(60, "斜率观测周期", minval=1, group=grp_7, display=display.none)
+dur_cg_conf     = input.int(5, "趋势确认时长 (日)", minval=1, group=grp_7, display=display.none)
 th_cg_noise     = input.float(0.05, "涨跌幅容差 (%)", minval=0.0, step=0.01, group=grp_7, display=display.none) 
 lock_cg_crash   = input.int(5, "崩盘锁定 (日)", minval=1, group=grp_7, display=display.none)
 
@@ -643,14 +644,17 @@ else // CN
         t6_s := "利润承压 (震荡)", t6_a := "【观察】 多看少做"
 
 // 7. 实体热度
+// 引入连续确认逻辑 (连续 N 日)
+int bars_cg_conf = math.max(1, math.ceil(dur_cg_conf * sec_per_day / sec_per_bar))
+
 if is_cg_crash
-    s7 := -1.0 // 崩盘 (单日暴跌优先)
-else if is_fake_recovery
+    s7 := -1.0 // 崩盘 (单日暴跌优先，无需确认)
+else if is_sustained(is_fake_recovery, bars_cg_conf)
     s7 := -0.5 // 伪复苏 (趋势背离)
-else if is_trend_down
+else if is_sustained(is_trend_down, bars_cg_conf)
     s7 := -0.5 // 衰退 (趋势向下)
-else if is_trend_up and is_cop_trend_up
-    s7 := 1.0  // 复苏 (趋势向上且铜价确认)
+else if is_sustained(is_trend_up and is_cop_trend_up, bars_cg_conf)
+    s7 := 1.0  // 复苏 (趋势向上且铜价上涨)
 else
     s7 := 0.0  // 震荡 (趋势不明显)
 

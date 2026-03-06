@@ -295,19 +295,19 @@
 *   监控地区: "美国" —— *影响流动性/利润空间*
 
 ### 6.2 组1 基准利率
-*   数据源 (EFFR): "FRED:EFFR"
+*   数据源 (EFFR): FRED:EFFR
 *   EMA 周期 (月): 10
 *   震荡阈值: 0.05
 *   救火降息有效期 (日): 90
 
 ### 6.3 组2 真实利率
-*   数据源 (TIPS): "FRED:DFII10"
-*   数据源 (RGDP): "FRED:A191RL1Q225SBEA"
+*   数据源 (TIPS): FRED:DFII10
+*   数据源 (RGDP): FRED:A191RL1Q225SBEA
 *   确认时长 (日): 5
 
 ### 6.4 组3 利差结构
-*   数据源 (10Y): "FRED:GS10"
-*   数据源 (2Y): "FRED:GS2"
+*   数据源 (10Y): FRED:GS10
+*   数据源 (2Y): FRED:GS2
 *   震荡阈值: 0.15
 *   牛陡容差: 0.15
 *   熊陡容差: 0.15
@@ -315,15 +315,15 @@
 *   熊陡确认时长 (日): 5
 
 ### 6.5 组4 信用风险
-*   数据源 (OAS): "FRED:BAMLH0A0HYM2"
+*   数据源 (OAS): FRED:BAMLH0A0HYM2
 *   斜率观测周期: 60
 *   斜率震荡阈值: 0.01
 *   熔断锁定 (日): 10
 
 ### 6.6 组5 流动性
-*   数据源 (美国M2): "FRED:M2REAL"
-*   数据源 (中国M1): "ECONOMICS:CNM1"
-*   数据源 (中国M2): "ECONOMICS:CNM2"
+*   数据源 (美国M2): FRED:M2REAL
+*   数据源 (中国M1): ECONOMICS:CNM1
+*   数据源 (中国M2): ECONOMICS:CNM2
 *   同比周期 (月): 12
 *   美国震荡阈值: 0.50
 *   美国枯竭阈值: -2.0
@@ -332,21 +332,22 @@
 *   确认时长 (月): 2
 
 ### 6.7 组6 利润空间
-*   数据源 (美国CPI): "FRED:CPIAUCSL"
-*   数据源 (美国PPI): "FRED:PPIACO"
-*   数据源 (中国CPI): "ECONOMICS:CNCPI"
-*   数据源 (中国PPI): "ECONOMICS:CNPPI"
+*   数据源 (美国CPI): FRED:CPIAUCSL
+*   数据源 (美国PPI): FRED:PPIACO
+*   数据源 (中国CPI): ECONOMICS:CNCPI
+*   数据源 (中国PPI): ECONOMICS:CNPPI
 *   同比周期 (月): 12
 *   震荡阈值: 0.20
 *   确认时长 (月): 2
 
 ### 6.8 组7 实体热度
-*   数据源 (铜): "COMEX:HG1!"
-*   数据源 (金): "COMEX:GC1!"
+*   数据源 (铜): COMEX:HG1!
+*   数据源 (金): COMEX:GC1!
 *   斜率观测周期: 60
+*   趋势确认时长 (日): 5
 *   涨跌幅容差 (%): 0.05
 *   崩盘锁定 (日): 5
 
 ### 6.9 组8 萨姆规则
-*   数据源 (Sahm): "FRED:SAHMREALTIME"
-*   数据源 (ICSA): "FRED:ICSA"
+*   数据源 (Sahm): FRED:SAHMREALTIME
+*   数据源 (ICSA): FRED:ICSA
