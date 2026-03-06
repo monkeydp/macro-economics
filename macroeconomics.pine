@@ -74,7 +74,7 @@ sym_copper      = input.symbol("COMEX:HG1!", "数据源 (铜)", group=grp_7, dis
 sym_gold        = input.symbol("COMEX:GC1!", "数据源 (金)", group=grp_7, display=display.none)
 cg_slope_len    = input.int(60, "斜率观测周期", minval=1, group=grp_7, display=display.none)
 dur_cg_conf     = input.int(5, "趋势确认时长 (日)", minval=1, group=grp_7, display=display.none)
-th_cg_noise     = input.float(0.05, "涨跌幅容差 (%)", minval=0.0, step=0.01, group=grp_7, display=display.none) 
+th_cg_noise     = input.float(1.0, "涨跌幅容差 (%)", minval=0.0, step=0.1, group=grp_7, display=display.none) 
 lock_cg_crash   = input.int(5, "崩盘锁定 (日)", minval=1, group=grp_7, display=display.none)
 
 // --- 8. 萨姆规则 (Sahm) ---
@@ -1074,6 +1074,13 @@ if barstate.islast and mode == "6. 利润空间"
 
 // 7. 实体热度: 铜金比
 plot(mode == "7. 实体热度" ? plot_val : na, "Copper/Gold", color = dyn_c, linewidth = 2)
+
+// 动态计算 EMA 周期
+// 日线: 60 (季度线)
+// 周线: 12 (季度线)
+// 月线: 12 (年线，更有意义)
+int ema_len_dynamic = timeframe.isdaily ? 60 : 12
+plot(mode == "7. 实体热度" ? ta.ema(plot_val, ema_len_dynamic) : na, "CG EMA", color = color.blue, linewidth = 1)
 
 // 8. 萨姆规则: Sahm + 阈值
 plot(mode == "8. 萨姆规则" ? plot_val : na, "Sahm", color = dyn_c, linewidth = 2)
