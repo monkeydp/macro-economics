@@ -1173,7 +1173,7 @@ if barstate.islast and show_report
     color final_txt = c_white
     
     if is_meltdown
-        final_res := "【熔断】 " + (s3==-1.0 and w3>1.0 ? "3.利差 " : "") + (s4==-1.0 and w4>1.0 ? "4.信用" : "") + (s8==-1.0 ? "8.衰退" : "")
+        final_res := "【熔断】 " + (s3==-1.0 and w3>1.0 ? "3.利差 " : "") + (s4==-1.0 and w4>1.0 ? "4.信用 " : "") + (s5==-1.0 ? "5.流动性" : "") + (s8==-1.0 ? "8.萨姆" : "")
         final_sugg := "清仓，仅留黄金/美债底仓"
         final_bg := c_super_red
         final_txt := c_yellow
