@@ -86,9 +86,9 @@ c_super_green  = #006400        // 🟢 深绿 (满仓背景)
 c_navy_60      = color.new(#000080, 40) // 海军蓝60 (宏观对冲行背景)
 c_beige        = #F5F5DC        // 米色 (标签文字)
 c_score_col    = #78D6FB        // 浅蓝 (得分/权重)
-c_gray_dark    = #333333        // 深灰 (默认背景)
-c_bg           = color.new(c_gray_dark, 10) // 背景色
-c_header       = color.new(color.gray, 10)  // 表头背景
+c_gray_dark    = #333333        // 深灰
+c_bg           = color.new(c_gray_dark, 50) // 背景色
+c_header       = color.new(color.gray, 50)  // 表头背景
 c_white        = color.white
 c_black        = color.black
 
