@@ -1021,6 +1021,42 @@ if barstate.islast and mode == "5. 流动性"
 // 6. 利润空间: Gap
 plot(mode == "6. 利润空间" ? plot_val : na, "Profit Gap", color = dyn_c, linewidth = 2)
 
+// 新增: CPI & PPI 辅助线
+// 颜色选择: 避免与 dyn_c (红绿灯) 和 背景色冲突
+// CPI 使用 紫色 (color.purple), PPI 使用 蓝色 (color.blue)
+// 确保只在"6. 利润空间"模式下显示
+float cpi_val = region == "美国" ? us_cpi_yoy : cn_cpi_yoy
+float ppi_val = region == "美国" ? us_ppi_yoy : cn_ppi_yoy
+
+plot(mode == "6. 利润空间" ? cpi_val : na, "CPI", color = color.purple, linewidth = 1)
+plot(mode == "6. 利润空间" ? ppi_val : na, "PPI", color = color.blue, linewidth = 1)
+plot(mode == "6. 利润空间" ? 3.0 : na, "CPI 3.0", color = color.new(color.red, 50), style = plot.style_circles)
+
+// 过热背景高亮 (CPI > 3.0)
+// 使用红色半透明背景，表示"过热"状态
+bgcolor(mode == "6. 利润空间" and cpi_val > 3.0 ? color.new(c_red, 85) : na, title="CPI Overheat BG")
+
+// 增加静态图例 (Legend Table)
+// 仅在 "6. 利润空间" 模式且为最后一根 K 线时显示
+// 位置：右下角 (bottom_right)
+var table legend_prof = table.new(position.bottom_right, 2, 4, bgcolor = c_bg, border_width = 1, border_color = color.gray, frame_width = 1)
+if barstate.islast and mode == "6. 利润空间"
+    // 标题行
+    table.cell(legend_prof, 0, 0, "📊 利润空间", text_color = c_white, text_size = size.small, bgcolor = c_header)
+    table.cell(legend_prof, 1, 0, "", bgcolor = c_header) // 占位
+    table.merge_cells(legend_prof, 0, 0, 1, 0)
+    
+    // 行 1: CPI (紫)
+    table.cell(legend_prof, 0, 1, "CPI", text_color = color.purple, text_halign = text.align_left, text_size = size.small)
+    table.cell(legend_prof, 1, 1, str.tostring(cpi_val, "0.00") + "%", text_color = c_white, text_halign = text.align_right, text_size = size.small)
+    
+    // 行 2: PPI (蓝)
+    table.cell(legend_prof, 0, 2, "PPI", text_color = color.blue, text_halign = text.align_left, text_size = size.small)
+    table.cell(legend_prof, 1, 2, str.tostring(ppi_val, "0.00") + "%", text_color = c_white, text_halign = text.align_right, text_size = size.small)
+
+    // 保留过热线标签 (因为它在顶部，不遮挡曲线)
+    label.new(bar_index, 3.0, "过热线 (3.0%)", color = color.new(color.red, 50), style = label.style_label_left, textcolor = c_white, size = size.small)
+
 // 7. 实体热度: 铜金比
 plot(mode == "7. 实体热度" ? plot_val : na, "Copper/Gold", color = dyn_c, linewidth = 2)
 
