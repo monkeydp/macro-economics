@@ -893,10 +893,19 @@ if is_bull_steep_melt and not is_bull_steep_melt[1]
 
 
 // 4. 信用风险: OAS + 阈值
-plot(mode == "4. 信用风险" ? plot_val : na, "OAS", color = dyn_c, linewidth = 2)
+// 修复：OAS 熔断时曲线显示深红
+color oas_col = dyn_c
+if mode == "4. 信用风险" and s4 == -1.0 and w4 > 1.0
+    oas_col := c_super_red
+
+plot(mode == "4. 信用风险" ? plot_val : na, "OAS", color = oas_col, linewidth = 2)
 plot(mode == "4. 信用风险" ? 10.0 : na, "OAS 10", color = c_super_red, style = plot.style_circles)
 plot(mode == "4. 信用风险" ? 6.0 : na, "OAS 6", color = c_red)
 plot(mode == "4. 信用风险" ? 3.5 : na, "OAS 3.5", color = c_lime)
+
+// OAS 熔断背景高亮 (深红半透明)
+bool is_oas_meltdown_bg = mode == "4. 信用风险" and s4 == -1.0 and w4 > 1.0
+bgcolor(is_oas_meltdown_bg ? color.new(c_super_red, 70) : na, title="OAS Melt BG")
 
 if barstate.islast and mode == "4. 信用风险"
     label.new(bar_index, 10.0, "熔断 (10%)", color = c_super_red, style = label.style_label_left, textcolor = c_white, size = size.small)
