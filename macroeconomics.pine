@@ -1726,24 +1726,24 @@ if barstate.islast and show_report
         if s7 == -1.0 // 崩盘 -> 止血 (橙)
             turn_score_disp := -0.5
         else if s7 == -0.5 
-            if is_fake_recovery // 伪复苏 -> 真复苏 (绿)
+            if is_fake_recovery // 伪复苏
                 turn_score_disp := 1.0
-            else // 衰退 -> 企稳 (黄)
+            else // 衰退
                 turn_score_disp := 0.0
-        else if s7 == 0.0 // 震荡 -> 复苏 (绿)
+        else if s7 == 0.0 // 震荡
             turn_score_disp := 1.0
-        else // 复苏 -> 衰退 (橙)
+        else // 复苏
             turn_score_disp := -0.5
             
     else if mode == "8. 萨姆规则"
         cur_score_disp := s8
-        if s8 == -1.0 and w8 > 1.0 // 熔断 -> 预警 (红)
+        if s8 == -1.0 and w8 > 1.0 // 熔断
             turn_score_disp := -1.0
-        else if s8 == -0.5 // 关注 -> 解除 (绿)
+        else if s8 == -0.5 // 关注
             turn_score_disp := 1.0
-        else if s8 == 1.0 // 健康 -> 关注 (红)
+        else if s8 == 1.0 // 健康
             turn_score_disp := -0.5
-        else // ICSA -> 改善 (绿)
+        else // ICSA
             turn_score_disp := 1.0
 
     // 渲染右表
