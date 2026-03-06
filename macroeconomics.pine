@@ -397,13 +397,13 @@ bool is_inflation_era = us_cpi_yoy > 3.0
 bool is_panic_era     = sahm_val >= 0.3 or is_bull_steep
 
 // 动态权重调整
+// 1. 通胀时代: 无论正负，权重全部翻倍 (实物资产逻辑主导)
 if is_inflation_era
     w6 := 2.0 // 利润
     w7 := 2.0 // 实体
-if is_panic_era
-    w3 := 2.0 // 利差
-    w4 := 2.0 // 信用
-    w8 := 2.0 // 萨姆
+
+// 2. 恐慌时代: 仅当指标为负时，权重翻倍 (只放大风险，不放大机会)
+// 先占位，具体赋值放到评分计算后进行修正
 
 // --- 评分计算 ---
 float s1=0.0, float s2=0.0, float s3=0.0, float s4=0.0
@@ -475,6 +475,10 @@ else
     bool is_bear_steep = is_sustained(is_bear_steep_raw, bars_yc_conf)
     s3 := is_bear_steep ? 1.0 : 0.5 // 熊陡+1.0, 普通陡峭+0.5
 
+// 恐慌时代动态权重: 利差 (仅负分翻倍)
+if is_panic_era and s3 < 0
+    w3 := 2.0
+
 // 4. OAS
 if is_oas_crash
     s4 := -1.0 // 信用崩盘 (配合权重x2)
@@ -493,6 +497,10 @@ else // < 3.5
         s4 := 0.0
     else
         s4 := 1.0 // 风险收敛
+
+// 恐慌时代动态权重: 信用 (仅负分翻倍)
+if is_panic_era and s4 < 0
+    w4 := 2.0
 
 // 5. Liquidity
 // 分别计算 US 和 CN 的流动性得分，用于宏观对冲逻辑
@@ -629,15 +637,17 @@ for i = 0 to bars_icsa_conf - 1
         break
 
 if sahm_val >= 0.5
-    s8 := -1.0 // 衰退熔断 (配合权重x2)
-    w8 := 2.0
+    s8 := -1.0 // 衰退熔断
 else if sahm_val >= 0.3
-    s8 := -0.5 // 衰退关注 (降级为橙色)
-    w8 := 2.0  // 权重依然翻倍 (恐慌时代)
+    s8 := -0.5 // 衰退关注 (橙色)
 else if is_icsa_warn
     s8 := -0.5 // ICSA 预警
 else
     s8 := 1.0  // 就业健康
+
+// 恐慌时代动态权重: 萨姆 (负分翻倍，Sahm本身就是负分源头)
+if is_panic_era and s8 < 0
+    w8 := 2.0
 
 // --- 总分计算 ---
 total_score = s1*w1 + s2*w2 + s3*w3 + s4*w4 + s5*w5 + s6*w6 + s7*w7 + s8*w8
