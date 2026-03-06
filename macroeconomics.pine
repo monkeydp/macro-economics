@@ -1322,7 +1322,7 @@ if barstate.islast and show_report
 
     else if mode == "5. 流动性"
         if region == "美国"
-            d_title := "流动性\n[M2 YoY]", d_def := "广义货币供应量同比(剔除通胀)。\n美国印钱=全球水位上涨。"
+            d_title := "流动性增速\n[M2REAL YoY]", d_def := "广义货币供应量同比(剔除通胀)。\nM2REAL 同比 > 0 = 美国印钱 = 全球水位上涨。"
             d_obs := "12月 (同比)", d_logic := "🔴 枯竭: <-2%\n🟠 紧缩: <0\n🟡 存量: ≈0\n🟢 扩张: >0", d_conf := "连续2个月确认"
             d_w := w5 > 1.0 ? "x2" : "x1"
             d_cur_stat := t5_s
@@ -1359,7 +1359,7 @@ if barstate.islast and show_report
             else // 扩张
                 d_risk := "开始抽水"
         else
-            d_title := "流动性\n[M1-M2]", d_def := "M1增速减M2增速(剪刀差)。\n正: 活水注入; 负: 资金空转(定期化)。"
+            d_title := "流动性增速差\n[M1增速 - M2增速]", d_def := "M1增速 - M2增速 (信贷脉搏)\n正: 活水注入; 负: 资金空转(定期化)。"
             d_obs := "12月 (同比)", d_logic := "🔴 严重空转: <-5%\n🟠 空转: <0\n🟢 活化: >0", d_conf := "连续2个月确认"
             d_w := w5 > 1.0 ? "x2" : "x1"
             d_cur_stat := t5_s
@@ -1372,7 +1372,7 @@ if barstate.islast and show_report
 
     else if mode == "6. 利润空间"
         if region == "美国"
-            d_title := "利润空间\n[CPI-PPI]", d_def := "售价(CPI) - 成本(PPI)。\n差值走阔=企业赚钱容易。"
+            d_title := "利润空间\n[CPI-PPI]", d_def := "CPI(售价) - PPI(成本) \n美国是全球最大制造国，重点看CPI(本国需求)"
             d_obs := "12月 (同比)", d_logic := "🔴 过热: CPI>3%\n🔴 通缩: 双负\n🟠 亏损: <0\n🟡 震荡: ≈0\n🟢 修复: 收窄\n🟢 躺赚: 走阔", d_conf := "连续2个月确认"
             d_w := w6 > 1.0 ? "x2" : "x1"
             d_cur_stat := t6_s
@@ -1424,16 +1424,43 @@ if barstate.islast and show_report
                 d_risk := "利润变薄"
                 
         else
-            d_title := "利润空间\n[CPI-PPI]", d_def := "内需(CPI) - 产能(PPI)。\n中国是制造国，重点看PPI(全球需求)。"
-            d_obs := "12月 (同比)", d_logic := "🔴 通缩: PPI<0\n🟢 复苏: PPI涨", d_conf := "连续2个月确认"
+            d_title := "利润空间\n[CPI-PPI]", d_def := "CPI(售价) - PPI(成本) \n中国是全球最大制造国，重点看PPI(对应全球需求)"
+            d_obs := "12月 (同比)", d_logic := "🔴 通缩: 双负\n🟠 亏损: <0\n🟡 内卷: ≈0\n🟢 修复: 收窄\n🟢 躺赚: 走阔", d_conf := "连续2个月确认"
             d_w := w6 > 1.0 ? "x2" : "x1"
             d_cur_stat := t6_s
-            d_cur_val := str.tostring(cn_profit_gap, "0.00") + "%"
-            d_turn_val := s6 > 0 ? "重新倒挂" : "亏损收窄"
-            d_cur_mean := s6 < 0 ? "亏本甩卖" : "供不应求"
-            d_risk := s6 < 0 ? "走出通缩" : "利润收缩"
-            d_tactics := (s6 < 0 ? (w6 > 1.0 ? "内需过热，物价飞涨。回避高估值，现金为王" : (cn_cpi_yoy<0 ? "全产业链通缩，需求疲软\n远离周期股，关注必选消费" : "出厂价低于成本价\n回避中游制造，关注上游资源")) : (s6 == 1.0 ? "上游降价，下游需求旺\n卖上游资源，买消费/中下游制造" : "最惨时刻已过，亏损减少\n博弈困境反转，左侧建仓"))
-            d_tactics_turn := "关注PPI触底反弹，困境反转信号"
+            d_cur_val := str.tostring(cn_profit_gap, "0.00") + "% | " + fmt_ym(cn_prof_time)
+            
+            // 6. 利润含义与战术 (中国)
+            if s6 == -1.0 // 通缩
+                d_cur_mean := "需求冰封，全线通缩"
+                d_tactics  := "全产业链通缩，需求疲软\n远离周期股，关注必选消费"
+                d_turn_val := "CPI/PPI 转正 (走出通缩)"
+                d_tactics_turn := "走出通缩，买入消费股\n经济复苏"
+                d_risk := "走出通缩"
+            else if s6 == -0.5 // 亏损
+                d_cur_mean := "成本倒挂，卖多亏多"
+                d_tactics  := "出厂价低于成本价\n回避中游制造，关注上游资源"
+                d_turn_val := "差值走阔 (亏损收窄)"
+                d_tactics_turn := "困境反转，关注行业龙头\n抢反弹"
+                d_risk := "亏损收窄"
+            else if s6 == 0.0 // 震荡/内卷
+                d_cur_mean := "上游涨价，下游卖不动"
+                d_tactics  := "利润压缩，内卷严重\n回避同质化竞争，只看龙头"
+                d_turn_val := "差值走阔 (利润释放)"
+                d_tactics_turn := "利润释放，加仓成长股\n业绩驱动"
+                d_risk := "利润释放"
+            else if s6 == 0.5 // 修复
+                d_cur_mean := "亏损减少，困境反转"
+                d_tactics  := "最惨时刻已过\n博弈困境反转，左侧建仓"
+                d_turn_val := "差值收窄 (持续变薄)"
+                d_tactics_turn := "利润变薄，去弱留强\n切换防御"
+                d_risk := "利润变薄"
+            else // 躺赚
+                d_cur_mean := "躺着赚钱，利润暴增"
+                d_tactics  := "上游降价，下游需求旺\n卖上游资源，买消费/中下游制造"
+                d_turn_val := "差值收窄 (利润变薄)"
+                d_tactics_turn := "暴利终结，切换防御资产\n落袋为安"
+                d_risk := "利润变薄"
 
     else if mode == "7. 实体热度"
         d_title := "实体热度\n[铜金比]", d_def := "铜(工业) / 金(避险)。\n比值涨=复苏; 比值跌=衰退。"
