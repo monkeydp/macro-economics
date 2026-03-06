@@ -5,6 +5,7 @@ indicator("[薯仔] 宏观经济审计看板", overlay = false, precision = 2, m
 // 1. 设置与参数
 // ==========================================
 show_report = input.bool(true, "显示决策看板", group="显示设置")
+show_markers = input.bool(true, "显示事件标记", group="显示设置")
 mode = input.string("1. 基准利率", "当前显示曲线",
      options=["1. 基准利率", "2. 真实利率", "3. 利差结构",
      "4. 信用风险", "5. 流动性", "6. 利润空间",
@@ -902,6 +903,11 @@ bgcolor(is_tips_risk_bg ? color.new(c_super_red, 80) : na, title="TIPS Risk BG")
 plot(mode == "1. 基准利率" ? plot_val : na, "EFFR", color = dyn_c, linewidth = 2, style = plot.style_stepline)
 plot(mode == "1. 基准利率" ? effr_ema : na, "EFFR EMA", color = color.blue, linewidth = 1)
 
+// 1. 救火标记
+bool is_fire_cut = mode == "1. 基准利率" and s1 == -1.0
+if is_fire_cut and not is_fire_cut[1] and show_markers
+    label.new(bar_index, plot_val + 0.5, "🚒\n救火", xloc = xloc.bar_index, yloc = yloc.price, color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
+
 // 2. 真实利率: TIPS + RGDP + 阈值
 // 优化：RGDP 极端值截断 (仅用于绘图)
 // 将绘图用的 RGDP 限制在 -10% 到 +10% 之间
@@ -917,12 +923,12 @@ plot(mode == "2. 真实利率" ? 0.5 * rgdp_plot : na, "0.5 RGDP", color = color
 
 // 滞胀: RGDP < 0 (显示在曲线上方，避免与虹吸重叠)
 bool is_stag = mode == "2. 真实利率" and s2 == -1.0 and rgdp_val < 0
-if is_stag and not is_stag[1]
+if is_stag and not is_stag[1] and show_markers
     label.new(bar_index, plot_val + 0.5, "🔥滞胀", xloc = xloc.bar_index, yloc = yloc.price, color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
 
 // 虹吸: TIPS >= RGDP (显示在曲线下方)
 bool is_siphon = mode == "2. 真实利率" and s2 == -1.0 and tips_live >= rgdp_val
-if is_siphon and not is_siphon[1]
+if is_siphon and not is_siphon[1] and show_markers
     label.new(bar_index, plot_val - 0.5, "🌪️虹吸", xloc = xloc.bar_index, yloc = yloc.price, color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
 
 // 添加 RGDP 极端值标签 (显示真实值)
@@ -1007,14 +1013,25 @@ plot(mode == "3. 利差结构" ? plot_val : na, "10Y-2Y", color = yc_col, linewi
 bgcolor(is_bull_steep_melt ? color.new(c_super_red, 70) : na, title="Bull Steep Melt BG")
 
 // 3. 文本标记 (仅在熔断开始时显示，避免拥挤)
-if is_bull_steep_melt and not is_bull_steep_melt[1]
-    label.new(bar_index, plot_val, "牛陡\n熔断", color = c_super_red, style = label.style_label_down, textcolor = c_white, size = size.small)
+bool show_bull_mark = mode == "3. 利差结构" and is_bull_steep_melt
+if show_bull_mark and not show_bull_mark[1] and show_markers
+    label.new(bar_index, plot_val + 0.2, "🐂\n牛陡", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
 
 
 // 4. 信用风险: OAS + 阈值
 color oas_col = dyn_c
 if mode == "4. 信用风险" and s4 == -1.0 and w4 > 1.0
     oas_col := c_super_red
+
+// 4. 信用崩盘标记
+bool is_credit_crash = mode == "4. 信用风险" and s4 == -1.0 and w4 > 1.0
+if is_credit_crash and not is_credit_crash[1] and show_markers
+    label.new(bar_index, plot_val + 0.5, "💔\n危机", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
+
+// 4. 严重恶化标记 (非熔断，但恶化)
+bool is_credit_bad = mode == "4. 信用风险" and s4 == -1.0 and w4 <= 1.0
+if is_credit_bad and not is_credit_bad[1] and show_markers
+    label.new(bar_index, plot_val + 0.5, "🩸\n恶化", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
 
 plot(mode == "4. 信用风险" ? plot_val : na, "OAS", color = oas_col, linewidth = 2)
 plot(mode == "4. 信用风险" ? 10.0 : na, "OAS 10", color = c_super_red)
@@ -1040,6 +1057,11 @@ if region == "美国"
 else
     is_liq_meltdown := is_cn_crash
 
+// 5. 枯竭标记
+bool show_liq_mark = mode == "5. 流动性" and is_liq_meltdown
+if show_liq_mark and not show_liq_mark[1] and show_markers
+    label.new(bar_index, plot_val - 4, "🏜️\n枯竭", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
+
 if is_liq_meltdown
     liq_col := c_super_red
 
@@ -1057,13 +1079,24 @@ if barstate.islast and mode == "5. 流动性"
         label.new(bar_index, th_liq_cn_crash, "熔断 (-5.0)", color = c_super_red, style = label.style_label_left, textcolor = c_white, size = size.small)
 
 // 6. 利润空间: Gap
-plot(mode == "6. 利润空间" ? plot_val : na, "Profit Gap", color = dyn_c, linewidth = 2)
-
-// 新增: CPI & PPI 辅助线
-// 确保只在"6. 利润空间"模式下显示
+// 定义 CPI & PPI 变量 (提前到这里，供绘图和标签使用)
 float cpi_val = region == "美国" ? us_cpi_yoy : cn_cpi_yoy
 float ppi_val = region == "美国" ? us_ppi_yoy : cn_ppi_yoy
 
+plot(mode == "6. 利润空间" ? plot_val : na, "Profit Gap", color = dyn_c, linewidth = 2)
+
+// 6. 通胀过热标记
+bool is_overheat = mode == "6. 利润空间" and cpi_val > 3.0
+if is_overheat and not is_overheat[1] and show_markers
+    label.new(bar_index, plot_val + 0.5, "🥵\n过热", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
+
+// 6. 深度通缩标记
+bool is_deflation = mode == "6. 利润空间" and cpi_val < 0 and ppi_val < 0
+if is_deflation and not is_deflation[1] and show_markers
+    label.new(bar_index, plot_val - 0.5, "🥶\n通缩", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
+
+// 新增: CPI & PPI 辅助线
+// 确保只在"6. 利润空间"模式下显示
 plot(mode == "6. 利润空间" ? cpi_val : na, "CPI", color = color.purple, linewidth = 1)
 plot(mode == "6. 利润空间" ? ppi_val : na, "PPI", color = color.blue, linewidth = 1)
 plot(mode == "6. 利润空间" ? 3.0 : na, "CPI 3.0", color = color.new(color.red, 50), style = plot.style_circles)
@@ -1098,6 +1131,11 @@ if barstate.islast and mode == "6. 利润空间"
 // 7. 实体热度: 铜金比
 plot(mode == "7. 实体热度" ? plot_val : na, "Copper/Gold", color = dyn_c, linewidth = 2)
 
+// 7. 崩盘标记
+bool is_cg_crash_mark = mode == "7. 实体热度" and s7 == -1.0
+if is_cg_crash_mark and not is_cg_crash_mark[1] and show_markers
+    label.new(bar_index, plot_val + 0.1, "📉\n崩盘", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
+
 // 动态计算 EMA 周期
 // 日线: 60 (季度线)
 // 周线: 12 (季度线)
@@ -1107,6 +1145,11 @@ plot(mode == "7. 实体热度" ? ta.ema(plot_val, ema_len_dynamic) : na, "CG EMA
 
 // 8. 萨姆规则: Sahm + 阈值
 plot(mode == "8. 萨姆规则" ? plot_val : na, "Sahm", color = dyn_c, linewidth = 2)
+
+// 8. 衰退熔断标记
+bool is_sahm_melt = mode == "8. 萨姆规则" and s8 == -1.0
+if is_sahm_melt and not is_sahm_melt[1] and show_markers
+    label.new(bar_index, plot_val + 0.1, "💀\n衰退", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
 
 // 萨姆规则阈值线
 hline(0.50, "衰退熔断", color = mode == "8. 萨姆规则" ? c_super_red : na, linestyle = hline.style_solid, linewidth = 2)
