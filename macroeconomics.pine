@@ -878,7 +878,11 @@ else if mode == "7. 实体热度"
     dyn_c := is_cg_crash_htf ? c_red : get_score_col(s7)
 else if mode == "8. 萨姆规则"
     plot_val := sahm_val
-    dyn_c := get_score_col(s8)
+    // 熔断时曲线变深红
+    dyn_c := s8 == -1.0 ? c_super_red : get_score_col(s8)
+    
+// 萨姆规则熔断背景高亮 (全局作用域)
+bgcolor(mode == "8. 萨姆规则" and s8 == -1.0 ? color.new(c_super_red, 80) : na, title="Sahm Meltdown BG")
 
 // --- 综合绘图 ---
 // 1. 基准利率: 阶梯图 + EMA
@@ -1069,11 +1073,18 @@ plot(mode == "7. 实体热度" ? plot_val : na, "Copper/Gold", color = dyn_c, li
 
 // 8. 萨姆规则: Sahm + 阈值
 plot(mode == "8. 萨姆规则" ? plot_val : na, "Sahm", color = dyn_c, linewidth = 2)
-plot(mode == "8. 萨姆规则" ? 0.5 : na, "Sahm 0.5", color = c_red, style = plot.style_circles)
-plot(mode == "8. 萨姆规则" ? 0.3 : na, "Sahm 0.3", color = c_orange)
+
+// 萨姆规则阈值线 (全局作用域)
+hline(0.50, "衰退熔断", color = mode == "8. 萨姆规则" ? c_super_red : na, linestyle = hline.style_solid, linewidth = 2)
+hline(0.30, "衰退关注", color = mode == "8. 萨姆规则" ? c_orange : na, linestyle = hline.style_dashed)
+
+// 萨姆规则标签
+if mode == "8. 萨姆规则" and barstate.islast
+    label.new(bar_index + 3, 0.50, "衰退熔断 (0.5%)", color = color(na), style = label.style_none, textcolor = c_super_red, size = size.normal, textalign = text.align_left)
+    label.new(bar_index + 3, 0.30, "衰退关注 (0.3%)", color = color(na), style = label.style_none, textcolor = c_orange, size = size.small, textalign = text.align_left)
 
 // 通用 0 轴 (虚线)
-hline(0, "Zero Line", color = color.gray, linestyle = hline.style_dashed)
+hline(0, "零线", color = color.gray, linestyle = hline.style_dashed)
 
 // --- 看板绘制 ---
 var table rpt = table.new(position.middle_left, 7, 11, bgcolor = c_bg, border_width = 1, border_color = color.gray)
