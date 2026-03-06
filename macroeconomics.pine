@@ -500,39 +500,38 @@ float score_us_liq = 0.0
 float score_cn_liq = 0.0
 
 // --- US Liquidity Calculation ---
-// 枯竭: <-2.0% (连续 N 月)
 float sec_per_month_liq = 86400000 / 1000 * 30 // 近似
 int bars_liq_conf = math.max(1, math.ceil(dur_liq_conf * sec_per_month_liq / sec_per_bar))
 
-bool is_liq_crash = true
-for i = 0 to bars_liq_conf - 1
-    if us_m2_yoy[i] >= -2.0
-        is_liq_crash := false
-        break
-        
-bool is_liq_expand = true
-for i = 0 to bars_liq_conf - 1
-    if us_m2_yoy[i] <= th_liq_us_noise
-        is_liq_expand := false
-        break
+// 枯竭: <-2.0% (连续 N 月)
+bool is_liq_crash = is_sustained(us_m2_yoy < -2.0, bars_liq_conf)
+// 紧缩: < -0.2% (连续 N 月, README 要求确认)
+bool is_liq_tight = is_sustained(us_m2_yoy < -th_liq_us_noise, bars_liq_conf)
+// 扩张: > 0.2% (连续 N 月)
+bool is_liq_expand = is_sustained(us_m2_yoy > th_liq_us_noise, bars_liq_conf)
 
 if is_liq_crash
     score_us_liq := -1.0 // 枯竭
-// 紧缩: <阈值 (即时)
-else if us_m2_yoy < -th_liq_us_noise
+else if is_liq_tight
     score_us_liq := -0.5 // 紧缩
-// 扩张: >阈值 (连续 N 月)
 else if is_liq_expand
     score_us_liq := 1.0  // 扩张
 else
     score_us_liq := 0.0  // 存量博弈
 
 // --- CN Liquidity Calculation ---
-if cn_gap < -5.0
+// 严重空转: <-5.0% (连续 N 月)
+bool is_cn_crash = is_sustained(cn_gap < -5.0, bars_liq_conf)
+// 资金空转: < -0.5% (连续 N 月)
+bool is_cn_tight = is_sustained(cn_gap < -th_liq_cn_noise, bars_liq_conf)
+// 活化: > 0.5% (连续 N 月)
+bool is_cn_expand = is_sustained(cn_gap > th_liq_cn_noise, bars_liq_conf)
+
+if is_cn_crash
     score_cn_liq := -1.0 // 严重空转
-else if cn_m1_yoy < cn_m2_yoy - th_liq_cn_noise
+else if is_cn_tight
     score_cn_liq := -0.5 // 资金空转
-else if cn_m1_yoy > cn_m2_yoy + th_liq_cn_noise
+else if is_cn_expand
     score_cn_liq := 1.0  // 活化
 else
     score_cn_liq := 0.0  // 结构震荡
