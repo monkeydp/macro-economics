@@ -993,6 +993,10 @@ if barstate.islast and mode == "4. 信用风险"
 plot(mode == "5. 流动性" ? plot_val : na, "Liquidity", color = dyn_c, linewidth = 2)
 plot(mode == "5. 流动性" and region == "美国" ? -2.0 : na, "M2 -2", color = c_red)
 
+// 增加 -2.0 标签
+if barstate.islast and mode == "5. 流动性" and region == "美国"
+    label.new(bar_index, -2.0, "枯竭 (-2%)", color = c_red, style = label.style_label_left, textcolor = c_white, size = size.small)
+
 // 6. 利润空间: Gap
 plot(mode == "6. 利润空间" ? plot_val : na, "Profit Gap", color = dyn_c, linewidth = 2)
 
