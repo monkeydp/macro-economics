@@ -1028,8 +1028,6 @@ if barstate.islast and mode == "5. 流动性"
 plot(mode == "6. 利润空间" ? plot_val : na, "Profit Gap", color = dyn_c, linewidth = 2)
 
 // 新增: CPI & PPI 辅助线
-// 颜色选择: 避免与 dyn_c (红绿灯) 和 背景色冲突
-// CPI 使用 紫色 (color.purple), PPI 使用 蓝色 (color.blue)
 // 确保只在"6. 利润空间"模式下显示
 float cpi_val = region == "美国" ? us_cpi_yoy : cn_cpi_yoy
 float ppi_val = region == "美国" ? us_ppi_yoy : cn_ppi_yoy
