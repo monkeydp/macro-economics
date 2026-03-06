@@ -1329,7 +1329,7 @@ if barstate.islast and show_report
 
     else if mode == "5. 流动性"
         if region == "美国"
-            d_title := "流动性增速\n[M2REAL YoY]", d_def := "广义货币供应量同比(剔除通胀)。\nM2REAL 同比 > 0 = 美国印钱 = 全球水位上涨。"
+            d_title := "流动性增速\n[M2REAL YoY]", d_def := "广义货币供应量同比(剔除通胀)。\nM2REAL 同比 >0 = 美国印钱 = 全球水位上涨。"
             d_obs := "12月 (同比)", d_logic := "🔴 枯竭: <-2%\n🟠 紧缩: <0\n🟡 存量: ≈0\n🟢 扩张: >0", d_conf := "连续2个月确认"
             d_w := w5 > 1.0 ? "x2" : "x1"
             d_cur_stat := t5_s
@@ -1367,7 +1367,7 @@ if barstate.islast and show_report
                 d_risk := "开始抽水"
         else
             d_title := "流动性增速差\n[M1增速 - M2增速]", d_def := "M1增速 - M2增速 (信贷脉搏)\n正: 活水注入; 负: 资金空转(定期化)。"
-            d_obs := "12月 (同比)", d_logic := "🔴 严重空转: <-5%\n🟠 空转: <0\n🟢 活化: >0", d_conf := "连续2个月确认"
+            d_obs := "12月 (同比)", d_logic := "🔴 严重空转: <-5%\n🟠 空转: <0\n🟡 震荡: ≈0\n🟢 活化: >0", d_conf := "连续2个月确认"
             d_w := w5 > 1.0 ? "x2" : "x1"
             d_cur_stat := t5_s
             d_cur_val := str.tostring(cn_gap, "0.00") + "% | " + fmt_ym(cn_time)
