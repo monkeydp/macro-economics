@@ -297,7 +297,7 @@ cn_gap = cn_m1_yoy - cn_m2_yoy
 [us_ppi, us_ppi_yoy] = request.security(sym_us_ppi, "M", [close, calc_yoy(close, prof_yoy_len)], gaps = barmerge.gaps_off)
 us_profit_gap = us_cpi_yoy - us_ppi_yoy
 
-cn_cpi_yoy = request.security(sym_cn_cpi, "M", calc_yoy(close, prof_yoy_len), gaps = barmerge.gaps_off)
+[cn_cpi_yoy, cn_prof_time] = request.security(sym_cn_cpi, "M", [calc_yoy(close, prof_yoy_len), time], gaps = barmerge.gaps_off)
 cn_ppi_yoy = request.security(sym_cn_ppi, "M", calc_yoy(close, prof_yoy_len), gaps = barmerge.gaps_off)
 cn_profit_gap = cn_cpi_yoy - cn_ppi_yoy
 
@@ -783,10 +783,11 @@ else
 
 // 6. 利润空间
 if region == "美国"
-    if s6 == -1.0 and w6 > 1.0
-        t6_s := "通胀过热", t6_a := "【避险】 卖出成长股，买入能源/黄金"
-    else if s6 == -1.0
-        t6_s := "通缩幻觉 (双负)", t6_a := "【避险】 卖出所有资产，买入美元现金"
+    if s6 == -1.0
+        if w6 > 1.0 // 通胀过热 (CPI>3)
+            t6_s := "通胀过热", t6_a := "【避险】 卖出成长股，买入能源/黄金"
+        else // 通缩 (双负)
+            t6_s := "通缩幻觉 (双负)", t6_a := "【避险】 卖出所有资产，买入美元现金"
     else if s6 == -0.5
         t6_s := "亏损 (成本倒挂)", t6_a := "【防御】 卖出中下游制造，买入防御/红利"
     else if s6 == 0.0
@@ -802,8 +803,10 @@ else
         t6_s := "亏损 (倒挂)", t6_a := "【防御】 卖出中游制造，买入上游资源"
     else if s6 == 0.0
         t6_s := "内卷 (利润压缩)", t6_a := "【观察】 回避同质化竞争，只看龙头"
+    else if s6 == 0.5
+        t6_s := "修复 (困境反转)", t6_a := "【进攻】 卖出防御股，买入反转股"
     else
-        t6_s := "修复 (改善)", t6_a := "【进攻】 卖出防御股，买入反转股"
+        t6_s := "躺赚 (利润释放)", t6_a := "【进攻】 卖出上游资源，买入消费/中下游"
 
 // 7. 实体热度
 if s7 == -1.0
@@ -1629,16 +1632,30 @@ if barstate.islast and show_report
             
     else if mode == "6. 利润空间"
         cur_score_disp := s6
-        if s6 == -1.0 // 过热/通缩 -> 降温/走出 (黄)
-            turn_score_disp := 0.0
-        else if s6 == -0.5 // 亏损 -> 收窄 (黄)
-            turn_score_disp := 0.0
-        else if s6 == 0.0 // 震荡 -> 释放 (绿)
-            turn_score_disp := 1.0
-        else if s6 == 0.5 // 修复 -> 变薄 (黄)
-            turn_score_disp := 0.0
-        else // 躺赚 -> 变薄 (浅绿)
-            turn_score_disp := 0.5
+        if region == "美国"
+            if s6 == -1.0 and w6 > 1.0 // 过热 -> 降温 (绿)
+                turn_score_disp := 0.5
+            else if s6 == -1.0 // 通缩 -> 复苏 (绿)
+                turn_score_disp := 0.5
+            else if s6 == -0.5 // 亏损 -> 收窄 (黄)
+                turn_score_disp := 0.0
+            else if s6 == 0.0 // 震荡 -> 释放 (绿)
+                turn_score_disp := 1.0
+            else if s6 == 0.5 // 修复 -> 变薄 (黄)
+                turn_score_disp := 0.0
+            else // 躺赚 -> 变薄 (浅绿)
+                turn_score_disp := 0.5
+        else
+            if s6 == -1.0 // 通缩 -> 复苏 (绿)
+                turn_score_disp := 0.5
+            else if s6 == -0.5 // 亏损 -> 收窄 (黄)
+                turn_score_disp := 0.0
+            else if s6 == 0.0 // 内卷 -> 释放 (绿)
+                turn_score_disp := 1.0
+            else if s6 == 0.5 // 修复 -> 变薄 (黄)
+                turn_score_disp := 0.0
+            else // 躺赚 -> 变薄 (浅绿)
+                turn_score_disp := 0.5
             
     else if mode == "7. 实体热度"
         cur_score_disp := s7
