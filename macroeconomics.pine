@@ -306,19 +306,16 @@ cn_profit_gap = cn_cpi_yoy - cn_ppi_yoy
 // 日线图：直接读取当日跌幅
 // 周线/月线图：扫描本周期内每一天的跌幅，只要有一天 < -3.0%，即触发崩盘
 
-// 1. 获取日线实时数据
-[copper, copper_chg_pct_d] = request.security(sym_copper, "D", [close, (close / close[1] - 1) * 100], gaps = barmerge.gaps_off)
-[gold, gold_prev]     = request.security(sym_gold, "D", [close, close[1]], gaps = barmerge.gaps_off)
+// 1. 获取日线实时数据及趋势数据
+[cop_d, cop_d_prev, cop_d_trend] = request.security(sym_copper, "D", [close, close[1], close[cg_slope_len]], gaps = barmerge.gaps_off)
+[gld_d, gld_d_prev, gld_d_trend] = request.security(sym_gold,   "D", [close, close[1], close[cg_slope_len]], gaps = barmerge.gaps_off)
 
-// 2. 获取日线铜金比 (用于显示)
-// 注意：动态计算 Ticker 字符串在 Pine Script 中有限制，无法直接传递给 request.security
-// 替代方案：分别获取铜和金的日线数据，在本地计算比值
-// 2.1 分别获取日线数据
-[cop_d, cop_d_prev] = request.security(sym_copper, "D", [close, close[1]], gaps = barmerge.gaps_off)
-[gld_d, gld_d_prev] = request.security(sym_gold, "D", [close, close[1]], gaps = barmerge.gaps_off)
-// 2.2 本地计算比值
-cg_ratio_d = cop_d / gld_d * 1000
-cg_ratio_prev_d = cop_d_prev / gld_d_prev * 1000
+// 2. 本地计算比值
+cg_ratio_d       = cop_d / gld_d * 1000
+cg_ratio_prev_d  = cop_d_prev / gld_d_prev * 1000     // 用于单日显示/崩盘计算
+cg_ratio_trend_d = cop_d_trend / gld_d_trend * 1000   // 用于60日趋势计算
+
+// 计算单日涨跌幅 (仅用于崩盘扫描)
 cg_chg_pct_d = (cg_ratio_d / cg_ratio_prev_d - 1) * 100
 
 // 3. 崩盘扫描
@@ -355,17 +352,22 @@ else if cg_crash_cnt > 0
     cg_crash_cnt := cg_crash_cnt - 1
 is_cg_crash = cg_crash_cnt > 0
 
-// 伪复苏: 铜金比 5日线涨 但 铜价 5日线跌 (右侧确认)
-// 简化处理：使用日线收盘价对比 (因为我们已经获取了 cop_d 和 cop_d_prev)
-// 伪复苏 = 铜金比涨 (cg_ratio_d > cg_ratio_prev_d) 但 铜价跌 (cop_d < cop_d_prev)
-bool is_fake_recovery = cg_ratio_d > cg_ratio_prev_d and cop_d < cop_d_prev
+// 趋势判定
+float cg_trend_chg_pct = (cg_ratio_d / cg_ratio_trend_d - 1) * 100
+float cop_trend_chg_pct = (cop_d / cop_d_trend - 1) * 100
 
-// 为了后续逻辑兼容，cg_ratio 依然需要赋值
+bool is_trend_up   = cg_trend_chg_pct > th_cg_noise
+bool is_trend_down = cg_trend_chg_pct < -th_cg_noise
+bool is_cop_trend_up   = cop_trend_chg_pct > 0
+bool is_cop_trend_down = cop_trend_chg_pct < 0
+
+// 伪复苏: 铜金比趋势涨，但铜价趋势跌
+bool is_fake_recovery = is_trend_up and is_cop_trend_down
+
 float cg_ratio = cg_ratio_d
-// 计算 cg_ratio_prev 仅用于后续简单对比
 float cg_ratio_prev = cg_ratio_prev_d
-// copper 变量也需要赋值用于后续显示
 float copper_prev = cop_d_prev
+float copper = cop_d
 
 // --- 8. 萨姆规则 (就业) ---
 // 确认时长: 非农公布日
@@ -411,7 +413,7 @@ string t6_s = "", string t6_a = ""
 string t7_s = "", string t7_a = ""
 string t8_s = "", string t8_a = ""
 
-// 1. EFFR
+// 1. 基准利率
 // 状态定义：基于 EMA 的周期判定
 bool is_cut_cycle  = effr_live < effr_ema - th_effr_noise
 bool is_hike_cycle = effr_live > effr_ema + th_effr_noise
@@ -443,7 +445,7 @@ else if is_cut_cycle
 else
     s1 := 0.0  // 常态震荡
 
-// 2. TIPS
+// 2. 真实利率
 int bars_tips_conf = math.max(1, math.ceil(dur_tips_conf * sec_per_day / sec_per_bar))
 
 // 辅助函数：连续满足
@@ -460,7 +462,7 @@ else if is_sustained(tips_live < 0, bars_tips_conf)
 else
     s2 := 1.0  // 健康支撑
 
-// 3. Yield Curve
+// 3. 利差结构
 if is_bull_steep
     w3 := 2.0
     s3 := -1.0 // 基础分设为-1, 配合权重2 => -2
@@ -470,8 +472,7 @@ else if math.abs(yc_val) <= th_yc_noise
     s3 := 0.0  // 平坦
 else
     // 熊陡: 双涨且长债涨幅 > 短债涨幅 (且长债涨幅显著 > 阈值)
-    // 增加确认期: 连续 N 日满足条件
-    // 修正：将 N 日转换为 N 个 Bar
+
     int bars_yc_conf = math.max(1, math.ceil(dur_yc_bear_conf * sec_per_day / sec_per_bar))
     bool is_bear_steep_raw = y10_chg > th_yc_bear_steep and y2_chg > 0 and y10_chg > y2_chg
     bool is_bear_steep = is_sustained(is_bear_steep_raw, bars_yc_conf)
@@ -481,7 +482,7 @@ else
 if is_panic_era and s3 < 0
     w3 := 2.0
 
-// 4. OAS
+// 4. 信用风险
 if is_oas_crash
     s4 := -1.0 
     w4 := 2.0
@@ -513,11 +514,8 @@ float score_cn_liq = 0.0
 float sec_per_month_liq = 86400000 / 1000 * 30 
 int bars_liq_conf = math.max(1, math.ceil(dur_liq_conf * sec_per_month_liq / sec_per_bar))
 
-// 枯竭: <-2.0% (立即生效，暴跌无需确认)
 bool is_liq_crash = us_m2_yoy < th_liq_us_crash
-// 紧缩: < -0.2% (连续 N 月)
 bool is_liq_tight = is_sustained(us_m2_yoy < -th_liq_us_noise, bars_liq_conf)
-// 扩张: > 0.2% (连续 N 月)
 bool is_liq_expand = is_sustained(us_m2_yoy > th_liq_us_noise, bars_liq_conf)
 
 if is_liq_crash
@@ -530,11 +528,8 @@ else
     score_us_liq := 0.0  // 存量博弈
 
 // --- 中国流动性计算 ---
-// 严重空转: <-5.0% (立即生效，暴跌无需确认)
 bool is_cn_crash = cn_gap < th_liq_cn_crash
-// 资金空转: < -0.5% (连续 N 月)
 bool is_cn_tight = is_sustained(cn_gap < -th_liq_cn_noise, bars_liq_conf)
-// 活化: > 0.5% (连续 N 月)
 bool is_cn_expand = is_sustained(cn_gap > th_liq_cn_noise, bars_liq_conf)
 
 if is_cn_crash
@@ -546,7 +541,7 @@ else if is_cn_expand
 else
     score_cn_liq := 0.0  // 结构震荡
 
-// 根据地区选择赋值 s5
+// 根据地区选择赋值
 if region == "美国"
     s5 := score_us_liq
 else // 中国
@@ -647,25 +642,23 @@ else // CN
         s6 := 0.0
         t6_s := "利润承压 (震荡)", t6_a := "【观察】 多看少做"
 
-// 7. Real Economy
+// 7. 实体热度
 if is_cg_crash
-    s7 := -1.0 // 崩盘
-else if cg_ratio < cg_ratio_prev * (1.0 - th_cg_noise/100.0) // 使用斜率阈值作为下跌缓冲? 这里简单处理，如果跌幅超过阈值
-    s7 := -0.5 // 衰退
+    s7 := -1.0 // 崩盘 (单日暴跌优先)
 else if is_fake_recovery
-    s7 := -0.5 // 伪复苏
-else if cg_ratio > cg_ratio_prev * (1.0 + th_cg_noise/100.0) and copper > copper_prev
-    s7 := 1.0  // 复苏
+    s7 := -0.5 // 伪复苏 (趋势背离)
+else if is_trend_down
+    s7 := -0.5 // 衰退 (趋势向下)
+else if is_trend_up and is_cop_trend_up
+    s7 := 1.0  // 复苏 (趋势向上且铜价确认)
 else
-    s7 := 0.0  // 震荡
+    s7 := 0.0  // 震荡 (趋势不明显)
 
-// 8. Sahm
-// 修正：将周数转换为 Bar 数 (ICSA 是周更数据)
+// 8. 萨姆规则
 float sec_per_week = 86400000 / 1000 * 7
 int bars_icsa_conf = math.max(1, math.ceil(2 * sec_per_week / sec_per_bar)) // 连续2周
 
 // ICSA 预警: 初请失业金同比 > 15% (连续 N 周)
-// 修正：使用 bars_icsa_conf 检查
 bool is_icsa_warn = true
 for i = 0 to bars_icsa_conf - 1
     // 注意：icsa_yoy 是周线数据，这里需要获取对应的历史值
@@ -1530,7 +1523,7 @@ if barstate.islast and show_report
 
     else if mode == "7. 实体热度"
         d_title := "实体热度\n[铜金比]", d_def := "铜(工业) / 金(避险)\n比值涨=复苏; 比值跌=衰退。"
-        d_obs := "20日 (趋势)", d_logic := "🔴 崩盘: 单日跌>3%\n🟠 衰退: 跌\n🟠 伪复苏: 铜跌\n🟡 震荡: 平\n🟢 复苏: 双涨", d_conf := "连续5日确认"
+        d_obs := "60日 (趋势)", d_logic := "🔴 崩盘: 单日跌>3%\n🟠 衰退: 跌\n🟠 伪复苏: 铜跌\n🟡 震荡: 平\n🟢 复苏: 双涨", d_conf := "连续5日确认"
         d_w := w7 > 1.0 ? "x2" : "x1"
         d_cur_stat := t7_s
         d_cur_val := str.tostring(cg_ratio, "0.00")
