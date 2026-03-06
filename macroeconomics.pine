@@ -877,9 +877,14 @@ bgcolor(mode == "8. 萨姆规则" and s8 == -1.0 ? color.new(c_super_red, 80) : 
 bool is_effr_panic_bg = mode == "1. 基准利率" and (s1 == -1.0 or ((timeframe.isweekly or timeframe.ismonthly) and effr_drop >= 0.5))
 bgcolor(is_effr_panic_bg ? color.new(c_red, 80) : na, title="EFFR Panic BG")
 
-// 真实利率滞胀/虹吸背景高亮 (全局作用域)
-bool is_tips_risk_bg = mode == "2. 真实利率" and s2 == -1.0
-bgcolor(is_tips_risk_bg ? color.new(c_super_red, 80) : na, title="TIPS Risk BG")
+// 真实利率背景高亮
+// 滞胀: 深红 (痛苦指数高)
+bool is_stag_bg = mode == "2. 真实利率" and s2 == -1.0 and rgdp_val < 0
+bgcolor(is_stag_bg ? color.new(c_super_red, 80) : na, title="Stagflation BG")
+
+// 虹吸: 红色 (资金抽离)
+bool is_siphon_bg = mode == "2. 真实利率" and s2 == -1.0 and tips_live >= rgdp_val
+bgcolor(is_siphon_bg ? color.new(c_red, 80) : na, title="Siphon BG")
 
 // --- 综合绘图 ---
 // 1. 基准利率: 阶梯图 + EMA
