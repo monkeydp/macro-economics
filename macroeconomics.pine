@@ -632,7 +632,8 @@ if sahm_val >= 0.5
     s8 := -1.0 // 衰退熔断 (配合权重x2)
     w8 := 2.0
 else if sahm_val >= 0.3
-    s8 := -1.0 // 衰退预警
+    s8 := -0.5 // 衰退关注 (降级为橙色)
+    w8 := 2.0  // 权重依然翻倍 (恐慌时代)
 else if is_icsa_warn
     s8 := -0.5 // ICSA 预警
 else
@@ -808,12 +809,13 @@ else
     t7_s := "复苏 (扩建鱼池)", t7_a := "【进攻】 卖出避险资产，买入周期股/工业品"
 
 // 8. 萨姆规则
-if s8 == -1.0 and w8 > 1.0
+if s8 == -1.0
     t8_s := "衰退熔断", t8_a := "【清仓】 卖出风险资产，买入美债/黄金"
-else if s8 == -1.0
-    t8_s := "衰退预警", t8_a := "【避险】 卖出风险资产，买入美债"
 else if s8 == -0.5
-    t8_s := "ICSA 提前预警", t8_a := "【防御】 卖出风险资产，买入现金/红利"
+    if sahm_val >= 0.3
+        t8_s := "衰退关注", t8_a := "【防御】 停止加仓，配置美债对冲"
+    else
+        t8_s := "ICSA 提前预警", t8_a := "【防御】 卖出风险资产，买入现金/红利"
 else
     t8_s := "就业健康", t8_a := "【进攻】 卖出避险资产，买入科技/消费"
 
@@ -1477,45 +1479,37 @@ if barstate.islast and show_report
 
     else if mode == "8. 萨姆规则"
         d_title := "衰退预警\n[Sahm]", d_def := "失业率3月均值 - 12月低点。\n死神信号，100%准确率。"
-        d_obs := "12月 (低点)", d_logic := "🛑 衰退: ≥0.5%\n🔴 预警: ≥0.3%\n🟠 预警: ICSA>15%\n🟢 健康: <0.3%", d_conf := "非农发布日确认"
+        d_obs := "12月 (低点)", d_logic := "🛑 衰退: ≥0.5%\n🟠 关注: ≥0.3%\n🟠 预警: ICSA>15%\n🟢 健康: <0.3%", d_conf := "非农发布日确认"
         d_w := w8 > 1.0 ? "x2" : "x1"
         d_cur_stat := t8_s
         d_cur_val := str.tostring(sahm_val, "0.00") + "% | " + fmt_ym(sahm_time)
         
-        // 8. 萨姆规则拐点
-        if s8 == -1.0 and w8 > 1.0 // 衰退熔断
+        // 8. 萨姆规则含义与战术 (复用左表逻辑)
+        if s8 == -1.0 // 熔断
+            d_cur_mean := "经济确信衰退，失业失控"
+            d_tactics  := "历史准确率100%的衰退信号\n必须离场，买入美债避险"
             d_turn_val := "回落至 0.5% 下 (警报解除)"
-        else if s8 == -1.0 // 衰退预警
-            d_turn_val := "回落至 0.3% 下 (风险解除)"
-        else if s8 == -0.5 // ICSA 预警
-            d_turn_val := "ICSA 回落 (就业改善)"
-        else // 就业健康
-            d_turn_val := "突破 0.3% (衰退预警)"
-            
-        // 8. 萨姆含义与拐点战术
-        if s8 == -1.0 and w8 > 1.0 // 熔断
-            d_cur_mean := "衰退确认，死神降临"
-            d_tactics_turn := "危机解除，报复性反弹\n买入超跌股"
-        else if s8 == -1.0 // 预警
-            d_cur_mean := "衰退预警，死神敲门"
-            d_tactics_turn := "虚惊一场，买回筹码\n加仓风险资产"
-        else if s8 == -0.5 // ICSA
-            d_cur_mean := "失业增加，乌云压顶"
-            d_tactics_turn := "就业改善，数据转好\n持有风险资产"
-        else // 健康
-            d_cur_mean := "就业充分，天下太平"
-            d_tactics_turn := "衰退预警，清仓避险\n买入美债"
-            
-        if s8 == -1.0 and w8 > 1.0 // 熔断
+            d_tactics_turn := "警报解除，但需确认趋势\n轻仓试探风险资产"
             d_risk := "警报解除"
-        else if s8 == -1.0 // 预警
-            d_risk := sahm_val < 0.3 ? "风险解除 (确认中)" : "风险解除"
-        else if s8 == -0.5 // ICSA
-            d_risk := "就业改善"
-        else // 健康
-            d_risk := sahm_val >= 0.3 ? "衰退预警 (确认中)" : "衰退预警"
-            
-        d_tactics := (s8 < 0 ? (sahm_val >= 0.5 ? "历史准确率100%的衰退信号，必须离场\n买入美债 (TLT) 和黄金 (GLD) 避险" : "衰退概率激增，不再恋战\n清仓股票，转入防御性资产") : "就业市场健康，经济韧性强\n大胆持有风险资产")
+        else if s8 == -0.5
+            if sahm_val >= 0.3 // 衰退关注
+                d_cur_mean := "衰退概率激增，不再恋战"
+                d_tactics  := "停止进攻，配置美债对冲\n不再加仓风险资产"
+                d_turn_val := "回落至 0.3% 下 (风险解除)"
+                d_tactics_turn := "虚惊一场，买回筹码\n加仓风险资产"
+                d_risk := "风险解除"
+            else // ICSA 预警
+                d_cur_mean := "就业市场出现裂痕"
+                d_tactics  := "初请失业金人数飙升\n减仓观望，等待萨姆确认"
+                d_turn_val := "ICSA 回落 (就业改善)"
+                d_tactics_turn := "就业数据改善\n恢复正常仓位"
+                d_risk := "就业改善"
+        else
+            d_cur_mean := "就业强劲，工资上涨"
+            d_tactics  := "消费有底气，利好美股\n大胆持有成长股"
+            d_turn_val := "突破 0.3% (衰退关注)"
+            d_tactics_turn := "就业恶化，准备防守\n降低风险敞口"
+            d_risk := "衰退关注"
 
     // Render Right Table
     // Row 0
