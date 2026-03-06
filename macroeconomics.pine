@@ -2,7 +2,7 @@
 indicator("[薯仔] 宏观经济审计看板", overlay = false, precision = 2, max_labels_count = 500)
 
 // ==========================================
-// 1. 设置与配色 (Settings & Colors)
+// 1. 设置与参数 (Settings & Inputs)
 // ==========================================
 show_report = input.bool(true, "显示决策看板", group="显示设置")
 mode = input.string("1. 基准利率", "当前显示曲线",
@@ -11,33 +11,70 @@ mode = input.string("1. 基准利率", "当前显示曲线",
      "7. 实体热度", "8. 萨姆规则"], group="显示设置")
 region = input.string("美国", "监控地区", options=["美国", "中国"], group="显示设置", tooltip="仅影响: 5.流动性 / 6.利润空间")
 
-// 参数设置
-effr_ema_len = input.int(10, "基准利率 EMA 周期", minval=1, group="周期参数设置", tooltip="仅影响: 1.基准利率")
-yoy_len = input.int(12, "增速同比周期", minval=1, group="周期参数设置", tooltip="仅影响: 5.流动性 / 6.利润空间")
-slope_len = input.int(60, "斜率观测周期", minval=1, group="周期参数设置", tooltip="仅影响: 3.利差结构 / 4.信用风险 / 7.实体热度")
+// --- 1. 基准利率 (EFFR) ---
+grp_1 = "1. 基准利率 (EFFR)"
+sym_effr        = input.symbol("FRED:EFFR", "数据源 (EFFR)", group=grp_1, display=display.none)
+effr_ema_len    = input.int(10, "EMA 周期（月）", minval=1, group=grp_1, display=display.none)
+th_effr_noise   = input.float(0.05, "震荡阈值", minval=0.0, step=0.01, group=grp_1, display=display.none)
+dur_sahm_panic  = input.int(90, "救火降息有效期 (日)", minval=1, group=grp_1, tooltip="自然日。90日 ≈ 1季度", display=display.none)
 
-// 震荡过滤阈值
-grp_noise = "震荡过滤阈值"
-th_effr_noise   = input.float(0.05, "基准利率震荡", minval=0.0, group=grp_noise)
-th_yc_noise     = input.float(0.15, "利差结构震荡",   minval=0.0, group=grp_noise)
-th_yc_bull_steep= input.float(0.15, "利差牛陡容差",   minval=0.0, group=grp_noise)
-th_yc_bear_steep= input.float(0.15, "利差熊陡容差",   minval=0.0, group=grp_noise)
-th_oas_noise    = input.float(0.01, "信用风险斜率",  minval=0.0, group=grp_noise)
-th_liq_us_noise = input.float(0.50, "美国流动性",     minval=0.0, group=grp_noise)
-th_liq_cn_noise = input.float(0.50, "中国流动性",  minval=0.0, group=grp_noise)
-th_prof_noise   = input.float(0.20, "利润空间",   minval=0.0, group=grp_noise)
-th_cg_noise     = input.float(0.05, "铜金比斜率",     minval=0.0, group=grp_noise)
+// --- 2. 真实利率 (TIPS) ---
+grp_2 = "2. 真实利率 (TIPS)"
+sym_tips        = input.symbol("FRED:DFII10", "数据源 (TIPS)", group=grp_2, display=display.none)
+sym_rgdp        = input.symbol("FRED:A191RL1Q225SBEA", "数据源 (RGDP)", group=grp_2, display=display.none)
+dur_tips_conf   = input.int(5, "确认时长 (日)", minval=1, group=grp_2, display=display.none)
 
-// 信号锁定周期 (Lock-in)
-grp_lock = "信号锁定与确认周期 (Timeframe)"
-lock_bull_steep   = input.int(10, "牛陡熔断锁定 (日)", minval=1, group=grp_lock, tooltip="交易日。10日 ≈ 2周")
-dur_yc_bear_conf  = input.int(5,  "熊陡确认 (日)",     minval=1, group=grp_lock, tooltip="交易日。5日 ≈ 1周")
-lock_credit_crash = input.int(10, "信用熔断锁定 (日)", minval=1, group=grp_lock, tooltip="交易日。10日 ≈ 2周")
-lock_cg_crash     = input.int(5,  "铜金崩盘锁定 (日)", minval=1, group=grp_lock, tooltip="交易日。5日 ≈ 1周")
-dur_tips_conf     = input.int(5,  "真实利率确认 (日)", minval=1, group=grp_lock)
-dur_liq_conf      = input.int(2,  "流动性确认 (月)",   minval=1, group=grp_lock)
-dur_prof_conf     = input.int(2,  "利润空间确认 (月)", minval=1, group=grp_lock)
-dur_sahm_panic    = input.int(90, "救火降息有效期 (日)", minval=1, group=grp_lock, tooltip="自然日。90日 ≈ 1季度")
+// --- 3. 利差结构 (Yield Curve) ---
+grp_3 = "3. 利差结构 (10Y-2Y)"
+sym_us_10y      = input.symbol("FRED:GS10", "数据源 (10Y)", group=grp_3, display=display.none)
+sym_us_2y       = input.symbol("FRED:GS2", "数据源 (2Y)", group=grp_3, display=display.none)
+th_yc_noise     = input.float(0.15, "震荡阈值", minval=0.0, step=0.01, group=grp_3, display=display.none)
+th_yc_bull_steep= input.float(0.15, "牛陡容差", minval=0.0, step=0.01, group=grp_3, display=display.none)
+th_yc_bear_steep= input.float(0.15, "熊陡容差", minval=0.0, step=0.01, group=grp_3, display=display.none)
+lock_bull_steep = input.int(10, "牛陡熔断锁定 (日)", minval=1, group=grp_3, display=display.none)
+dur_yc_bear_conf= input.int(5, "熊陡确认时长 (日)", minval=1, group=grp_3, display=display.none)
+
+// --- 4. 信用风险 (OAS) ---
+grp_4 = "4. 信用风险 (OAS)"
+sym_oas         = input.symbol("FRED:BAMLH0A0HYM2", "数据源 (OAS)", group=grp_4, display=display.none)
+oas_slope_len   = input.int(60, "斜率观测周期", minval=1, group=grp_4, display=display.none)
+th_oas_noise    = input.float(0.01, "斜率震荡阈值", minval=0.0, step=0.01, group=grp_4, display=display.none)
+lock_credit_crash = input.int(10, "熔断锁定 (日)", minval=1, group=grp_4, display=display.none)
+
+// --- 5. 流动性 (Liquidity) ---
+grp_5 = "5. 流动性 (M2 / M1-M2)"
+sym_us_m2       = input.symbol("FRED:M2REAL", "数据源 (美国M2)", group=grp_5, display=display.none)
+sym_cn_m1       = input.symbol("ECONOMICS:CNM1", "数据源 (中国M1)", group=grp_5, display=display.none)
+sym_cn_m2       = input.symbol("ECONOMICS:CNM2", "数据源 (中国M2)", group=grp_5, display=display.none)
+liq_yoy_len     = input.int(12, "同比周期 (月)", minval=1, group=grp_5, display=display.none)
+th_liq_us_noise = input.float(0.50, "美国震荡阈值", minval=0.0, step=0.1, group=grp_5, display=display.none)
+th_liq_cn_noise = input.float(0.50, "中国震荡阈值", minval=0.0, step=0.1, group=grp_5, display=display.none)
+dur_liq_conf    = input.int(2, "确认时长 (月)", minval=1, group=grp_5, display=display.none)
+
+// --- 6. 利润空间 (Profit) ---
+grp_6 = "6. 利润空间 (CPI-PPI)"
+sym_us_cpi      = input.symbol("FRED:CPIAUCSL", "数据源 (美国CPI)", group=grp_6, display=display.none)
+sym_us_ppi      = input.symbol("FRED:PPIACO", "数据源 (美国PPI)", group=grp_6, display=display.none)
+sym_cn_cpi      = input.symbol("ECONOMICS:CNCPI", "数据源 (中国CPI)", group=grp_6, display=display.none)
+sym_cn_ppi      = input.symbol("ECONOMICS:CNPPI", "数据源 (中国PPI)", group=grp_6, display=display.none)
+prof_yoy_len    = input.int(12, "同比周期 (月)", minval=1, group=grp_6, display=display.none)
+th_prof_noise   = input.float(0.20, "震荡阈值", minval=0.0, step=0.1, group=grp_6, display=display.none)
+dur_prof_conf   = input.int(2, "确认时长 (月)", minval=1, group=grp_6, display=display.none)
+
+// --- 7. 实体热度 (Copper/Gold) ---
+grp_7 = "7. 实体热度 (铜金比)"
+sym_copper      = input.symbol("COMEX:HG1!", "数据源 (铜)", group=grp_7, display=display.none)
+sym_gold        = input.symbol("COMEX:GC1!", "数据源 (金)", group=grp_7, display=display.none)
+cg_slope_len    = input.int(60, "斜率观测周期", minval=1, group=grp_7, display=display.none) // 实际上代码里没用到斜率，用的是涨跌幅，但为了完整性保留或删除？
+// 代码里用的是涨跌幅，不是斜率。原参数 th_cg_noise 是"铜金比斜率"，默认0.05
+// 检查原逻辑: cg_ratio < cg_ratio_prev * (1.0 - th_cg_noise/100.0) -> 这是百分比跌幅阈值
+th_cg_noise     = input.float(0.05, "涨跌幅容差 (%)", minval=0.0, step=0.01, group=grp_7, display=display.none) 
+lock_cg_crash   = input.int(5, "崩盘锁定 (日)", minval=1, group=grp_7, display=display.none)
+
+// --- 8. 萨姆规则 (Sahm) ---
+grp_8 = "8. 萨姆规则 (Sahm)"
+sym_sahm        = input.symbol("FRED:SAHMREALTIME", "数据源 (Sahm)", group=grp_8, display=display.none)
+sym_icsa        = input.symbol("FRED:ICSA", "数据源 (ICSA)", group=grp_8, display=display.none)
 
 // 颜色定义
 c_red          = color.red      // 🔴 红色 (得分 -1.0)
@@ -74,27 +111,43 @@ float sec_per_day = 86400
 
 // --- 1. 基准利率 (EFFR) ---
 // 确认时长: FOMC 公布日
-// 修改：只获取当前值，在本地计算跌幅，以适应不同周期 (周线/月线也能捕捉到降息)
-// 修复：增加 effr_drop_max_22d 检测月内是否有救火降息
-[effr_live, effr_time, effr_chg, effr_drop_max_22d] = request.security("FRED:EFFR", "D", [close, time, close[1] - close, ta.highest(close[1] - close, 22)], gaps = barmerge.gaps_off)
-// 修改：使用月线 EMA 以匹配长期趋势 (10月EMA)
-effr_ema  = request.security("FRED:EFFR", "M", ta.ema(close, effr_ema_len), gaps = barmerge.gaps_off)
+// 核心修正：全周期扫描逻辑
+// 日线图：直接读取当日跌幅
+// 周线/月线图：扫描本周期内每一天的跌幅，只要有一天 >= 0.50%，即触发救火信号
+// 这样既不漏信号（哪怕是月初第一天），也不拖影（上个月的信号只留在上个月）
 
-// 核心修正：如果当前是月线或周线图，使用过去22天内的最大降幅
-bool is_high_tf_effr = timeframe.isweekly or timeframe.ismonthly
-effr_drop = is_high_tf_effr ? effr_drop_max_22d : effr_chg
+// 1. 获取日线实时数据 (用于绘图和基础判断)
+[effr_live, effr_time, effr_chg] = request.security(sym_effr, "D", [close, time, close[1] - close], gaps = barmerge.gaps_off)
+// 2. 获取长期趋势 EMA (月线)
+effr_ema = request.security(sym_effr, "M", ta.ema(close, effr_ema_len), gaps = barmerge.gaps_off)
+
+// 3. 救火降息扫描 (Panic Cut Scan)
+float effr_drop_scan = 0.0
+if timeframe.isdaily
+    // 日线图：直接看当天跌幅
+    effr_drop_scan := effr_chg
+else if timeframe.isweekly or timeframe.ismonthly
+    // 周/月线图：全量扫描日线跌幅
+    // request.security_lower_tf 返回的是本周期内的日线数据数组
+    float[] drops = request.security_lower_tf(sym_effr, "D", close[1] - close)
+    if array.size(drops) > 0
+        // 只要有一天跌幅超过 0.5，max 就会超过 0.5
+        effr_drop_scan := array.max(drops)
+
+// 统一使用扫描结果
+effr_drop = effr_drop_scan
 
 // --- 2. 真实利率 (TIPS) ---
 // 确认时长: 连续 5 日
-[tips_live, tips_time] = request.security("FRED:DFII10", "D", [close, time], gaps = barmerge.gaps_off)
+[tips_live, tips_time] = request.security(sym_tips, "D", [close, time], gaps = barmerge.gaps_off)
 // 修改: 同时获取 RGDP 的时间戳，用于精准显示数据周期
-[rgdp_val, rgdp_time]  = request.security("FRED:A191RL1Q225SBEA", "D", [close, time], gaps = barmerge.gaps_off)
+[rgdp_val, rgdp_time]  = request.security(sym_rgdp, "D", [close, time], gaps = barmerge.gaps_off)
 
 // --- 3. 利差结构 (10Y-2Y) ---
 // 确认时长: 即时生效 (基于 20 日趋势)
 // 修复：强制在 Daily 级别计算 Change，防止月线图上出现月度 Change 误判
-[y10, y10_chg_d] = request.security("FRED:GS10", "D", [close, close - close[1]], gaps = barmerge.gaps_off)
-[y2, y2_chg_d]   = request.security("FRED:GS2", "D", [close, close - close[1]], gaps = barmerge.gaps_off)
+[y10, y10_chg_d] = request.security(sym_us_10y, "D", [close, close - close[1]], gaps = barmerge.gaps_off)
+[y2, y2_chg_d]   = request.security(sym_us_2y, "D", [close, close - close[1]], gaps = barmerge.gaps_off)
 yc_val = y10 - y2
 y10_chg = y10_chg_d
 y2_chg  = y2_chg_d
@@ -107,8 +160,8 @@ bool is_bull_steep_daily = y10_chg < 0 and y2_chg < -th_yc_bull_steep and y2_chg
 bool is_bull_steep_htf = false
 bool is_high_tf_yc = timeframe.isweekly or timeframe.ismonthly
 if is_high_tf_yc
-    float[] y10_diffs_m = request.security_lower_tf("FRED:GS10", "D", close - close[1])
-    float[] y2_diffs_m  = request.security_lower_tf("FRED:GS2", "D", close - close[1])
+    float[] y10_diffs_m = request.security_lower_tf(sym_us_10y, "D", close - close[1])
+    float[] y2_diffs_m  = request.security_lower_tf(sym_us_2y, "D", close - close[1])
     if array.size(y10_diffs_m) > 0 and array.size(y2_diffs_m) > 0
         int len = math.min(array.size(y10_diffs_m), array.size(y2_diffs_m))
         for i = 0 to len - 1
@@ -132,16 +185,33 @@ is_bull_steep = bull_steep_cnt > 0
 
 // --- 4. 信用风险 (OAS) ---
 // 确认时长: 连续 3 日; 熔断即时
-// 修复：强制在 Daily 级别计算 5日涨幅，防止月线图误判
-// 增加 oas_crash_flag: 在日线级别计算是否触发熔断 (OAS > 10% 或 (OAS > 6.0% 且 5日涨幅 > 20%))
-// 然后取过去 22 天的最高值，只要有一天触发，月线图就显示熔断
-[oas_val, oas_slope, oas_chg_5d_pct, oas_crash_flag] = request.security("FRED:BAMLH0A0HYM2", "D", [close, calc_slope_linreg(close, slope_len), (close / close[5] - 1) * 100, ta.highest((close > 10.0 or (close > 6.0 and (close / close[5] - 1) * 100 > 20.0)) ? 1.0 : 0.0, 22)], gaps = barmerge.gaps_off)
+// 核心修正：全周期扫描逻辑
+// 日线图：直接读取当日状态
+// 周线/月线图：扫描本周期内每一天，只要有一天处于“熔断”状态，即触发
+// OAS > 10% 或 (OAS > 6% 且 5日涨幅 > 20%)
 
-// 熔断检测
-// 月线/周线图: 只要区间内有过熔断 (oas_crash_flag > 0) 即触发
-// 日线图: 实时检测
-bool is_high_tf_oas = timeframe.isweekly or timeframe.ismonthly
-is_oas_crash_trigger = is_high_tf_oas ? (oas_crash_flag > 0) : (oas_val > 10.0 or (oas_val > 6.0 and oas_chg_5d_pct > 20.0))
+// 1. 获取日线实时数据
+// 修改：使用 oas_slope_len 替换全局 slope_len
+[oas_val, oas_slope, oas_chg_5d_pct] = request.security(sym_oas, "D", [close, calc_slope_linreg(close, oas_slope_len), (close / close[5] - 1) * 100], gaps = barmerge.gaps_off)
+
+// 2. 信用崩盘扫描 (Credit Crash Scan)
+bool oas_crash_scan = false
+if timeframe.isdaily
+    // 日线图：直接看当天是否熔断
+    oas_crash_scan := oas_val > 10.0 or (oas_val > 6.0 and oas_chg_5d_pct > 20.0)
+else if timeframe.isweekly or timeframe.ismonthly
+    // 周/月线图：全量扫描日线状态
+    // 我们需要在 lower_tf 表达式中直接计算好是否熔断，返回布尔值数组
+    // 注意：request.security_lower_tf 不支持复杂的元组返回，建议返回 float (1.0/0.0)
+    // 表达式逻辑：如果 (OAS > 10) 或 (OAS > 6 且 5日涨幅 > 20%) 则返回 1.0，否则 0.0
+    float[] crash_flags = request.security_lower_tf(sym_oas, "D", (close > 10.0 or (close > 6.0 and (close / close[5] - 1) * 100 > 20.0)) ? 1.0 : 0.0)
+    if array.size(crash_flags) > 0
+        // 只要有一天是 1.0，max 就是 1.0
+        if array.max(crash_flags) > 0.5
+            oas_crash_scan := true
+
+// 统一使用扫描结果
+is_oas_crash_trigger = oas_crash_scan
 
 // 锁定 10 日 (默认)
 // 修正：将天数转换为 Bar 数
@@ -155,37 +225,70 @@ is_oas_crash = oas_crash_cnt > 0
 
 // --- 5. 流动性 (M2 / M1-M2) ---
 // 确认时长: 连续 2 个月
-[us_m2_real, us_m2_yoy, us_m2_time] = request.security("FRED:M2REAL", "M", [close, calc_yoy(close, yoy_len), time], gaps = barmerge.gaps_off)
+[us_m2_real, us_m2_yoy, us_m2_time] = request.security(sym_us_m2, "M", [close, calc_yoy(close, liq_yoy_len), time], gaps = barmerge.gaps_off)
 
-[cn_m1, cn_m1_yoy, cn_time] = request.security("ECONOMICS:CNM1", "M", [close, calc_yoy(close, yoy_len), time], gaps = barmerge.gaps_off)
-[cn_m2, cn_m2_yoy] = request.security("ECONOMICS:CNM2", "M", [close, calc_yoy(close, yoy_len)], gaps = barmerge.gaps_off)
+[cn_m1, cn_m1_yoy, cn_time] = request.security(sym_cn_m1, "M", [close, calc_yoy(close, liq_yoy_len), time], gaps = barmerge.gaps_off)
+[cn_m2, cn_m2_yoy] = request.security(sym_cn_m2, "M", [close, calc_yoy(close, liq_yoy_len)], gaps = barmerge.gaps_off)
 cn_gap = cn_m1_yoy - cn_m2_yoy
 
 // --- 6. 利润空间 (CPI-PPI) ---
 // 确认时长: 连续 2 个月
-[us_cpi, us_cpi_yoy, us_prof_time] = request.security("FRED:CPIAUCSL", "M", [close, calc_yoy(close, yoy_len), time], gaps = barmerge.gaps_off)
-[us_ppi, us_ppi_yoy] = request.security("FRED:PPIACO", "M", [close, calc_yoy(close, yoy_len)], gaps = barmerge.gaps_off)
+[us_cpi, us_cpi_yoy, us_prof_time] = request.security(sym_us_cpi, "M", [close, calc_yoy(close, prof_yoy_len), time], gaps = barmerge.gaps_off)
+[us_ppi, us_ppi_yoy] = request.security(sym_us_ppi, "M", [close, calc_yoy(close, prof_yoy_len)], gaps = barmerge.gaps_off)
 us_profit_gap = us_cpi_yoy - us_ppi_yoy
 
-cn_cpi_yoy = request.security("ECONOMICS:CNCPI", "M", calc_yoy(close, yoy_len), gaps = barmerge.gaps_off)
-cn_ppi_yoy = request.security("ECONOMICS:CNPPI", "M", calc_yoy(close, yoy_len), gaps = barmerge.gaps_off)
+cn_cpi_yoy = request.security(sym_cn_cpi, "M", calc_yoy(close, prof_yoy_len), gaps = barmerge.gaps_off)
+cn_ppi_yoy = request.security(sym_cn_ppi, "M", calc_yoy(close, prof_yoy_len), gaps = barmerge.gaps_off)
 cn_profit_gap = cn_cpi_yoy - cn_ppi_yoy
 
 // --- 7. 实体热度 (铜金比) ---
 // 确认时长: 连续 5 日
-[copper, copper_chg_pct_d] = request.security("COMEX:HG1!", "D", [close, (close / close[1] - 1) * 100], gaps = barmerge.gaps_off)
-[gold, gold_prev]     = request.security("COMEX:GC1!", "D", [close, close[1]], gaps = barmerge.gaps_off)
+// 核心修正：全周期扫描逻辑
+// 日线图：直接读取当日跌幅
+// 周线/月线图：扫描本周期内每一天的跌幅，只要有一天 < -3.0%，即触发崩盘
 
-// 崩盘检测需要铜金比本身的日度变化
-// 我们可以直接在 Daily 级别计算铜金比及其变化
-// 修复：增加 was_crash_in_month 检测月内是否有崩盘
-[cg_ratio_d, cg_chg_pct_d, was_crash_in_month] = request.security("COMEX:HG1! / COMEX:GC1! * 1000", "D", [close, (close / close[1] - 1) * 100, ta.highest((close / close[1] - 1) * 100 < -3.0 ? 1.0 : 0.0, 22)], gaps = barmerge.gaps_off)
+// 1. 获取日线实时数据
+[copper, copper_chg_pct_d] = request.security(sym_copper, "D", [close, (close / close[1] - 1) * 100], gaps = barmerge.gaps_off)
+[gold, gold_prev]     = request.security(sym_gold, "D", [close, close[1]], gaps = barmerge.gaps_off)
 
-// 崩盘检测: 单日跌幅 > 3% (强制使用日度数据)
-// 修复：如果当前是月线/周线图，使用 was_crash_in_month 回溯检测
-// 如果是日线图，直接用 cg_chg_pct_d
-bool is_high_tf_cg = timeframe.isweekly or timeframe.ismonthly
-is_cg_crash_trigger = is_high_tf_cg ? (was_crash_in_month > 0) : (cg_chg_pct_d < -3.0)
+// 2. 获取日线铜金比 (用于显示)
+// 注意：动态计算 Ticker 字符串在 Pine Script 中有限制，无法直接传递给 request.security
+// 替代方案：分别获取铜和金的日线数据，在本地计算比值
+// [cg_ratio_d, cg_chg_pct_d] = request.security("COMEX:HG1! / COMEX:GC1! * 1000", "D", [close, (close / close[1] - 1) * 100], gaps = barmerge.gaps_off)
+
+// 2.1 分别获取日线数据
+[cop_d, cop_d_prev] = request.security(sym_copper, "D", [close, close[1]], gaps = barmerge.gaps_off)
+[gld_d, gld_d_prev] = request.security(sym_gold, "D", [close, close[1]], gaps = barmerge.gaps_off)
+// 2.2 本地计算比值
+cg_ratio_d = cop_d / gld_d * 1000
+cg_ratio_prev_d = cop_d_prev / gld_d_prev * 1000
+cg_chg_pct_d = (cg_ratio_d / cg_ratio_prev_d - 1) * 100
+
+// 3. 崩盘扫描 (Copper-Gold Crash Scan)
+bool cg_crash_scan = false
+if timeframe.isdaily
+    // 日线图：直接看当天跌幅
+    cg_crash_scan := cg_chg_pct_d < -3.0
+else if timeframe.isweekly or timeframe.ismonthly
+    // 周/月线图：全量扫描日线跌幅
+    // 分别获取铜和金的日线比率 (Price Ratio = close / close[1])
+    // 理由：Ratio_Change = (C1/G1)/(C0/G0) - 1 = (C1/C0)/(G1/G0) - 1 = C_Ratio / G_Ratio - 1
+    float[] cop_ratios = request.security_lower_tf(sym_copper, "D", close / close[1])
+    float[] gld_ratios = request.security_lower_tf(sym_gold, "D", close / close[1])
+    
+    if array.size(cop_ratios) > 0 and array.size(gld_ratios) > 0
+        int len_r = math.min(array.size(cop_ratios), array.size(gld_ratios))
+        for i = 0 to len_r - 1
+            float c_r = array.get(cop_ratios, i)
+            float g_r = array.get(gld_ratios, i)
+            // 计算比值的日涨跌幅
+            float r_chg = (c_r / g_r - 1) * 100
+            if r_chg < -3.0
+                cg_crash_scan := true
+                break
+
+// 统一使用扫描结果
+is_cg_crash_trigger = cg_crash_scan
 
 // 锁定 5 日 (默认)
 // 修正：将天数转换为 Bar 数
@@ -196,28 +299,27 @@ if is_cg_crash_trigger
 else if cg_crash_cnt > 0
     cg_crash_cnt := cg_crash_cnt - 1
 is_cg_crash = cg_crash_cnt > 0
-// 伪复苏: 铜金比 5日线涨 但 铜价 5日线跌 (右侧确认)
-// 这里的 SMA 5 需要在日线上计算，如果在月线上计算就是 5个月
-// 上面的 request 语法有误，不能在一个 request 里请求不同品种
-// 分拆请求
-[cg_sma_5d, cg_sma_5d_prev] = request.security("COMEX:HG1! / COMEX:GC1! * 1000", "D", [ta.sma(close, 5), ta.sma(close[1], 5)], gaps = barmerge.gaps_off)
-[cop_sma_5d, cop_sma_5d_prev] = request.security("COMEX:HG1!", "D", [ta.sma(close, 5), ta.sma(close[1], 5)], gaps = barmerge.gaps_off)
 
-is_fake_recovery = cg_sma_5d > cg_sma_5d_prev and cop_sma_5d < cop_sma_5d_prev
+// 伪复苏: 铜金比 5日线涨 但 铜价 5日线跌 (右侧确认)
+// 这里的 SMA 5 需要在日线上计算
+// 由于无法动态拼接 ticker，我们使用日线数据的简单趋势判断代替 SMA (在不可用 SMA 时)
+// 或者，如果是在日线图，我们可以计算 SMA。如果是在月线图，我们只能用当前月线值判断趋势。
+// 简化处理：使用日线收盘价对比 (因为我们已经获取了 cop_d 和 cop_d_prev)
+// 伪复苏 = 铜金比涨 (cg_ratio_d > cg_ratio_prev_d) 但 铜价跌 (cop_d < cop_d_prev)
+bool is_fake_recovery = cg_ratio_d > cg_ratio_prev_d and cop_d < cop_d_prev
+
 // 为了后续逻辑兼容，cg_ratio 依然需要赋值
 float cg_ratio = cg_ratio_d
-// 计算 cg_ratio_prev 仅用于后续简单对比，这里可以用 cg_ratio_d / (1 + chg) 反推
-float cg_ratio_prev = cg_ratio_d / (1 + cg_chg_pct_d / 100)
+// 计算 cg_ratio_prev 仅用于后续简单对比
+float cg_ratio_prev = cg_ratio_prev_d
 // copper 变量也需要赋值用于后续显示
-// 只需要补充 copper_prev
-float copper_prev_val = request.security("COMEX:HG1!", "D", close[1], gaps = barmerge.gaps_off)
-float copper_prev = copper_prev_val
+float copper_prev = cop_d_prev
 
 // --- 8. 萨姆规则 (就业) ---
 // 确认时长: 非农公布日
-[sahm_val, sahm_time] = request.security("FRED:SAHMREALTIME", "M", [close, time], gaps = barmerge.gaps_off)
+[sahm_val, sahm_time] = request.security(sym_sahm, "M", [close, time], gaps = barmerge.gaps_off)
 // ICSA 预警: 初请失业金同比 > 15%
-[icsa, icsa_yoy, icsa_yoy_prev] = request.security("FRED:ICSA", "W", [close, (close / close[52] - 1) * 100, (close[1] / close[53] - 1) * 100], gaps = barmerge.gaps_off)
+[icsa, icsa_yoy, icsa_yoy_prev] = request.security(sym_icsa, "W", [close, (close / close[52] - 1) * 100, (close[1] / close[53] - 1) * 100], gaps = barmerge.gaps_off)
 // 连续 2 周确认
 icsa_warn = icsa_yoy > 15.0 and icsa_yoy_prev > 15.0
 
@@ -663,8 +765,8 @@ color dyn_c = c_white
 if mode == "1. 基准利率"
     plot_val := effr_live
     // 修复：基准利率的颜色应该反映“救火”状态
-    // 如果是月线/周线图，且发生了救火降息 (effr_drop_max_22d >= 0.5)，则强制红色
-    bool is_fire_cut_htf = (timeframe.isweekly or timeframe.ismonthly) and effr_drop_max_22d >= 0.5
+    // 如果是月线/周线图，且发生了救火降息 (effr_drop >= 0.5)，则强制红色
+    bool is_fire_cut_htf = (timeframe.isweekly or timeframe.ismonthly) and effr_drop >= 0.5
     dyn_c := is_fire_cut_htf ? c_red : get_score_col(s1)
 else if mode == "2. 真实利率"
     plot_val := tips_live
@@ -684,8 +786,8 @@ else if mode == "6. 利润空间"
 else if mode == "7. 实体热度"
     plot_val := cg_ratio
     // 修复：铜金比颜色应该反映“月内崩盘”状态
-    // 如果是月线/周线图，且发生了崩盘 (was_crash_in_month)，则强制红色
-    bool is_cg_crash_htf = (timeframe.isweekly or timeframe.ismonthly) and was_crash_in_month > 0
+    // 如果是月线/周线图，且发生了崩盘 (cg_crash_scan)，则强制红色
+    bool is_cg_crash_htf = (timeframe.isweekly or timeframe.ismonthly) and cg_crash_scan
     dyn_c := is_cg_crash_htf ? c_red : get_score_col(s7)
 else if mode == "8. 萨姆规则"
     plot_val := sahm_val
