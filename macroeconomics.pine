@@ -47,8 +47,10 @@ sym_us_m2       = input.symbol("FRED:M2REAL", "数据源 (美国M2)", group=grp_
 sym_cn_m1       = input.symbol("ECONOMICS:CNM1", "数据源 (中国M1)", group=grp_5, display=display.none)
 sym_cn_m2       = input.symbol("ECONOMICS:CNM2", "数据源 (中国M2)", group=grp_5, display=display.none)
 liq_yoy_len     = input.int(12, "同比周期 (月)", minval=1, group=grp_5, display=display.none)
-th_liq_us_noise = input.float(0.50, "美国震荡阈值", minval=0.0, step=0.1, group=grp_5, display=display.none)
-th_liq_cn_noise = input.float(0.50, "中国震荡阈值", minval=0.0, step=0.1, group=grp_5, display=display.none)
+th_liq_us_noise = input.float(0.50, "美国震荡阈值 (M2)", minval=0.0, step=0.1, group=grp_5, display=display.none)
+th_liq_us_crash = input.float(-2.0, "美国枯竭阈值 (M2)", step=0.1, group=grp_5, display=display.none)
+th_liq_cn_noise = input.float(0.50, "中国震荡阈值 (M1-M2)", minval=0.0, step=0.1, group=grp_5, display=display.none)
+th_liq_cn_crash = input.float(-5.0, "中国空转阈值 (M1-M2)", step=0.1, group=grp_5, display=display.none)
 dur_liq_conf    = input.int(2, "确认时长 (月)", minval=1, group=grp_5, display=display.none)
 
 // --- 6. 利润空间 (Profit) ---
@@ -512,7 +514,7 @@ float sec_per_month_liq = 86400000 / 1000 * 30 // 近似
 int bars_liq_conf = math.max(1, math.ceil(dur_liq_conf * sec_per_month_liq / sec_per_bar))
 
 // 枯竭: <-2.0% (立即生效，暴跌无需确认)
-bool is_liq_crash = us_m2_yoy < -2.0
+bool is_liq_crash = us_m2_yoy < th_liq_us_crash
 // 紧缩: < -0.2% (连续 N 月, README 要求确认)
 bool is_liq_tight = is_sustained(us_m2_yoy < -th_liq_us_noise, bars_liq_conf)
 // 扩张: > 0.2% (连续 N 月)
@@ -529,7 +531,7 @@ else
 
 // --- CN Liquidity Calculation ---
 // 严重空转: <-5.0% (立即生效，暴跌无需确认)
-bool is_cn_crash = cn_gap < -5.0
+bool is_cn_crash = cn_gap < th_liq_cn_crash
 // 资金空转: < -0.5% (连续 N 月)
 bool is_cn_tight = is_sustained(cn_gap < -th_liq_cn_noise, bars_liq_conf)
 // 活化: > 0.5% (连续 N 月)
@@ -991,11 +993,15 @@ if barstate.islast and mode == "4. 信用风险"
 
 // 5. 流动性: M2 YoY + 阈值
 plot(mode == "5. 流动性" ? plot_val : na, "Liquidity", color = dyn_c, linewidth = 2)
-plot(mode == "5. 流动性" and region == "美国" ? -2.0 : na, "M2 -2", color = c_red)
+plot(mode == "5. 流动性" and region == "美国" ? th_liq_us_crash : na, "M2 -2", color = c_red)
+plot(mode == "5. 流动性" and region == "中国" ? th_liq_cn_crash : na, "M1-M2 -5", color = c_red)
 
-// 增加 -2.0 标签
-if barstate.islast and mode == "5. 流动性" and region == "美国"
-    label.new(bar_index, -2.0, "枯竭 (-2%)", color = c_red, style = label.style_label_left, textcolor = c_white, size = size.small)
+// 增加标签
+if barstate.islast and mode == "5. 流动性"
+    if region == "美国"
+        label.new(bar_index, th_liq_us_crash, "枯竭 (" + str.tostring(th_liq_us_crash) + "%)", color = c_red, style = label.style_label_left, textcolor = c_white, size = size.small)
+    else // 中国
+        label.new(bar_index, th_liq_cn_crash, "严重空转 (" + str.tostring(th_liq_cn_crash) + "%)", color = c_red, style = label.style_label_left, textcolor = c_white, size = size.small)
 
 // 6. 利润空间: Gap
 plot(mode == "6. 利润空间" ? plot_val : na, "Profit Gap", color = dyn_c, linewidth = 2)
