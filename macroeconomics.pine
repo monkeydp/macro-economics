@@ -2,7 +2,7 @@
 indicator("[薯仔] 宏观经济审计看板", overlay = false, precision = 2, max_labels_count = 500)
 
 // ==========================================
-// 1. 设置与参数 (Settings & Inputs)
+// 1. 设置与参数
 // ==========================================
 show_report = input.bool(true, "显示决策看板", group="显示设置")
 mode = input.string("1. 基准利率", "当前显示曲线",
@@ -69,9 +69,7 @@ dur_prof_trend  = input.int(3, "趋势确认时长 (月)", minval=2, group=grp_6
 grp_7 = "7. 实体热度 (铜金比)"
 sym_copper      = input.symbol("COMEX:HG1!", "数据源 (铜)", group=grp_7, display=display.none)
 sym_gold        = input.symbol("COMEX:GC1!", "数据源 (金)", group=grp_7, display=display.none)
-cg_slope_len    = input.int(60, "斜率观测周期", minval=1, group=grp_7, display=display.none) // 实际上代码里没用到斜率，用的是涨跌幅，但为了完整性保留或删除？
-// 代码里用的是涨跌幅，不是斜率。原参数 th_cg_noise 是"铜金比斜率"，默认0.05
-// 检查原逻辑: cg_ratio < cg_ratio_prev * (1.0 - th_cg_noise/100.0) -> 这是百分比跌幅阈值
+cg_slope_len    = input.int(60, "斜率观测周期", minval=1, group=grp_7, display=display.none)
 th_cg_noise     = input.float(0.05, "涨跌幅容差 (%)", minval=0.0, step=0.01, group=grp_7, display=display.none) 
 lock_cg_crash   = input.int(5, "崩盘锁定 (日)", minval=1, group=grp_7, display=display.none)
 
@@ -97,10 +95,10 @@ c_white        = color.white
 c_black        = color.black
 
 // ==========================================
-// 2. 数据获取与计算 (Data Fetching)
+// 2. 数据获取与计算
 // ==========================================
 
-// --- Helper Functions ---
+// --- 辅助函数 ---
 fmt_ym(t) => str.tostring(year(t)) + "-" + (month(t) < 10 ? "0" : "") + str.tostring(month(t))
 fmt_ymd(t) => str.tostring(year(t)) + "-" + (month(t) < 10 ? "0" : "") + str.tostring(month(t)) + "-" + (dayofmonth(t) < 10 ? "0" : "") + str.tostring(dayofmonth(t))
 
@@ -113,7 +111,7 @@ calc_yoy(src, len) => (src / src[len] - 1) * 100
 float sec_per_bar = timeframe.in_seconds(timeframe.period)
 float sec_per_day = 86400
 
-// --- 录入美联储官方公布的议息会议日期 (此处录入了2025至2026年的公布日) ---
+// --- 录入美联储官方公布的议息会议日期 ---
 // 注意：美联储会议通常为期两天，利率决议在第二天的美东时间下午 14:00 公布
 var int[] f_year  = array.from(2025, 2025, 2025, 2025, 2025, 2025, 2025, 2025, 2026, 2026, 2026, 2026, 2026, 2026, 2026, 2026)
 var int[] f_month = array.from(   1,    3,    5,    6,    7,    9,   10,   12,    1,    3,    4,    6,    7,    9,   10,   12)
@@ -141,12 +139,10 @@ get_fomc_formatted_times() =>
         // --- 分支逻辑 ---
         if fomc_time <= time
             // 【上一次 (已发布)】: 只显示日期，不要时间
-            // 如果是同一年，显示 "01-29"；如果是跨年，显示 "2025-12-11"
             string fmt_past = is_same_year ? "MM-dd" : "yyyy-MM-dd"
             last_str := str.format_time(fomc_time, fmt_past, syminfo.timezone)
         else
             // 【下一次 (即将发布)】: 显示日期 + 时间，精确到分
-            // 如果是同一年，显示 "03-19 02:00"；跨年显示完整年份
             string fmt_future = is_same_year ? "MM-dd HH:mm" : "yyyy-MM-dd HH:mm"
             next_str := str.format_time(fomc_time, fmt_future, syminfo.timezone)
             
@@ -159,12 +155,12 @@ get_fomc_formatted_times() =>
 
 // --- 1. 基准利率 (EFFR) ---
 
-// 1. 获取日线实时数据 (用于绘图和基础判断)
+// 1. 获取日线实时数据
 [effr_live, effr_time, effr_chg] = request.security(sym_effr, "D", [close, time, close[1] - close], gaps = barmerge.gaps_off)
 // 2. 获取长期趋势 EMA (月线)
 effr_ema = request.security(sym_effr, "M", ta.ema(close, effr_ema_len), gaps = barmerge.gaps_off)
 
-// 3. 救火降息扫描 (Panic Cut Scan)
+// 3. 救火降息扫描
 float effr_drop_scan = 0.0
 if timeframe.isdaily
     // 日线图：直接看当天跌幅
@@ -187,14 +183,14 @@ effr_drop = effr_drop_scan
 
 // --- 3. 利差结构 (10Y-2Y) ---
 // 确认时长: 即时生效 (基于 20 日趋势)
-// 修复：强制在 Daily 级别计算 Change，防止月线图上出现月度 Change 误判
+// 强制在 Daily 级别计算 Change
 [y10, y10_chg_d] = request.security(sym_us_10y, "D", [close, close - close[1]], gaps = barmerge.gaps_off)
 [y2, y2_chg_d]   = request.security(sym_us_2y, "D", [close, close - close[1]], gaps = barmerge.gaps_off)
 yc_val = y10 - y2
 y10_chg = y10_chg_d
 y2_chg  = y2_chg_d
 
-// 牛陡判定 (日线逻辑): 长跌且短跌，且短跌 > 长跌 (且短跌跌幅显著 > 阈值)
+// 牛陡判定 (日线逻辑)
 bool is_bull_steep_daily = y10_chg < 0 and y2_chg < -th_yc_bull_steep and y2_chg < y10_chg
 
 // 月线/周线图适配：使用 request.security_lower_tf 捕捉月内/周内牛陡
@@ -249,7 +245,7 @@ is_bull_steep = bull_steep_cnt > 0
 
 // --- 4. 信用风险 (OAS) ---
 // 确认时长: 连续 3 日; 熔断即时
-// 核心修正：全周期扫描逻辑
+// 核心：全周期扫描逻辑
 // 日线图：直接读取当日状态
 // 周线/月线图：扫描本周期内每一天，只要有一天处于“熔断”状态，即触发
 // OAS > 10% 或 (OAS > 6% 且 5日涨幅 > 20%)
@@ -258,7 +254,7 @@ is_bull_steep = bull_steep_cnt > 0
 [oas_val, oas_slope, oas_chg_5d_pct, oas_time] = request.security(sym_oas, "D", [close, calc_slope_linreg(close, oas_slope_len), (close / close[5] - 1) * 100, time], gaps = barmerge.gaps_off)
 
 
-// 2. 信用崩盘扫描 (Credit Crash Scan)
+// 2. 信用崩盘扫描
 bool oas_crash_scan = false
 if timeframe.isdaily
     // 日线图：直接看当天是否熔断
@@ -278,7 +274,6 @@ else if timeframe.isweekly or timeframe.ismonthly
 is_oas_crash_trigger = oas_crash_scan
 
 // 锁定 10 日 (默认)
-// 修正：将天数转换为 Bar 数
 int bars_lock_credit = math.max(1, math.ceil(lock_credit_crash * sec_per_day / sec_per_bar))
 var int oas_crash_cnt = 0
 if is_oas_crash_trigger
@@ -307,7 +302,7 @@ cn_profit_gap = cn_cpi_yoy - cn_ppi_yoy
 
 // --- 7. 实体热度 (铜金比) ---
 // 确认时长: 连续 5 日
-// 核心修正：全周期扫描逻辑
+// 核心：全周期扫描逻辑
 // 日线图：直接读取当日跌幅
 // 周线/月线图：扫描本周期内每一天的跌幅，只要有一天 < -3.0%，即触发崩盘
 
@@ -318,8 +313,6 @@ cn_profit_gap = cn_cpi_yoy - cn_ppi_yoy
 // 2. 获取日线铜金比 (用于显示)
 // 注意：动态计算 Ticker 字符串在 Pine Script 中有限制，无法直接传递给 request.security
 // 替代方案：分别获取铜和金的日线数据，在本地计算比值
-// [cg_ratio_d, cg_chg_pct_d] = request.security("COMEX:HG1! / COMEX:GC1! * 1000", "D", [close, (close / close[1] - 1) * 100], gaps = barmerge.gaps_off)
-
 // 2.1 分别获取日线数据
 [cop_d, cop_d_prev] = request.security(sym_copper, "D", [close, close[1]], gaps = barmerge.gaps_off)
 [gld_d, gld_d_prev] = request.security(sym_gold, "D", [close, close[1]], gaps = barmerge.gaps_off)
@@ -328,7 +321,7 @@ cg_ratio_d = cop_d / gld_d * 1000
 cg_ratio_prev_d = cop_d_prev / gld_d_prev * 1000
 cg_chg_pct_d = (cg_ratio_d / cg_ratio_prev_d - 1) * 100
 
-// 3. 崩盘扫描 (Copper-Gold Crash Scan)
+// 3. 崩盘扫描
 bool cg_crash_scan = false
 if timeframe.isdaily
     // 日线图：直接看当天跌幅
@@ -336,7 +329,6 @@ if timeframe.isdaily
 else if timeframe.isweekly or timeframe.ismonthly
     // 周/月线图：全量扫描日线跌幅
     // 分别获取铜和金的日线比率 (Price Ratio = close / close[1])
-    // 理由：Ratio_Change = (C1/G1)/(C0/G0) - 1 = (C1/C0)/(G1/G0) - 1 = C_Ratio / G_Ratio - 1
     float[] cop_ratios = request.security_lower_tf(sym_copper, "D", close / close[1])
     float[] gld_ratios = request.security_lower_tf(sym_gold, "D", close / close[1])
     
@@ -355,7 +347,6 @@ else if timeframe.isweekly or timeframe.ismonthly
 is_cg_crash_trigger = cg_crash_scan
 
 // 锁定 5 日 (默认)
-// 修正：将天数转换为 Bar 数
 int bars_lock_cg = math.max(1, math.ceil(lock_cg_crash * sec_per_day / sec_per_bar))
 var int cg_crash_cnt = 0
 if is_cg_crash_trigger
@@ -365,9 +356,6 @@ else if cg_crash_cnt > 0
 is_cg_crash = cg_crash_cnt > 0
 
 // 伪复苏: 铜金比 5日线涨 但 铜价 5日线跌 (右侧确认)
-// 这里的 SMA 5 需要在日线上计算
-// 由于无法动态拼接 ticker，我们使用日线数据的简单趋势判断代替 SMA (在不可用 SMA 时)
-// 或者，如果是在日线图，我们可以计算 SMA。如果是在月线图，我们只能用当前月线值判断趋势。
 // 简化处理：使用日线收盘价对比 (因为我们已经获取了 cop_d 和 cop_d_prev)
 // 伪复苏 = 铜金比涨 (cg_ratio_d > cg_ratio_prev_d) 但 铜价跌 (cop_d < cop_d_prev)
 bool is_fake_recovery = cg_ratio_d > cg_ratio_prev_d and cop_d < cop_d_prev
@@ -388,7 +376,7 @@ float copper_prev = cop_d_prev
 icsa_warn = icsa_yoy > 15.0 and icsa_yoy_prev > 15.0
 
 // ==========================================
-// 3. 评分逻辑 (Scoring Logic)
+// 3. 评分逻辑
 // ==========================================
 
 // --- 权重系统 ---
@@ -396,7 +384,7 @@ icsa_warn = icsa_yoy > 15.0 and icsa_yoy_prev > 15.0
 float w1=1.0, float w2=1.0, float w3=1.0, float w4=1.0
 float w5=1.0, float w6=1.0, float w7=1.0, float w8=1.0
 
-// 时代判定 (Regime)
+// 时代判定
 bool is_inflation_era = us_cpi_yoy > 3.0
 bool is_panic_era     = sahm_val >= 0.3 or is_bull_steep
 
@@ -495,10 +483,10 @@ if is_panic_era and s3 < 0
 
 // 4. OAS
 if is_oas_crash
-    s4 := -1.0 // 信用崩盘 (配合权重x2)
+    s4 := -1.0 
     w4 := 2.0
 else if oas_val > 6.0
-    s4 := -1.0 // 严重恶化
+    s4 := -1.0 
 else if oas_val >= 3.5
     // 风险走阔: 趋势向上
     if oas_slope > th_oas_noise
@@ -516,18 +504,18 @@ else // < 3.5
 if is_panic_era and s4 < 0
     w4 := 2.0
 
-// 5. Liquidity
+// 5. 流动性
 // 分别计算 US 和 CN 的流动性得分，用于宏观对冲逻辑
 float score_us_liq = 0.0
 float score_cn_liq = 0.0
 
-// --- US Liquidity Calculation ---
-float sec_per_month_liq = 86400000 / 1000 * 30 // 近似
+// --- 美国流动性计算 ---
+float sec_per_month_liq = 86400000 / 1000 * 30 
 int bars_liq_conf = math.max(1, math.ceil(dur_liq_conf * sec_per_month_liq / sec_per_bar))
 
 // 枯竭: <-2.0% (立即生效，暴跌无需确认)
 bool is_liq_crash = us_m2_yoy < th_liq_us_crash
-// 紧缩: < -0.2% (连续 N 月, README 要求确认)
+// 紧缩: < -0.2% (连续 N 月)
 bool is_liq_tight = is_sustained(us_m2_yoy < -th_liq_us_noise, bars_liq_conf)
 // 扩张: > 0.2% (连续 N 月)
 bool is_liq_expand = is_sustained(us_m2_yoy > th_liq_us_noise, bars_liq_conf)
@@ -541,7 +529,7 @@ else if is_liq_expand
 else
     score_us_liq := 0.0  // 存量博弈
 
-// --- CN Liquidity Calculation ---
+// --- 中国流动性计算 ---
 // 严重空转: <-5.0% (立即生效，暴跌无需确认)
 bool is_cn_crash = cn_gap < th_liq_cn_crash
 // 资金空转: < -0.5% (连续 N 月)
@@ -558,13 +546,13 @@ else if is_cn_expand
 else
     score_cn_liq := 0.0  // 结构震荡
 
-// Assign s5 based on region selection
+// 根据地区选择赋值 s5
 if region == "美国"
     s5 := score_us_liq
-else // CN
+else // 中国
     s5 := score_cn_liq
 
-// 6. Profit
+// 6. 利润空间
 if region == "美国"
     float sec_per_month_prof = 86400000 / 1000 * 30 
     int bars_prof_state = math.max(1, math.ceil(dur_prof_state * sec_per_month_prof / sec_per_bar))
@@ -589,27 +577,28 @@ if region == "美国"
 
     // 逻辑分层
     if is_heat
-        s6 := -1.0 // 🔴 通胀过热 (政策收紧)
+        s6 := -1.0 // 通胀过热 (政策收紧)
         w6 := 2.0  // 熔断级关注
         t6_s := "通胀过热 (政策收紧)", t6_a := "【避险】 卖出成长股，买入现金/能源"
     else if is_deflation
-        s6 := -1.0 // 🔴 深度通缩 (需求崩塌)
+        s6 := -1.0 // 深度通缩 (需求崩塌)
         t6_s := "深度通缩 (需求崩塌)", t6_a := "【避险】 卖出所有资产，买入美元现金"
     else if is_sustained(us_profit_gap < 0, bars_prof_state) // 亏损
         // 分支：走阔(反转) vs 其他(恶化)
         if is_widening_trend
-            s6 := 0.5 // 🟢 困境反转 (亏损收窄)
+            s6 := 0.5 // 困境反转 (亏损收窄)
             t6_s := "困境反转 (亏损收窄)", t6_a := "【进攻】 卖出防御股，买入反转股"
         else
-            s6 := -0.5 // 🟠 亏损恶化 (成本倒挂)
+            s6 := -0.5 // 亏损恶化 (成本倒挂)
             t6_s := "亏损恶化 (成本倒挂)", t6_a := "【防御】 卖出中下游制造，买入防御资产"
     else if is_sustained(us_profit_gap > 0, bars_prof_state) // 盈利
         // 分支：走阔(躺赚) vs 其他(承压)
         if is_widening_trend
-            s6 := 1.0 // 🟢 利润走阔 (躺赚时刻)
+            s6 := 1.0 // 利润走阔 (躺赚时刻)
             t6_s := "利润走阔 (躺赚时刻)", t6_a := "【进攻】 卖出低效资产，买入成长股"
         else
             // 收窄 或 走平 -> 利润承压
+
             s6 := 0.0 // 🟡 利润承压 (增长停滞)
             t6_s := "利润承压 (增长停滞)", t6_a := "【观察】 卖出投机股，买入绩优股"
     else
@@ -710,7 +699,7 @@ max_score   = w1 + w2 + w3 + w4 + w5 + w6 + w7 + w8
 bool is_meltdown = (s3 == -1.0 and w3 > 1.0) or (s4 == -1.0 and w4 > 1.0) or (s8 == -1.0 and w8 > 1.0) or (s5 == -1.0)
 
 // ==========================================
-// 4. UI 渲染 (UI Rendering)
+// 4. UI 渲染
 // ==========================================
 
 // --- 状态文本生成器 ---
@@ -752,8 +741,8 @@ get_score_col(s) =>
     else
         c_lime // +0.5 or +1.0
 
-// --- 全局文案生成 (Global Text Generation) ---
-// 将文案逻辑从绘图逻辑中剥离，确保左表(Report)始终正确显示
+// --- 全局文案生成 ---
+// 将文案逻辑从绘图逻辑中剥离，确保左表始终正确显示
 
 // 1. 基准利率
 if s1 == -1.0
@@ -827,7 +816,7 @@ else
         t5_s := "资金活化 (活水变多)", t5_a := "【进攻】 卖出防御资产，买入科技/成长"
 
 // 6. 利润空间
-// 逻辑移至 Calculation Block，因为涉及复杂的趋势判定
+// 逻辑移至计算模块，因为涉及复杂的趋势判定
 // t6_s, t6_a 已在上方赋值
 
 // 7. 实体热度
@@ -862,7 +851,7 @@ color dyn_c = c_white
 if mode == "1. 基准利率"
     plot_val := effr_live
     // 修复：基准利率的颜色应该反映“救火”状态
-    // 如果是月线/周线图，且发生了救火降息 (effr_drop >= 0.5)，则强制红色
+    // 如果是月线/周线图，且发生了救火降息，则强制红色
     bool is_fire_cut_htf = (timeframe.isweekly or timeframe.ismonthly) and effr_drop >= 0.5
     dyn_c := is_fire_cut_htf ? c_red : get_score_col(s1)
 else if mode == "2. 真实利率"
@@ -883,22 +872,21 @@ else if mode == "6. 利润空间"
 else if mode == "7. 实体热度"
     plot_val := cg_ratio
     // 修复：铜金比颜色应该反映“月内崩盘”状态
-    // 如果是月线/周线图，且发生了崩盘 (cg_crash_scan)，则强制红色
+    // 如果是月线/周线图，且发生了崩盘，则强制红色
     bool is_cg_crash_htf = (timeframe.isweekly or timeframe.ismonthly) and cg_crash_scan
     dyn_c := is_cg_crash_htf ? c_red : get_score_col(s7)
 else if mode == "8. 萨姆规则"
     plot_val := sahm_val
     dyn_c := get_score_col(s8)
 
-// --- 综合绘图 (Plotting) ---
+// --- 综合绘图 ---
 // 1. 基准利率: 阶梯图 + EMA
 plot(mode == "1. 基准利率" ? plot_val : na, "EFFR", color = dyn_c, linewidth = 2, style = plot.style_stepline)
 plot(mode == "1. 基准利率" ? effr_ema : na, "EFFR EMA", color = color.blue, linewidth = 1)
 
 // 2. 真实利率: TIPS + RGDP + 阈值
-// 优化：RGDP 极端值截断 (仅用于绘图，不影响逻辑)
-// 2020年Q2 GDP 暴跌至 -30%，Q3 暴涨至 +33%，会导致 Y 轴压缩
-// 将绘图用的 RGDP 限制在 -10% 到 +10% 之间，恢复常规波动的可见性
+// 优化：RGDP 极端值截断 (仅用于绘图)
+// 将绘图用的 RGDP 限制在 -10% 到 +10% 之间
 float rgdp_plot = math.max(math.min(rgdp_val, 10.0), -10.0)
 
 plot(mode == "2. 真实利率" ? plot_val : na, "TIPS", color = dyn_c, linewidth = 2)
@@ -906,7 +894,7 @@ plot(mode == "2. 真实利率" ? rgdp_plot : na, "RGDP", color = color.gray, lin
 plot(mode == "2. 真实利率" ? 0.5 * rgdp_plot : na, "0.5 RGDP", color = color.new(color.orange, 50), style = plot.style_circles)
 
 // 添加 RGDP 极端值标签 (显示真实值)
-// 优化：仅在"季度结束"时绘制上一个季度的标签，确保每个季度只有一个标签，彻底解决重叠问题
+// 优化：仅在"季度结束"时绘制上一个季度的标签
 // 检测季度变化: 当前季度 != 上一根K线的季度
 int cur_q = math.ceil(month(time) / 3.0)
 int prev_q_idx = math.ceil(month(time[1]) / 3.0)
@@ -922,7 +910,7 @@ int m_rgdp = month(t_rgdp)
 int q_rgdp = math.ceil(m_rgdp / 3.0)
 string rgdp_date_str = " (" + str.tostring(y_rgdp) + " Q" + str.tostring(q_rgdp) + ")"
 
-// 优化：放弃复杂的历史回溯居中算法，改用"数据突变点 + 时间偏移"的物理定位法
+// 优化：改用"数据突变点 + 时间偏移"的物理定位法
 // 仅在 RGDP 数值发生突变 (新季度数据发布) 时绘制
 if mode == "2. 真实利率" and ta.change(rgdp_val) != 0
     // 获取当前新的 RGDP 值
@@ -1056,7 +1044,7 @@ bgcolor(mode == "6. 利润空间" and cpi_val > 3.0 ? color.new(c_red, 85) : na,
 
 // 增加静态图例 (Legend Table)
 // 仅在 "6. 利润空间" 模式且为最后一根 K 线时显示
-// 位置：右下角 (bottom_right)
+// 位置：右下角
 var table legend_prof = table.new(position.bottom_right, 2, 4, bgcolor = c_bg, border_width = 1, border_color = color.gray, frame_width = 1)
 if barstate.islast and mode == "6. 利润空间"
     // 标题行
@@ -1136,8 +1124,8 @@ if barstate.islast and show_report
     fill_row(7, "7.实体热度", str.tostring(cg_ratio, "0.00"), s7, w7, "铜金比", t7_s, t7_a, false)
     fill_row(8, "8.萨姆规则", str.tostring(sahm_val, "0.00")+"%", s8, w8, "死神信号", t8_s, t8_a, s8 == -1.0 and w8 > 1.0)
 
-    // Row 9: Macro Hedge Strategy
-    // Logic: US (Liquidity + Rate), CN (Liquidity)
+    // Row 9: 宏观对冲策略
+    // 逻辑: US (Liquidity + Rate), CN (Liquidity)
     // 修复：强制使用分离后的 US 和 CN 流动性数据，不再依赖 s5
     bool us_loose = s1 == 1.0 or score_us_liq == 1.0 // US: 降息 OR M2扩张
     bool us_tight = s1 < 0 or score_us_liq < 0       // US: 加息/救火 OR M2紧缩/枯竭
@@ -1178,7 +1166,7 @@ if barstate.islast and show_report
     table.cell(rpt, 4, 9, strat_us + "\n" + strat_cn, bgcolor = c_navy_60, text_color = c_white, text_size = size.small)
     table.cell(rpt, 5, 9, strat_d, bgcolor = c_navy_60, text_color = c_white), table.merge_cells(rpt, 5, 9, 6, 9)
 
-    // Row 10: Final Diagnosis
+    // Row 10: 最终诊断
     string final_res = "", string final_sugg = ""
     color final_bg = c_gray_dark
     color final_txt = c_white
@@ -1455,12 +1443,12 @@ if barstate.islast and show_report
     else if mode == "6. 利润空间"
         if region == "美国"
             d_title := "利润空间\n[CPI-PPI]", d_def := "CPI(售价) - PPI(成本) \n美国是全球最大消费国，重点看CPI(本国需求)"
-            d_obs := "12月 (同比)", d_logic := "🔴 过热: CPI>3%\n🔴 通缩: 双负\n🟠 亏损: <0\n🟡 震荡: ≈0\n🟢 修复: 收窄\n🟢 躺赚: 走阔", d_conf := "连续2个月确认"
+            d_obs := "12月 (同比)", d_logic := "🔴 过热: CPI>3%\n🔴 通缩: 双负\n🟠 亏损: <0\n🟡 承压: 收窄/平\n🟢 修复: 走阔\n🟢 躺赚: 走阔", d_conf := "状态2月/趋势3月"
             d_w := w6 > 1.0 ? "x2" : "x1"
             d_cur_stat := t6_s
             d_cur_val := str.tostring(us_profit_gap, "0.00") + "% | " + fmt_ym(us_prof_time)
             
-            // 6. 利润含义与战术
+            // 6. 利润含义与战术 (US)
             if s6 == -1.0 and w6 > 1.0 // 过热
                 d_cur_mean := "物价飞涨，通胀失控"
                 d_tactics  := "通胀失控，必须刹车\n拥抱抗通胀资产"
@@ -1474,42 +1462,38 @@ if barstate.islast and show_report
             else if s6 == -0.5 // 亏损
                 d_cur_mean := "成本倒挂，卖多亏多"
                 d_tactics  := "成本高于售价，亏损扩大\n规避中下游制造业"
-                d_turn_val := "差值走阔 (亏损收窄)"
+                d_turn_val := "趋势走阔 (亏损收窄)"
                 d_tactics_turn := "困境反转，关注行业龙头\n抢反弹"
-            else if s6 == 0.0 // 震荡
+            else if s6 == 0.0 // 承压
                 d_cur_mean := "利润微薄，存量竞争"
                 d_tactics  := "利润空间有限\n多看少做"
-                d_turn_val := "差值走阔 (利润释放)"
+                d_turn_val := "趋势走阔 (利润释放)"
                 d_tactics_turn := "利润释放，加仓成长股\n业绩驱动"
             else if s6 == 0.5 // 修复
                 d_cur_mean := "利润修复，困境反转"
                 d_tactics  := "虽利润变薄，但还在赚钱\n不激进追高"
-                d_turn_val := "差值收窄 (持续变薄)"
+                d_turn_val := "趋势收窄 (持续变薄)"
                 d_tactics_turn := "利润变薄，去弱留强\n切换防御"
             else // 躺赚
                 d_cur_mean := "躺着赚钱，利润暴增"
                 d_tactics  := "售价涨幅大于成本\n积极买入成长股"
-                d_turn_val := "差值收窄 (利润变薄)"
+                d_turn_val := "趋势收窄 (利润变薄)"
                 d_tactics_turn := "暴利终结，切换防御资产\n落袋为安"
                 
-            if s6 == -1.0 and w6 > 1.0 // 过热
-                d_risk := "通胀降温"
-            else if s6 == -1.0 // 通缩
-                d_risk := "走出通缩"
-            else if s6 == -0.5 // 亏损
-                d_risk := "亏损收窄"
-            else if s6 == 0.0 // 震荡
-                d_risk := "利润释放"
-            else if s6 == 0.5 // 修复
-                d_risk := "利润变薄"
-            else // 躺赚
-                d_risk := "利润变薄"
+            d_risk := "趋势变化"
                 
         else
             d_title := "利润空间\n[CPI-PPI]", d_def := "CPI(售价) - PPI(成本) \n中国是全球最大制造国，重点看PPI(对应全球需求)"
-            d_obs := "12月 (同比)", d_logic := "🔴 通缩: 双负\n🟠 亏损: <0\n🟡 内卷: ≈0\n🟢 修复: 收窄\n🟢 躺赚: 走阔", d_conf := "连续2个月确认"
+            d_obs := "12月 (同比)", d_logic := "🔴 通缩: 双负\n🟠 亏损: <0\n🟡 承压: 收窄/平\n🟢 修复: 走阔\n🟢 躺赚: 走阔", d_conf := "状态2月/趋势3月"
             d_w := w6 > 1.0 ? "x2" : "x1"
             d_cur_stat := t6_s
+            d_cur_val := str.tostring(cn_profit_gap, "0.00") + "% | " + fmt_ym(cn_prof_time)
+            
+            // 6. 利润含义与战术 (CN)
+            // 简单填充，具体逻辑参考 README
+            d_cur_mean := "制造国利润变动"
+            d_tactics := "关注出海与龙头"
+            d_risk := "趋势变化"
             d_cur_val := str.tostring(cn_profit_gap, "0.00") + "% | " + fmt_ym(cn_prof_time)
             
             // 6. 利润含义与战术 (中国)
@@ -1718,7 +1702,7 @@ if barstate.islast and show_report
                 turn_score_disp := 0.5
             else if s6 == -0.5 // 亏损 -> 收窄 (黄)
                 turn_score_disp := 0.0
-            else if s6 == 0.0 // 震荡 -> 释放 (绿)
+            else if s6 == 0.0 // 承压 -> 释放 (绿)
                 turn_score_disp := 1.0
             else if s6 == 0.5 // 修复 -> 变薄 (黄)
                 turn_score_disp := 0.0
@@ -1729,7 +1713,7 @@ if barstate.islast and show_report
                 turn_score_disp := 0.5
             else if s6 == -0.5 // 亏损 -> 收窄 (黄)
                 turn_score_disp := 0.0
-            else if s6 == 0.0 // 内卷 -> 释放 (绿)
+            else if s6 == 0.0 // 承压 -> 释放 (绿)
                 turn_score_disp := 1.0
             else if s6 == 0.5 // 修复 -> 变薄 (黄)
                 turn_score_disp := 0.0
@@ -1754,18 +1738,24 @@ if barstate.islast and show_report
         cur_score_disp := s8
         if s8 == -1.0 and w8 > 1.0 // 熔断 -> 预警 (红)
             turn_score_disp := -1.0
-        else if s8 == -1.0 // 预警 -> 解除 (绿)
+        else if s8 == -0.5 // 关注 -> 解除 (绿)
             turn_score_disp := 1.0
-        else if s8 == -0.5 // ICSA -> 改善 (绿)
+        else if s8 == 1.0 // 健康 -> 关注 (红)
+            turn_score_disp := -0.5
+        else // ICSA -> 改善 (绿)
             turn_score_disp := 1.0
-        else // 健康 -> 预警 (红)
-            turn_score_disp := -1.0
 
+    // 渲染右表
+    // Row 3: 状态行 (含拐点)
     table.cell(info, 1, 3, d_cur_val, bgcolor = c_bg, text_color = get_score_col(cur_score_disp)), table.merge_cells(info, 1, 3, 2, 3), table.cell_set_text_halign(info, 1, 3, text.align_left)
     table.cell(info, 3, 3, d_turn_val, bgcolor = c_bg, text_color = get_score_col(turn_score_disp), text_halign = text.align_left)
+    
+    // Row 4: 含义行
     table.cell(info, 0, 4, "含义:", bgcolor = c_bg, text_color = c_beige, text_halign = text.align_left)
     table.cell(info, 1, 4, d_cur_mean, bgcolor = c_bg, text_color = c_white, text_halign = text.align_left), table.merge_cells(info, 1, 4, 2, 4)
     table.cell(info, 3, 4, d_risk, bgcolor = c_bg, text_color = c_white, text_halign = text.align_left)
+    
+    // Row 5: 战术行
     table.cell(info, 0, 5, "战术:", bgcolor = c_bg, text_color = c_beige, text_halign = text.align_left)
     string clean_tactics = str.replace(d_tactics, "【战术】\n", "")
     table.cell(info, 1, 5, clean_tactics, bgcolor = c_bg, text_color = c_white, text_halign = text.align_left), table.merge_cells(info, 1, 5, 2, 5)
