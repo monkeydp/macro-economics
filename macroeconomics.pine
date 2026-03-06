@@ -52,6 +52,7 @@ th_liq_us_crash = input.float(-2.0, "美国枯竭阈值 (M2)", step=0.1, group=g
 th_liq_cn_noise = input.float(0.50, "中国震荡阈值 (M1-M2)", minval=0.0, step=0.1, group=grp_5, display=display.none)
 th_liq_cn_crash = input.float(-5.0, "中国空转阈值 (M1-M2)", step=0.1, group=grp_5, display=display.none)
 dur_liq_conf    = input.int(2, "确认时长 (月)", minval=1, group=grp_5, display=display.none)
+lock_liq_crash  = input.int(3, "熔断锁定 (月)", minval=1, group=grp_5, display=display.none)
 
 // --- 6. 利润空间 (Profit) ---
 grp_6 = "6. 利润空间 (CPI-PPI)"
@@ -656,7 +657,8 @@ total_score = s1*w1 + s2*w2 + s3*w3 + s4*w4 + s5*w5 + s6*w6 + s7*w7 + s8*w8
 max_score   = w1 + w2 + w3 + w4 + w5 + w6 + w7 + w8
 
 // 熔断一票否决
-bool is_meltdown = (s3 == -1.0 and w3 > 1.0) or (s4 == -1.0 and w4 > 1.0) or (s8 == -1.0 and w8 > 1.0)
+// 流动性熔断 (s5 == -1.0) 权重不翻倍，但也算熔断
+bool is_meltdown = (s3 == -1.0 and w3 > 1.0) or (s4 == -1.0 and w4 > 1.0) or (s8 == -1.0 and w8 > 1.0) or (s5 == -1.0)
 
 // ==========================================
 // 4. UI 渲染 (UI Rendering)
@@ -765,23 +767,23 @@ else
 
 // 5. 流动性
 if region == "美国"
-    if s5 == -1.0
-        t5_s := "枯竭 (休克)", t5_a := "【避险】 卖出所有资产，买入美元现金"
+    if s5 == -1.0 // 严重收缩 (熔断)
+        t5_s := "严重收缩 (水位见底)", t5_a := "【避险】 卖出所有资产，买入美元现金"
     else if s5 == -0.5
         t5_s := "紧缩 (水位下降)", t5_a := "【防御】 卖出风险资产，买入现金"
     else if s5 == 0.0
-        t5_s := "存量博弈 (水位不定)", t5_a := "【观察】 多看少做"
+        t5_s := "存量博弈 (水位震荡)", t5_a := "【观察】 多看少做"
     else
         t5_s := "扩张 (水位上涨)", t5_a := "【进攻】 卖出美元，买入科技/成长"
 else
-    if s5 == -1.0
-        t5_s := "严重空转 (活水稀缺)", t5_a := "【避险】 卖出所有资产，买入现金"
+    if s5 == -1.0 // 严重空转 (熔断)
+        t5_s := "严重空转 (活水断流)", t5_a := "【避险】 卖出所有资产，买入现金"
     else if s5 == -0.5
         t5_s := "资金空转 (活水变少)", t5_a := "【防御】 卖出重资产，买入高股息"
     else if s5 == 0.0
-        t5_s := "结构震荡", t5_a := "【观察】 多看少做"
+        t5_s := "存量博弈 (活水震荡)", t5_a := "【观察】 多看少做"
     else
-        t5_s := "活化 (活水变多)", t5_a := "【进攻】 卖出防御资产，买入科技/成长"
+        t5_s := "资金活化 (活水变多)", t5_a := "【进攻】 卖出防御资产，买入科技/成长"
 
 // 6. 利润空间
 if region == "美国"
@@ -992,16 +994,29 @@ if barstate.islast and mode == "4. 信用风险"
 
 
 // 5. 流动性: M2 YoY + 阈值
-plot(mode == "5. 流动性" ? plot_val : na, "Liquidity", color = dyn_c, linewidth = 2)
-plot(mode == "5. 流动性" and region == "美国" ? th_liq_us_crash : na, "M2 -2", color = c_red)
-plot(mode == "5. 流动性" and region == "中国" ? th_liq_cn_crash : na, "M1-M2 -5", color = c_red)
+color liq_col = dyn_c
+// 熔断背景高亮 (深红半透明)
+bool is_liq_meltdown = false
+if region == "美国"
+    is_liq_meltdown := is_liq_crash
+else
+    is_liq_meltdown := is_cn_crash
+
+if is_liq_meltdown
+    liq_col := c_super_red
+
+plot(mode == "5. 流动性" ? plot_val : na, "Liquidity", color = liq_col, linewidth = 2)
+plot(mode == "5. 流动性" and region == "美国" ? th_liq_us_crash : na, "M2 -2", color = c_super_red)
+plot(mode == "5. 流动性" and region == "中国" ? th_liq_cn_crash : na, "M1-M2 -5", color = c_super_red)
+
+bgcolor(mode == "5. 流动性" and is_liq_meltdown ? color.new(c_super_red, 70) : na, title="Liq Melt BG")
 
 // 增加标签
 if barstate.islast and mode == "5. 流动性"
     if region == "美国"
-        label.new(bar_index, th_liq_us_crash, "枯竭 (" + str.tostring(th_liq_us_crash) + "%)", color = c_red, style = label.style_label_left, textcolor = c_white, size = size.small)
-    else // 中国
-        label.new(bar_index, th_liq_cn_crash, "严重空转 (" + str.tostring(th_liq_cn_crash) + "%)", color = c_red, style = label.style_label_left, textcolor = c_white, size = size.small)
+        label.new(bar_index, th_liq_us_crash, "熔断 (-2.0)", color = c_super_red, style = label.style_label_left, textcolor = c_white, size = size.small)
+    else
+        label.new(bar_index, th_liq_cn_crash, "熔断 (-5.0)", color = c_super_red, style = label.style_label_left, textcolor = c_white, size = size.small)
 
 // 6. 利润空间: Gap
 plot(mode == "6. 利润空间" ? plot_val : na, "Profit Gap", color = dyn_c, linewidth = 2)
@@ -1059,7 +1074,7 @@ if barstate.islast and show_report
     fill_row(4, "4.信用风险", str.tostring(oas_val, "0.00")+"%", s4, w4, "风险保证金", t4_s, t4_a, s4 == -1.0 and w4 > 1.0)
     
     string l5_v = region == "美国" ? str.tostring(us_m2_yoy, "0.00")+"%" : str.tostring(cn_gap, "0.00")+"%"
-    fill_row(5, "5.流动性", l5_v, s5, w5, "鱼池活水率", t5_s, t5_a, false)
+    fill_row(5, "5.流动性", l5_v, s5, w5, "鱼池活水率", t5_s, t5_a, s5 == -1.0)
     
     string l6_v = region == "美国" ? str.tostring(us_profit_gap, "0.00")+"%" : str.tostring(cn_profit_gap, "0.00")+"%"
     fill_row(6, "6.利润空间", l6_v, s6, w6, "养鱼账本", t6_s, t6_a, false)
@@ -1335,7 +1350,7 @@ if barstate.islast and show_report
 
     else if mode == "5. 流动性"
         if region == "美国"
-            d_title := "流动性增速\n[M2REAL YoY]", d_def := "广义货币供应量同比(剔除通胀)。\nM2REAL 同比 >0 = 美国印钱 = 全球水位上涨。"
+            d_title := "流动性增速\n[M2REAL YoY]", d_def := "广义货币供应量同比(剔除通胀)\nM2REAL 同比 >0 = 美国印钱 = 全球水位上涨"
             d_obs := "12月 (同比)", d_logic := "🔴 枯竭: <-2%\n🟠 紧缩: <0\n🟡 存量: ≈0\n🟢 扩张: >0", d_conf := "连续2个月确认"
             d_w := w5 > 1.0 ? "x2" : "x1"
             d_cur_stat := t5_s
@@ -1476,7 +1491,7 @@ if barstate.islast and show_report
                 d_risk := "利润变薄"
 
     else if mode == "7. 实体热度"
-        d_title := "实体热度\n[铜金比]", d_def := "铜(工业) / 金(避险)。\n比值涨=复苏; 比值跌=衰退。"
+        d_title := "实体热度\n[铜金比]", d_def := "铜(工业) / 金(避险)\n比值涨=复苏; 比值跌=衰退。"
         d_obs := "20日 (趋势)", d_logic := "🔴 崩盘: 单日跌>3%\n🟠 衰退: 跌\n🟠 伪复苏: 铜跌\n🟡 震荡: 平\n🟢 复苏: 双涨", d_conf := "连续5日确认"
         d_w := w7 > 1.0 ? "x2" : "x1"
         d_cur_stat := t7_s
@@ -1528,7 +1543,7 @@ if barstate.islast and show_report
         d_tactics := (s7 < 0 ? (is_cg_crash ? "极度恐慌，抛售一切资产\n只有美元和美债最安全" : (is_fake_recovery ? "铜比金强但都在跌，衰退假象\n不要被比值上涨迷惑" : "实体疲软，避险主导\n买黄金/美债，规避强周期")) : (s7 > 0 ? "实体需求旺盛，风险偏好上升\n买周期股、工业大宗商品" : "方向不明，多看少做"))
 
     else if mode == "8. 萨姆规则"
-        d_title := "衰退预警\n[Sahm]", d_def := "失业率3月均值 - 12月低点。\n死神信号，100%准确率。"
+        d_title := "衰退预警\n[Sahm]", d_def := "失业率3月均值 - 12月低点\n死神信号，100%准确率。"
         d_obs := "12月 (低点)", d_logic := "🛑 衰退: ≥0.5%\n🟠 关注: ≥0.3%\n🟠 预警: ICSA>15%\n🟢 健康: <0.3%", d_conf := "非农发布日确认"
         d_w := w8 > 1.0 ? "x2" : "x1"
         d_cur_stat := t8_s
