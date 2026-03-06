@@ -884,12 +884,9 @@ bool is_bull_steep_melt = mode == "3. 利差结构" and s3 == -1.0 and w3 > 1.0
 
 // 1. 曲线变色 (保持深红)
 color yc_col = is_bull_steep_melt ? c_super_red : dyn_c
-// Fix: linewidth expects input int (constant), cannot be series. Use constant 2.
 plot(mode == "3. 利差结构" ? plot_val : na, "10Y-2Y", color = yc_col, linewidth = 2)
 
 // 2. 背景高亮 (深红半透明)
-// Fix: bgcolor color argument must be color, not bool.
-// Fix: title is optional.
 bgcolor(is_bull_steep_melt ? color.new(c_super_red, 70) : na, title="Bull Steep Melt BG")
 
 // 3. 文本标记 (仅在熔断开始时显示，避免拥挤)
