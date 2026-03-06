@@ -109,12 +109,51 @@ calc_yoy(src, len) => (src / src[len] - 1) * 100
 float sec_per_bar = timeframe.in_seconds(timeframe.period)
 float sec_per_day = 86400
 
+// --- 录入美联储官方公布的议息会议日期 (此处录入了2025至2026年的公布日) ---
+// 注意：美联储会议通常为期两天，利率决议在第二天的美东时间下午 14:00 公布
+var int[] f_year  = array.from(2025, 2025, 2025, 2025, 2025, 2025, 2025, 2025, 2026, 2026, 2026, 2026, 2026, 2026, 2026, 2026)
+var int[] f_month = array.from(   1,    3,    5,    6,    7,    9,   10,   12,    1,    3,    4,    6,    7,    9,   10,   12)
+var int[] f_day   = array.from(  29,   19,    7,   18,   30,   17,   29,   10,   28,   18,   29,   17,   29,   16,   28,    9)
+
+get_fomc_formatted_times() =>
+    string last_str = "暂无数据"
+    string next_str = "暂无数据"
+    
+    // 获取当前K线所在时区的年份
+    int current_year = year(time, syminfo.timezone)
+    
+    for i = 0 to array.size(f_year) - 1
+        y = array.get(f_year, i)
+        m = array.get(f_month, i)
+        d = array.get(f_day, i)
+        
+        // 生成美东时间(纽约)下午14:00的时间戳
+        fomc_time = timestamp("America/New_York", y, m, d, 14, 0, 0)
+        
+        // 获取该会议在你本地时区的年份
+        int fomc_year = year(fomc_time, syminfo.timezone)
+        bool is_same_year = (fomc_year == current_year)
+        
+        // --- 分支逻辑 ---
+        if fomc_time <= time
+            // 【上一次 (已发布)】: 只显示日期，不要时间
+            // 如果是同一年，显示 "01-29"；如果是跨年，显示 "2025-12-11"
+            string fmt_past = is_same_year ? "MM-dd" : "yyyy-MM-dd"
+            last_str := str.format_time(fomc_time, fmt_past, syminfo.timezone)
+        else
+            // 【下一次 (即将发布)】: 显示日期 + 时间，精确到分
+            // 如果是同一年，显示 "03-19 02:00"；跨年显示完整年份
+            string fmt_future = is_same_year ? "MM-dd HH:mm" : "yyyy-MM-dd HH:mm"
+            next_str := str.format_time(fomc_time, fmt_future, syminfo.timezone)
+            
+            // 找到最近的一个未来时间后，立即退出循环
+            break
+            
+    [last_str, next_str]
+
+[last_fomc_time, next_fomc_time] = get_fomc_formatted_times()
+
 // --- 1. 基准利率 (EFFR) ---
-// 确认时长: FOMC 公布日
-// 核心修正：全周期扫描逻辑
-// 日线图：直接读取当日跌幅
-// 周线/月线图：扫描本周期内每一天的跌幅，只要有一天 >= 0.50%，即触发救火信号
-// 这样既不漏信号（哪怕是月初第一天），也不拖影（上个月的信号只留在上个月）
 
 // 1. 获取日线实时数据 (用于绘图和基础判断)
 [effr_live, effr_time, effr_chg] = request.security(sym_effr, "D", [close, time, close[1] - close], gaps = barmerge.gaps_off)
@@ -916,13 +955,12 @@ if is_bull_steep_melt and not is_bull_steep_melt[1]
 
 
 // 4. 信用风险: OAS + 阈值
-// 修复：OAS 熔断时曲线显示深红
 color oas_col = dyn_c
 if mode == "4. 信用风险" and s4 == -1.0 and w4 > 1.0
     oas_col := c_super_red
 
 plot(mode == "4. 信用风险" ? plot_val : na, "OAS", color = oas_col, linewidth = 2)
-plot(mode == "4. 信用风险" ? 10.0 : na, "OAS 10", color = c_super_red, style = plot.style_circles)
+plot(mode == "4. 信用风险" ? 10.0 : na, "OAS 10", color = c_super_red)
 plot(mode == "4. 信用风险" ? 6.0 : na, "OAS 6", color = c_red)
 plot(mode == "4. 信用风险" ? 3.5 : na, "OAS 3.5", color = c_lime)
 
@@ -1090,10 +1128,10 @@ if barstate.islast and show_report
     
     if mode == "1. 基准利率"
         d_title := "基准利率\n[EFFR]", d_def := "美联储联邦基金有效利率\n全球资金成本的总阀门。"
-        d_obs := "10月 (EMA)", d_logic := "🔴 救火: ≥50bp\n🟠 加息: >EMA\n🟡 震荡: ≈EMA\n🟢 降息: <EMA", d_conf := "FOMC公布日确认"
+        d_obs := "10月 (EMA)", d_logic := "🔴 救火: ≥50bp\n🟠 加息: >EMA\n🟡 震荡: ≈EMA\n🟢 降息: <EMA", d_conf := "FOMC公布日确认 (" + next_fomc_time + ")"
         d_w := w1 > 1.0 ? "x2" : "x1"
         d_cur_stat := t1_s
-        d_cur_val := str.tostring(effr_live, "0.00") + "% | " + fmt_ymd(effr_time)
+        d_cur_val := str.tostring(effr_live, "0.00") + "% | " + last_fomc_time
         
         // 1. 基准利率含义与战术 (全状态覆盖)
         if s1 == -1.0 // 救火
@@ -1224,7 +1262,7 @@ if barstate.islast and show_report
 
     else if mode == "4. 信用风险"
         d_title := "信用风险\n[OAS]", d_def := "高收益企业债期权调整利差\n银行借钱给烂公司的额外利息(风险保证金)\n趋势向上 = 银行惜贷，信用收缩\n趋势向下 = 市场风险偏好下降，融资成本上升"
-        d_obs := "20日 (趋势)", d_logic := "🛑 危机: >10%或暴涨\n🔴 恶化: >6%\n🟠 走阔: 趋势上\n🟡 压力: 震荡\n🟢 收敛: <3.5%", d_conf := "连续3日确认【熔断即时】"
+        d_obs := "20日 (趋势)", d_logic := "🛑 危机: >10%或暴涨\n🔴 恶化: >6%\n🟠 走阔: 趋势上\n🟡 压力: 震荡\n🟡 底部回升：< 3.5% 但趋势向上\n🟢 收敛: <3.5%", d_conf := "连续3日确认【熔断即时】"
         d_w := w4 > 1.0 ? "x2" : "x1"
         d_cur_stat := t4_s
         // 修复：使用正确的格式化字符串 "0.00" 并添加时间戳，与左表对齐
