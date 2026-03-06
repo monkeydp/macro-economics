@@ -881,7 +881,11 @@ else if mode == "8. 萨姆规则"
     // 熔断时曲线变深红
     dyn_c := s8 == -1.0 ? c_super_red : get_score_col(s8)
     
-// 萨姆规则熔断背景高亮 (全局作用域)
+// 实体热度崩盘背景高亮
+bool is_cg_crash_bg = mode == "7. 实体热度" and (s7 == -1.0 or ((timeframe.isweekly or timeframe.ismonthly) and cg_crash_scan))
+bgcolor(is_cg_crash_bg ? color.new(c_red, 80) : na, title="Copper Crash BG")
+
+// 萨姆规则熔断背景高亮
 bgcolor(mode == "8. 萨姆规则" and s8 == -1.0 ? color.new(c_super_red, 80) : na, title="Sahm Meltdown BG")
 
 // --- 综合绘图 ---
@@ -1074,7 +1078,7 @@ plot(mode == "7. 实体热度" ? plot_val : na, "Copper/Gold", color = dyn_c, li
 // 8. 萨姆规则: Sahm + 阈值
 plot(mode == "8. 萨姆规则" ? plot_val : na, "Sahm", color = dyn_c, linewidth = 2)
 
-// 萨姆规则阈值线 (全局作用域)
+// 萨姆规则阈值线
 hline(0.50, "衰退熔断", color = mode == "8. 萨姆规则" ? c_super_red : na, linestyle = hline.style_solid, linewidth = 2)
 hline(0.30, "衰退关注", color = mode == "8. 萨姆规则" ? c_orange : na, linestyle = hline.style_dashed)
 
@@ -1544,7 +1548,7 @@ if barstate.islast and show_report
 
     else if mode == "7. 实体热度"
         d_title := "实体热度\n[铜金比]", d_def := "铜(工业) / 金(避险)\n比值涨=复苏; 比值跌=衰退。"
-        d_obs := "60日 (趋势)", d_logic := "🔴 崩盘: 单日跌>3%\n🟠 衰退: 跌\n🟠 伪复苏: 铜跌\n🟡 震荡: 平\n🟢 复苏: 双涨", d_conf := "连续5日确认"
+        d_obs := "60日 (趋势)", d_logic := "🔴 崩盘: 单日跌>3%\n🟠 衰退: 跌\n🟠 伪复苏: 涨，但铜跌\n🟡 震荡: 平\n🟢 复苏: 双涨", d_conf := "连续5日确认"
         d_w := w7 > 1.0 ? "x2" : "x1"
         d_cur_stat := t7_s
         d_cur_val := str.tostring(cg_ratio, "0.00")
