@@ -1042,6 +1042,10 @@ plot(mode == "6. 利润空间" ? 3.0 : na, "CPI 3.0", color = color.new(color.re
 // 使用红色半透明背景，表示"过热"状态
 bgcolor(mode == "6. 利润空间" and cpi_val > 3.0 ? color.new(c_red, 85) : na, title="CPI Overheat BG")
 
+// 通缩背景高亮 (CPI < 0 且 PPI < 0)
+// 使用蓝色半透明背景，表示"冰冻"状态
+bgcolor(mode == "6. 利润空间" and cpi_val < 0 and ppi_val < 0 ? color.new(color.blue, 85) : na, title="Deflation BG")
+
 // 增加静态图例 (Legend Table)
 // 仅在 "6. 利润空间" 模式且为最后一根 K 线时显示
 // 位置：右下角
