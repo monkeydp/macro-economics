@@ -62,7 +62,8 @@ sym_cn_cpi      = input.symbol("ECONOMICS:CNCPI", "数据源 (中国CPI)", group
 sym_cn_ppi      = input.symbol("ECONOMICS:CNPPI", "数据源 (中国PPI)", group=grp_6, display=display.none)
 prof_yoy_len    = input.int(12, "同比周期 (月)", minval=1, group=grp_6, display=display.none)
 th_prof_noise   = input.float(0.20, "震荡阈值", minval=0.0, step=0.1, group=grp_6, display=display.none)
-dur_prof_conf   = input.int(2, "确认时长 (月)", minval=1, group=grp_6, display=display.none)
+dur_prof_state  = input.int(2, "状态确认时长 (月)", minval=1, group=grp_6, display=display.none)
+dur_prof_trend  = input.int(3, "趋势确认时长 (月)", minval=2, group=grp_6, display=display.none)
 
 // --- 7. 实体热度 (Copper/Gold) ---
 grp_7 = "7. 实体热度 (铜金比)"
@@ -412,6 +413,16 @@ if is_inflation_era
 float s1=0.0, float s2=0.0, float s3=0.0, float s4=0.0
 float s5=0.0, float s6=0.0, float s7=0.0, float s8=0.0
 
+// 全局文案变量
+string t1_s = "", string t1_a = ""
+string t2_s = "", string t2_a = ""
+string t3_s = "", string t3_a = ""
+string t4_s = "", string t4_a = ""
+string t5_s = "", string t5_a = ""
+string t6_s = "", string t6_a = ""
+string t7_s = "", string t7_a = ""
+string t8_s = "", string t8_a = ""
+
 // 1. EFFR
 // 状态定义：基于 EMA 的周期判定
 bool is_cut_cycle  = effr_live < effr_ema - th_effr_noise
@@ -555,59 +566,97 @@ else // CN
 
 // 6. Profit
 if region == "美国"
-    // 修正：将月数转换为 Bar 数
-    float sec_per_month_prof = 86400000 / 1000 * 30 // 近似
-    int bars_prof_conf = math.max(1, math.ceil(dur_prof_conf * sec_per_month_prof / sec_per_bar))
+    float sec_per_month_prof = 86400000 / 1000 * 30 
+    int bars_prof_state = math.max(1, math.ceil(dur_prof_state * sec_per_month_prof / sec_per_bar))
+    int bars_prof_trend = math.max(1, math.ceil(dur_prof_trend * sec_per_month_prof / sec_per_bar))
 
-    bool is_prof_heat = true
-    for i = 0 to bars_prof_conf - 1
-        if us_cpi_yoy[i] <= 3.0
-            is_prof_heat := false
+    // 状态判定 (2个月确认)
+    bool is_heat      = is_sustained(us_cpi_yoy > 3.0, bars_prof_state)
+    bool is_deflation = is_sustained(us_cpi_yoy < 0 and us_ppi_yoy < 0, bars_prof_state)
+    
+    // 趋势判定 (3个月确认)
+    // 走阔: 连续 N 个点 gap 变大 (gap > gap[1])
+    bool is_widening_trend = true
+    for i = 0 to bars_prof_trend - 2
+        if us_profit_gap[i] <= us_profit_gap[i+1]
+            is_widening_trend := false
             break
             
-    bool is_prof_deflation = true
-    for i = 0 to bars_prof_conf - 1
-        if us_cpi_yoy[i] >= 0 or us_ppi_yoy[i] >= 0
-            is_prof_deflation := false
+    // 收窄: 连续 N 个点 gap 变小 (gap < gap[1])
+    // 实际上文档中"走阔"用于盈利区，"收窄"用于亏损区(反转)
+    // 这里我们只关心"是否在变好(Widening/Recovering)" vs "是否在变坏(Narrowing/Worsening)"
+    // 统一逻辑: gap 变大 = Widening (无论正负); gap 变小 = Narrowing (无论正负)
+
+    // 逻辑分层
+    if is_heat
+        s6 := -1.0 // 🔴 通胀过热 (政策收紧)
+        w6 := 2.0  // 熔断级关注
+        t6_s := "通胀过热 (政策收紧)", t6_a := "【避险】 卖出成长股，买入现金/能源"
+    else if is_deflation
+        s6 := -1.0 // 🔴 深度通缩 (需求崩塌)
+        t6_s := "深度通缩 (需求崩塌)", t6_a := "【避险】 卖出所有资产，买入美元现金"
+    else if is_sustained(us_profit_gap < 0, bars_prof_state) // 亏损
+        // 分支：走阔(反转) vs 其他(恶化)
+        if is_widening_trend
+            s6 := 0.5 // 🟢 困境反转 (亏损收窄)
+            t6_s := "困境反转 (亏损收窄)", t6_a := "【进攻】 卖出防御股，买入反转股"
+        else
+            s6 := -0.5 // 🟠 亏损恶化 (成本倒挂)
+            t6_s := "亏损恶化 (成本倒挂)", t6_a := "【防御】 卖出中下游制造，买入防御资产"
+    else if is_sustained(us_profit_gap > 0, bars_prof_state) // 盈利
+        // 分支：走阔(躺赚) vs 其他(承压)
+        if is_widening_trend
+            s6 := 1.0 // 🟢 利润走阔 (躺赚时刻)
+            t6_s := "利润走阔 (躺赚时刻)", t6_a := "【进攻】 卖出低效资产，买入成长股"
+        else
+            // 收窄 或 走平 -> 利润承压
+            s6 := 0.0 // 🟡 利润承压 (增长停滞)
+            t6_s := "利润承压 (增长停滞)", t6_a := "【观察】 卖出投机股，买入绩优股"
+    else
+        // 震荡区 (正负切换期间，或未满2个月确认期)
+        s6 := 0.0 
+        t6_s := "利润承压 (震荡)", t6_a := "【观察】 多看少做"
+
+else // CN
+    float sec_per_month_prof = 86400000 / 1000 * 30 
+    int bars_prof_state = math.max(1, math.ceil(dur_prof_state * sec_per_month_prof / sec_per_bar))
+    int bars_prof_trend = math.max(1, math.ceil(dur_prof_trend * sec_per_month_prof / sec_per_bar))
+
+    // 状态判定
+    bool is_cn_heat      = is_sustained(cn_cpi_yoy > 3.0, bars_prof_state)
+    bool is_cn_deflation = is_sustained(cn_cpi_yoy < 0 and cn_ppi_yoy < 0, bars_prof_state)
+
+    // 趋势判定
+    bool is_cn_widening_trend = true
+    for i = 0 to bars_prof_trend - 2
+        if cn_profit_gap[i] <= cn_profit_gap[i+1]
+            is_cn_widening_trend := false
             break
 
-    // 过热: >3% (连续 N 月)
-    if is_prof_heat
-        s6 := -1.0 // 通胀过热 (配合权重x2)
+    if is_cn_heat
+        s6 := -1.0 
         w6 := 2.0
-    // 通缩幻觉: 双负 (连续 N 月)
-    else if is_prof_deflation
-        s6 := -1.0 // 通缩幻觉
-    else if us_profit_gap < -th_prof_noise
-        s6 := -0.5 // 亏损
-    else if us_profit_gap > th_prof_noise
-        // 走阔
-        if us_profit_gap > us_profit_gap[1]
-            s6 := 1.0 // 躺赚
-        else
-            s6 := 0.5 // 修复
-    else
-        s6 := 0.0 // 震荡
-else // CN
-    if cn_cpi_yoy > 3.0
-        s6 := -1.0 // 通胀过热
-        w6 := 2.0
-    else if cn_cpi_yoy < 0 and cn_ppi_yoy < 0
-        s6 := -1.0 // 深度通缩
-    else if cn_profit_gap < -th_prof_noise
-        // 亏损
-        if cn_profit_gap > cn_profit_gap[1] // 收窄
-            s6 := 0.5 
+        t6_s := "通胀过热 (政策收紧)", t6_a := "【避险】 卖出成长股，买入现金/能源"
+    else if is_cn_deflation
+        s6 := -1.0
+        t6_s := "深度通缩 (需求崩塌)", t6_a := "【避险】 卖出周期股，买入必选消费"
+    else if is_sustained(cn_profit_gap < 0, bars_prof_state) // 亏损
+        if is_cn_widening_trend // 亏损收窄
+            s6 := 0.5
+            t6_s := "困境反转 (亏损收窄)", t6_a := "【进攻】 卖出防御股，买入反转股"
         else
             s6 := -0.5
-    else if cn_profit_gap > th_prof_noise
-        // 盈利
-        if cn_profit_gap > cn_profit_gap[1]
+            t6_s := "亏损恶化 (成本倒挂)", t6_a := "【防御】 卖出中游制造，买入上游资源"
+    else if is_sustained(cn_profit_gap > 0, bars_prof_state) // 盈利
+        if is_cn_widening_trend // 走阔
             s6 := 1.0
+            t6_s := "利润走阔 (躺赚时刻)", t6_a := "【进攻】 卖出上游资源，买入消费股、中下游制造股"
         else
             s6 := 0.0
+            t6_s := "利润承压 (增长停滞)", t6_a := "【观察】 回避同质化竞争，只看有提价权的龙头"
     else
         s6 := 0.0
+        t6_s := "利润承压 (震荡)", t6_a := "【观察】 多看少做"
 
 // 7. Real Economy
 if is_cg_crash
@@ -705,14 +754,6 @@ get_score_col(s) =>
 
 // --- 全局文案生成 (Global Text Generation) ---
 // 将文案逻辑从绘图逻辑中剥离，确保左表(Report)始终正确显示
-string t1_s = "", string t1_a = ""
-string t2_s = "", string t2_a = ""
-string t3_s = "", string t3_a = ""
-string t4_s = "", string t4_a = ""
-string t5_s = "", string t5_a = ""
-string t6_s = "", string t6_a = ""
-string t7_s = "", string t7_a = ""
-string t8_s = "", string t8_a = ""
 
 // 1. 基准利率
 if s1 == -1.0
@@ -786,31 +827,8 @@ else
         t5_s := "资金活化 (活水变多)", t5_a := "【进攻】 卖出防御资产，买入科技/成长"
 
 // 6. 利润空间
-if region == "美国"
-    if s6 == -1.0
-        if w6 > 1.0 // 通胀过热 (CPI>3)
-            t6_s := "通胀过热", t6_a := "【避险】 卖出成长股，买入能源/黄金"
-        else // 通缩 (双负)
-            t6_s := "通缩幻觉 (双负)", t6_a := "【避险】 卖出所有资产，买入美元现金"
-    else if s6 == -0.5
-        t6_s := "亏损 (成本倒挂)", t6_a := "【防御】 卖出中下游制造，买入防御/红利"
-    else if s6 == 0.0
-        t6_s := "震荡", t6_a := "【观察】 多看少做"
-    else if s6 == 0.5
-        t6_s := "修复 (利润变薄)", t6_a := "【进攻】 卖出高估值，买入绩优股/核心"
-    else
-        t6_s := "躺赚 (利润变厚)", t6_a := "【进攻】 卖出低效资产，买入科技/成长"
-else
-    if s6 == -1.0
-        t6_s := "通缩 (双负)", t6_a := "【避险】 卖出周期股，买入必选消费"
-    else if s6 == -0.5
-        t6_s := "亏损 (倒挂)", t6_a := "【防御】 卖出中游制造，买入上游资源"
-    else if s6 == 0.0
-        t6_s := "内卷 (利润压缩)", t6_a := "【观察】 回避同质化竞争，只看龙头"
-    else if s6 == 0.5
-        t6_s := "修复 (困境反转)", t6_a := "【进攻】 卖出防御股，买入反转股"
-    else
-        t6_s := "躺赚 (利润释放)", t6_a := "【进攻】 卖出上游资源，买入消费/中下游"
+// 逻辑移至 Calculation Block，因为涉及复杂的趋势判定
+// t6_s, t6_a 已在上方赋值
 
 // 7. 实体热度
 if s7 == -1.0
