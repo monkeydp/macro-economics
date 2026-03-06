@@ -511,8 +511,8 @@ float score_cn_liq = 0.0
 float sec_per_month_liq = 86400000 / 1000 * 30 // 近似
 int bars_liq_conf = math.max(1, math.ceil(dur_liq_conf * sec_per_month_liq / sec_per_bar))
 
-// 枯竭: <-2.0% (连续 N 月)
-bool is_liq_crash = is_sustained(us_m2_yoy < -2.0, bars_liq_conf)
+// 枯竭: <-2.0% (立即生效，暴跌无需确认)
+bool is_liq_crash = us_m2_yoy < -2.0
 // 紧缩: < -0.2% (连续 N 月, README 要求确认)
 bool is_liq_tight = is_sustained(us_m2_yoy < -th_liq_us_noise, bars_liq_conf)
 // 扩张: > 0.2% (连续 N 月)
@@ -528,8 +528,8 @@ else
     score_us_liq := 0.0  // 存量博弈
 
 // --- CN Liquidity Calculation ---
-// 严重空转: <-5.0% (连续 N 月)
-bool is_cn_crash = is_sustained(cn_gap < -5.0, bars_liq_conf)
+// 严重空转: <-5.0% (立即生效，暴跌无需确认)
+bool is_cn_crash = cn_gap < -5.0
 // 资金空转: < -0.5% (连续 N 月)
 bool is_cn_tight = is_sustained(cn_gap < -th_liq_cn_noise, bars_liq_conf)
 // 活化: > 0.5% (连续 N 月)
