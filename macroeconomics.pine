@@ -159,16 +159,38 @@ bool is_bull_steep_daily = y10_chg < 0 and y2_chg < -th_yc_bull_steep and y2_chg
 bool is_bull_steep_htf = false
 bool is_high_tf_yc = timeframe.isweekly or timeframe.ismonthly
 if is_high_tf_yc
-    float[] y10_diffs_m = request.security_lower_tf(sym_us_10y, "D", close - close[1])
-    float[] y2_diffs_m  = request.security_lower_tf(sym_us_2y, "D", close - close[1])
+    [y10_diffs_m, y10_times_m] = request.security_lower_tf(sym_us_10y, "D", [close - close[1], time])
+    [y2_diffs_m, y2_times_m]  = request.security_lower_tf(sym_us_2y, "D", [close - close[1], time])
+    
     if array.size(y10_diffs_m) > 0 and array.size(y2_diffs_m) > 0
-        int len = math.min(array.size(y10_diffs_m), array.size(y2_diffs_m))
-        for i = 0 to len - 1
-            float d10 = array.get(y10_diffs_m, i)
-            float d2  = array.get(y2_diffs_m, i)
-            if d10 < 0 and d2 < -th_yc_bull_steep and d2 < d10
-                is_bull_steep_htf := true
-                break
+        int len10 = array.size(y10_diffs_m)
+        int len2 = array.size(y2_diffs_m)
+        
+        // 双指针遍历，确保时间戳对齐
+        int i10 = 0
+        int i2 = 0
+        
+        while i10 < len10 and i2 < len2
+            int t10 = array.get(y10_times_m, i10)
+            int t2 = array.get(y2_times_m, i2)
+            
+            if t10 == t2
+                float d10 = array.get(y10_diffs_m, i10)
+                float d2 = array.get(y2_diffs_m, i2)
+                
+                // 只有当两者时间完全一致时才比较
+                if d10 < 0 and d2 < -th_yc_bull_steep and d2 < d10
+                    is_bull_steep_htf := true
+                    break
+                
+                i10 := i10 + 1
+                i2 := i2 + 1
+            else if t10 < t2
+                // t10 更早，说明 t2 这一天 10Y 缺数据，跳过 t10
+                i10 := i10 + 1
+            else
+                // t2 更早，说明 t10 这一天 2Y 缺数据，跳过 t2
+                i2 := i2 + 1
 
 is_bull_steep_trigger = is_high_tf_yc ? is_bull_steep_htf : is_bull_steep_daily
 
