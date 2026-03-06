@@ -618,20 +618,27 @@ else // CN
     if is_cn_heat
         s6 := -1.0 
         w6 := 2.0
+        t6_s := "通胀过热 (政策收紧)", t6_a := "【避险】 卖出成长股，买入现金/能源"
     else if is_cn_deflation
         s6 := -1.0
-    else if is_sustained(cn_profit_gap < 0, bars_prof_state)
+        t6_s := "深度通缩 (需求崩塌)", t6_a := "【避险】 卖出周期股，买入必选消费"
+    else if is_sustained(cn_profit_gap < 0, bars_prof_state) // 亏损
         if is_cn_widening_trend // 亏损收窄
             s6 := 0.5
+            t6_s := "困境反转 (亏损收窄)", t6_a := "【进攻】 卖出防御股，买入反转股"
         else
             s6 := -0.5
-    else if is_sustained(cn_profit_gap > 0, bars_prof_state)
+            t6_s := "亏损恶化 (成本倒挂)", t6_a := "【防御】 卖出中游制造，买入上游资源"
+    else if is_sustained(cn_profit_gap > 0, bars_prof_state) // 盈利
         if is_cn_widening_trend // 走阔
             s6 := 1.0
+            t6_s := "利润走阔 (躺赚时刻)", t6_a := "【进攻】 卖出上游资源，买入消费股、中下游制造股"
         else
             s6 := 0.0
+            t6_s := "利润承压 (增长停滞)", t6_a := "【观察】 回避同质化竞争，只看有提价权的龙头"
     else
         s6 := 0.0
+        t6_s := "利润承压 (震荡)", t6_a := "【观察】 多看少做"
 
 // 7. 实体热度
 // 引入连续确认逻辑 (连续 N 日)
