@@ -190,7 +190,8 @@ is_bull_steep = bull_steep_cnt > 0
 // OAS > 10% 或 (OAS > 6% 且 5日涨幅 > 20%)
 
 // 1. 获取日线实时数据
-[oas_val, oas_slope, oas_chg_5d_pct] = request.security(sym_oas, "D", [close, calc_slope_linreg(close, oas_slope_len), (close / close[5] - 1) * 100], gaps = barmerge.gaps_off)
+[oas_val, oas_slope, oas_chg_5d_pct, oas_time] = request.security(sym_oas, "D", [close, calc_slope_linreg(close, oas_slope_len), (close / close[5] - 1) * 100, time], gaps = barmerge.gaps_off)
+
 
 // 2. 信用崩盘扫描 (Credit Crash Scan)
 bool oas_crash_scan = false
@@ -1204,7 +1205,8 @@ if barstate.islast and show_report
         d_obs := "20日 (趋势)", d_logic := "🛑 危机: >10%或暴涨\n🔴 恶化: >6%\n🟠 走阔: 趋势上\n🟡 压力: 震荡\n🟢 收敛: <3.5%", d_conf := "连续3日确认【熔断即时】"
         d_w := w4 > 1.0 ? "x2" : "x1"
         d_cur_stat := t4_s
-        d_cur_val := str.tostring(oas_val, "0.2") + "%"
+        // 修复：使用正确的格式化字符串 "0.00" 并添加时间戳，与左表对齐
+        d_cur_val := str.tostring(oas_val, "0.00") + "% | " + fmt_ymd(oas_time)
         
         // 4. 信用含义与战术
         if s4 == -1.0 and w4 > 1.0 // 熔断
