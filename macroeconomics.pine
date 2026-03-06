@@ -581,32 +581,23 @@ if region == "美国"
     if is_heat
         s6 := -1.0 // 通胀过热 (政策收紧)
         w6 := 2.0  // 熔断级关注
-        t6_s := "通胀过热 (政策收紧)", t6_a := "【避险】 卖出成长股，买入现金/能源"
     else if is_deflation
         s6 := -1.0 // 深度通缩 (需求崩塌)
-        t6_s := "深度通缩 (需求崩塌)", t6_a := "【避险】 卖出所有资产，买入美元现金"
-    else if is_sustained(us_profit_gap < 0, bars_prof_state) // 亏损
-        // 分支：走阔(反转) vs 其他(恶化)
+    else if is_sustained(us_profit_gap < 0, bars_prof_state)
         if is_widening_trend
             s6 := 0.5 // 困境反转 (亏损收窄)
-            t6_s := "困境反转 (亏损收窄)", t6_a := "【进攻】 卖出防御股，买入反转股"
         else
             s6 := -0.5 // 亏损恶化 (成本倒挂)
-            t6_s := "亏损恶化 (成本倒挂)", t6_a := "【防御】 卖出中下游制造，买入防御资产"
-    else if is_sustained(us_profit_gap > 0, bars_prof_state) // 盈利
+    else if is_sustained(us_profit_gap > 0, bars_prof_state)
         // 分支：走阔(躺赚) vs 其他(承压)
         if is_widening_trend
             s6 := 1.0 // 利润走阔 (躺赚时刻)
-            t6_s := "利润走阔 (躺赚时刻)", t6_a := "【进攻】 卖出低效资产，买入成长股"
         else
-            // 收窄 或 走平 -> 利润承压
-
+            // 收窄 或 走平
             s6 := 0.0 // 🟡 利润承压 (增长停滞)
-            t6_s := "利润承压 (增长停滞)", t6_a := "【观察】 卖出投机股，买入绩优股"
     else
         // 震荡区 (正负切换期间，或未满2个月确认期)
         s6 := 0.0 
-        t6_s := "利润承压 (震荡)", t6_a := "【观察】 多看少做"
 
 else // CN
     float sec_per_month_prof = 86400000 / 1000 * 30 
@@ -627,27 +618,20 @@ else // CN
     if is_cn_heat
         s6 := -1.0 
         w6 := 2.0
-        t6_s := "通胀过热 (政策收紧)", t6_a := "【避险】 卖出成长股，买入现金/能源"
     else if is_cn_deflation
         s6 := -1.0
-        t6_s := "深度通缩 (需求崩塌)", t6_a := "【避险】 卖出周期股，买入必选消费"
-    else if is_sustained(cn_profit_gap < 0, bars_prof_state) // 亏损
+    else if is_sustained(cn_profit_gap < 0, bars_prof_state)
         if is_cn_widening_trend // 亏损收窄
             s6 := 0.5
-            t6_s := "困境反转 (亏损收窄)", t6_a := "【进攻】 卖出防御股，买入反转股"
         else
             s6 := -0.5
-            t6_s := "亏损恶化 (成本倒挂)", t6_a := "【防御】 卖出中游制造，买入上游资源"
-    else if is_sustained(cn_profit_gap > 0, bars_prof_state) // 盈利
+    else if is_sustained(cn_profit_gap > 0, bars_prof_state)
         if is_cn_widening_trend // 走阔
             s6 := 1.0
-            t6_s := "利润走阔 (躺赚时刻)", t6_a := "【进攻】 卖出上游资源，买入消费股、中下游制造股"
         else
             s6 := 0.0
-            t6_s := "利润承压 (增长停滞)", t6_a := "【观察】 回避同质化竞争，只看有提价权的龙头"
     else
         s6 := 0.0
-        t6_s := "利润承压 (震荡)", t6_a := "【观察】 多看少做"
 
 // 7. 实体热度
 // 引入连续确认逻辑 (连续 N 日)
@@ -801,7 +785,7 @@ else
 // 5. 流动性
 if region == "美国"
     if s5 == -1.0 // 严重收缩 (熔断)
-        t5_s := "严重收缩 (水位见底)", t5_a := "【避险】 卖出所有资产，买入美元现金"
+        t5_s := "严重收缩 (水位见底)", t5_a := "【清仓】 卖出所有资产，买入美元现金"
     else if s5 == -0.5
         t5_s := "紧缩 (水位下降)", t5_a := "【防御】 卖出风险资产，买入现金"
     else if s5 == 0.0
@@ -810,7 +794,7 @@ if region == "美国"
         t5_s := "扩张 (水位上涨)", t5_a := "【进攻】 卖出美元，买入科技/成长"
 else
     if s5 == -1.0 // 严重空转 (熔断)
-        t5_s := "严重空转 (活水断流)", t5_a := "【避险】 卖出所有资产，买入现金"
+        t5_s := "严重空转 (活水断流)", t5_a := "【清仓】 卖出所有资产，买入现金"
     else if s5 == -0.5
         t5_s := "资金空转 (活水变少)", t5_a := "【防御】 卖出重资产，买入高股息"
     else if s5 == 0.0
@@ -879,7 +863,6 @@ else if mode == "7. 实体热度"
     dyn_c := is_cg_crash_htf ? c_red : get_score_col(s7)
 else if mode == "8. 萨姆规则"
     plot_val := sahm_val
-    // 熔断时曲线变深红
     dyn_c := s8 == -1.0 ? c_super_red : get_score_col(s8)
     
 // 实体热度崩盘背景高亮
@@ -1002,7 +985,6 @@ if barstate.islast and mode == "2. 真实利率"
               textalign = text.align_left)
 
 // 3. 利差结构: 10Y-2Y
-// 牛陡熔断: 使用深红背景 + 文本标记
 bool is_bull_steep_melt = mode == "3. 利差结构" and s3 == -1.0 and w3 > 1.0
 
 // 1. 曲线变色 (保持深红)
@@ -1038,7 +1020,6 @@ plot(mode == "4. 信用风险" ? 10.0 : na, "OAS 10", color = c_super_red)
 plot(mode == "4. 信用风险" ? 6.0 : na, "OAS 6", color = c_red)
 plot(mode == "4. 信用风险" ? 3.5 : na, "OAS 3.5", color = c_lime)
 
-// OAS 熔断背景高亮 (深红半透明)
 bool is_oas_meltdown_bg = mode == "4. 信用风险" and s4 == -1.0 and w4 > 1.0
 bgcolor(is_oas_meltdown_bg ? color.new(c_super_red, 70) : na, title="OAS Melt BG")
 
@@ -1050,7 +1031,6 @@ if barstate.islast and mode == "4. 信用风险"
 
 // 5. 流动性: M2 YoY + 阈值
 color liq_col = dyn_c
-// 熔断背景高亮 (深红半透明)
 bool is_liq_meltdown = false
 if region == "美国"
     is_liq_meltdown := is_liq_crash
