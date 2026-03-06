@@ -140,7 +140,6 @@ effr_drop = effr_drop_scan
 // --- 2. 真实利率 (TIPS) ---
 // 确认时长: 连续 5 日
 [tips_live, tips_time] = request.security(sym_tips, "D", [close, time], gaps = barmerge.gaps_off)
-// 修改: 同时获取 RGDP 的时间戳，用于精准显示数据周期
 [rgdp_val, rgdp_time]  = request.security(sym_rgdp, "D", [close, time], gaps = barmerge.gaps_off)
 
 // --- 3. 利差结构 (10Y-2Y) ---
@@ -191,7 +190,6 @@ is_bull_steep = bull_steep_cnt > 0
 // OAS > 10% 或 (OAS > 6% 且 5日涨幅 > 20%)
 
 // 1. 获取日线实时数据
-// 修改：使用 oas_slope_len 替换全局 slope_len
 [oas_val, oas_slope, oas_chg_5d_pct] = request.security(sym_oas, "D", [close, calc_slope_linreg(close, oas_slope_len), (close / close[5] - 1) * 100], gaps = barmerge.gaps_off)
 
 // 2. 信用崩盘扫描 (Credit Crash Scan)
@@ -682,7 +680,7 @@ if s4 == -1.0 and w4 > 1.0
 else if s4 == -1.0
     t4_s := "严重恶化 (信用枯竭)", t4_a := "【避险】 卖出垃圾债/小盘，买入美元/短债"
 else if s4 == -0.5
-    t4_s := "风险走阔 (信用收缩)", t4_a := "【防御】 卖出垃圾债/小盘，买入美债"
+    t4_s := "风险走阔 (信用收缩)", t4_a := "【防御】 卖出垃圾债/小盘，买入核心/红利"
 else if s4 == 0.0
     if oas_val < 3.5
         t4_s := "底部回升 (关注)", t4_a := "【观察】 环境依然宽松，保持关注"
@@ -926,7 +924,6 @@ var table info = table.new(position.middle_right, 4, 6, bgcolor = c_bg, border_w
 fill_row(r, name, val_str, s, w, meta, status, action, is_melt) =>
     c_s = get_score_col(s)
     w_str = w > 1.0 ? "x2" : ""
-    // 修正分数显示格式：移除多余符号，确保正数带+，负数带-，0不带
     float final_s = s * w
     string s_str = final_s > 0 ? "+" + str.tostring(final_s, "#.#") : (final_s == 0 ? "0" : str.tostring(final_s, "#.#"))
     
@@ -1203,24 +1200,28 @@ if barstate.islast and show_report
             d_risk := "危机解除"
         else if s4 == -1.0 // 恶化
             d_cur_mean := "融资成本极高，企业失血"
-            d_tactics  := "风险过高，下降也不碰\n抛售垃圾债和小盘股"
+            d_tactics  := "绝对风险过高，下降也不碰\n抛售垃圾债和小盘股"
             d_turn_val := "回落至 6% 下 (流动性恢复)"
             d_tactics_turn := "流动性恢复，买入小盘股\n关注困境反转"
             d_risk := "流动性恢复"
         else if s4 == -0.5 // 走阔
-            d_cur_mean := "银行惜贷，信贷收缩"
-            d_tactics  := "虽有压力但未失控\n处于观望期"
+            d_cur_mean := "避险升温，资金嫌贫爱富"
+            d_tactics  := "减少风险资产配置\n退守大盘股或美债"
             d_turn_val := "趋势向下 (压力缓解)"
             d_tactics_turn := "压力缓解，关注信用债\n配置可转债"
             d_risk := "压力缓解"
-        else if s4 == 0.0 // 压力
-            d_cur_mean := "借贷平衡，市场观望"
-            d_tactics  := "环境宽松，买入高弹性资产\n如小盘股和垃圾债"
-            d_turn_val := "回落至 3.5% 下 (环境宽松)"
-            d_tactics_turn := "环境宽松，大胆加杠杆\n全仓进攻"
-            if oas_val < 3.5
+        else if s4 == 0.0 // 压力/底部回升
+            if oas_val < 3.5 // 底部回升
+                d_cur_mean := "虽在变差，但环境仍宽松"
+                d_tactics  := "环境宽松，无需过度紧张\n保持关注"
+                d_turn_val := "趋势向下 (虚惊一场)"
+                d_tactics_turn := "虚惊一场，继续奏乐\n维持进攻"
                 d_risk := "虚惊一场"
-            else
+            else // 局部压力
+                d_cur_mean := "虽有压力但未失控"
+                d_tactics  := "金融环境尚可\n多看少做"
+                d_turn_val := "回落至 3.5% 下 (环境宽松)"
+                d_tactics_turn := "环境宽松，大胆加杠杆\n全仓进攻"
                 d_risk := "环境宽松"
         else // 收敛
             d_cur_mean := "资金泛滥，融资容易"
