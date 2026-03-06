@@ -394,7 +394,7 @@ float w5=1.0, float w6=1.0, float w7=1.0, float w8=1.0
 
 // 时代判定 (Regime)
 bool is_inflation_era = us_cpi_yoy > 3.0
-bool is_panic_era     = sahm_val >= 0.5 or is_bull_steep
+bool is_panic_era     = sahm_val >= 0.3 or is_bull_steep
 
 // 动态权重调整
 if is_inflation_era
@@ -753,21 +753,22 @@ else
 // 5. 流动性
 if region == "美国"
     if s5 == -1.0
-        t5_s := "枯竭 (休克)", t5_a := "【避险】 卖出所有资产，买入美元"
+        t5_s := "枯竭 (休克)", t5_a := "【避险】 卖出所有资产，买入美元现金"
     else if s5 == -0.5
         t5_s := "紧缩 (水位下降)", t5_a := "【防御】 卖出风险资产，买入现金"
     else if s5 == 0.0
-        t5_s := "存量博弈 (水位不定)", t5_a := "【观察】 结构性行情，精选个股"
+        t5_s := "存量博弈 (水位不定)", t5_a := "【观察】 多看少做"
     else
         t5_s := "扩张 (水位上涨)", t5_a := "【进攻】 卖出美元，买入科技/成长"
 else
-    if s5 < 0
-        if cn_gap < -5.0
-            t5_s := "严重空转 (流动性陷阱)", t5_a := "【避险】 卖出所有资产，买入现金"
-        else
-            t5_s := "空转 (定期化)", t5_a := "【防御】 卖出重资产，买入高股息"
+    if s5 == -1.0
+        t5_s := "严重空转 (活水稀缺)", t5_a := "【避险】 卖出所有资产，买入现金"
+    else if s5 == -0.5
+        t5_s := "资金空转 (活水变少)", t5_a := "【防御】 卖出重资产，买入高股息"
+    else if s5 == 0.0
+        t5_s := "结构震荡", t5_a := "【观察】 多看少做"
     else
-        t5_s := "活化 (活水注入)", t5_a := "【进攻】 卖出防御资产，买入科技/成长"
+        t5_s := "活化 (活水变多)", t5_a := "【进攻】 卖出防御资产，买入科技/成长"
 
 // 6. 利润空间
 if region == "美国"
@@ -1050,7 +1051,8 @@ if barstate.islast and show_report
 
     // CN: Loose (Activate), Tight (Idle), Flat
     bool cn_loose = score_cn_liq == 1.0
-    bool cn_tight = score_cn_liq < 0
+    // 修复：严格遵循 README Note，"中国紧"指 M1-M2 剪刀差 < -5.0 (极度空转)
+    bool cn_tight = score_cn_liq == -1.0
 
     string strat_t = "", string strat_d = "", string strat_us = "", string strat_cn = ""
     color strat_c = c_white
