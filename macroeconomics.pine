@@ -888,6 +888,15 @@ bgcolor(is_cg_crash_bg ? color.new(c_red, 80) : na, title="Copper Crash BG")
 // 萨姆规则熔断背景高亮
 bgcolor(mode == "8. 萨姆规则" and s8 == -1.0 ? color.new(c_super_red, 80) : na, title="Sahm Meltdown BG")
 
+// 基准利率救火背景高亮 (全局作用域)
+// 逻辑: 模式为1 且 (s1为-1.0 或 高周期扫描出暴跌)
+bool is_effr_panic_bg = mode == "1. 基准利率" and (s1 == -1.0 or ((timeframe.isweekly or timeframe.ismonthly) and effr_drop >= 0.5))
+bgcolor(is_effr_panic_bg ? color.new(c_red, 80) : na, title="EFFR Panic BG")
+
+// 真实利率滞胀/虹吸背景高亮 (全局作用域)
+bool is_tips_risk_bg = mode == "2. 真实利率" and s2 == -1.0
+bgcolor(is_tips_risk_bg ? color.new(c_super_red, 80) : na, title="TIPS Risk BG")
+
 // --- 综合绘图 ---
 // 1. 基准利率: 阶梯图 + EMA
 plot(mode == "1. 基准利率" ? plot_val : na, "EFFR", color = dyn_c, linewidth = 2, style = plot.style_stepline)
@@ -901,6 +910,20 @@ float rgdp_plot = math.max(math.min(rgdp_val, 10.0), -10.0)
 plot(mode == "2. 真实利率" ? plot_val : na, "TIPS", color = dyn_c, linewidth = 2)
 plot(mode == "2. 真实利率" ? rgdp_plot : na, "RGDP", color = color.gray, linewidth = 1, style = plot.style_stepline)
 plot(mode == "2. 真实利率" ? 0.5 * rgdp_plot : na, "0.5 RGDP", color = color.new(color.orange, 50), style = plot.style_circles)
+
+// 真实利率风险标记 (状态切换时绘制一次性标签)
+// 逻辑: 仅在状态首次触发时，在曲线下方绘制图标+文字
+// 避免连续绘制导致图表压扁或重叠
+
+// 滞胀: RGDP < 0 (显示在曲线上方，避免与虹吸重叠)
+bool is_stag = mode == "2. 真实利率" and s2 == -1.0 and rgdp_val < 0
+if is_stag and not is_stag[1]
+    label.new(bar_index, plot_val + 0.5, "🔥滞胀", xloc = xloc.bar_index, yloc = yloc.price, color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
+
+// 虹吸: TIPS >= RGDP (显示在曲线下方)
+bool is_siphon = mode == "2. 真实利率" and s2 == -1.0 and tips_live >= rgdp_val
+if is_siphon and not is_siphon[1]
+    label.new(bar_index, plot_val - 0.5, "🌪️虹吸", xloc = xloc.bar_index, yloc = yloc.price, color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
 
 // 添加 RGDP 极端值标签 (显示真实值)
 // 优化：仅在"季度结束"时绘制上一个季度的标签
