@@ -1307,170 +1307,321 @@ if barstate.islast and show_report
     // Row 10: 最终诊断
     // 升级为双轨制建议：进攻仓位 + 避险仓位 + 警惕项
     
-    // 1. 收集各维度的资产建议 (去重逻辑)
-    // 定义资产桶
-    string risk_assets = ""  // ⚔️ 进攻资产 (股票/商品/垃圾债)
-    string safe_assets = ""  // 🛡️ 避险资产 (美债/黄金/现金)
-    string warn_risks = ""   // ⚠️ 警惕 (风险点)
-    string veto_assets = ""  // ⛔ 否决 (仅用于警惕项展示)
+    // 1. 收集各维度的资产建议 (去重逻辑 - 升级为标志位否决制)
+    // 定义兼容变量 (供后续文案生成使用)
+    string risk_assets = ""  // ⚔️ 进攻资产
+    string safe_assets = ""  // 🛡️ 避险资产
+    string warn_risks = ""   // ⚠️ 警惕
+    string veto_assets = ""  // ⛔ 否决
 
-    // 遍历指标填充桶
+    // 定义资产推荐开关 (Recommend)
+    bool rec_tech   = false // 科技/成长
+    bool rec_cycle  = false // 周期/大宗
+    bool rec_core   = false // 核心/消费/红利
+    bool rec_small  = false // 小盘/垃圾债
+    bool rec_risk   = false // 泛指风险资产 (用于兜底)
+    
+    // 定义资产否决开关 (Veto)
+    bool veto_tech  = false
+    bool veto_cycle = false
+    bool veto_core  = false
+    bool veto_small = false
+    bool veto_bond_l = false // 否决长债
+    bool veto_risk_all = false // 否决所有风险资产
+
+    // 定义避险资产推荐 (Safe Haven)
+    bool rec_cash   = false // 美元/现金
+    bool rec_bond_s = false // 短债
+    bool rec_bond_l = false // 长债
+    bool rec_gold   = false // 黄金
+
+    // --- 遍历维度填充开关 ---
+
     // 1. 基准利率
-    if s1 == -1.0
-        safe_assets := append_unique(safe_assets, "黄金/长债")
-        veto_assets := append_unique(veto_assets, "顺周期")
-    else if s1 == -0.5
-        safe_assets := append_unique(safe_assets, "短债/美元")
-        veto_assets := append_unique(veto_assets, "长债")
-    else if s1 == 1.0
-        risk_assets := append_unique(risk_assets, "科技/长债")
-        veto_assets := append_unique(veto_assets, "美元")
-
+    if s1 == -1.0 // 救火
+        rec_gold := true, rec_bond_l := true
+        veto_cycle := true, veto_tech := true // 卖出顺周期/科技
+    else if s1 == -0.5 // 加息
+        rec_bond_s := true, rec_cash := true
+        veto_bond_l := true, veto_tech := true // 卖出长债/成长
+    else if s1 == 1.0 // 降息
+        rec_tech := true, rec_bond_l := true
+        // 卖出美元/短债 -> 不推荐现金即可
+    
     // 2. 真实利率
-    if s2 == -1.0
-        safe_assets := append_unique(safe_assets, "美元")
-        veto_assets := append_unique(veto_assets, "风险资产")
-    else if s2 == -0.5
-        risk_assets := append_unique(risk_assets, "红利")
-        veto_assets := append_unique(veto_assets, "高估值")
-    else if s2 == 1.0
-        risk_assets := append_unique(risk_assets, "成长")
-        safe_assets := append_unique(safe_assets, "黄金")
+    if s2 == -1.0 // 滞胀/虹吸
+        rec_cash := true
+        if rgdp_val < 0 
+            rec_gold := true // 滞胀买黄金
+        else
+            rec_bond_s := true // 虹吸买短债
+        veto_risk_all := true // 否决风险资产
+    else if s2 == -0.5 // 杀估值
+        rec_core := true // 红利
+        veto_tech := true // 否决高估值
+    else if s2 == 1.0 // 健康/负利率
+        rec_tech := true
+        if tips_live < 0
+            rec_gold := true // 负利率买黄金
+        // 卖出美元 -> 不推现金
 
     // 3. 利差结构
-    if s3 == -1.0
-        safe_assets := append_unique(safe_assets, "美债")
-        veto_assets := append_unique(veto_assets, "风险资产")
-    else if s3 == -0.5
-        safe_assets := append_unique(safe_assets, "现金")
-        risk_assets := append_unique(risk_assets, "红利")
-    else if s3 == 0.5
-        risk_assets := append_unique(risk_assets, "风险资产")
-    else if s3 > 0.5
-        risk_assets := append_unique(risk_assets, "周期")
+    if s3 == -1.0 // 牛陡
+        rec_bond_l := true, rec_gold := true
+        veto_risk_all := true // 清仓风险资产
+    else if s3 == -0.5 // 倒挂
+        rec_cash := true, rec_core := true // 现金/红利
+        veto_tech := true // 卖出成长
+    else if s3 == 0.5 // 陡峭
+        rec_risk := true // 泛指
+    else if s3 > 0.5 // 熊陡
+        rec_cycle := true // 周期/大宗
+        // 卖出美债 -> 不推长债
 
     // 4. 信用风险
-    if s4 == -1.0
-        safe_assets := append_unique(safe_assets, "美元")
-        veto_assets := append_unique(veto_assets, "垃圾债")
-    else if s4 == -0.5
-        risk_assets := append_unique(risk_assets, "红利")
-        veto_assets := append_unique(veto_assets, "小盘")
-    else if s4 > 0
-        risk_assets := append_unique(risk_assets, "小盘")
+    if s4 == -1.0 // 熔断/恶化
+        rec_cash := true, rec_bond_s := true
+        veto_small := true // 卖出垃圾债/小盘
+        if w4 > 1.0
+            veto_risk_all := true // 熔断时清仓股票
+    else if s4 == -0.5 // 走阔
+        rec_core := true // 红利
+        veto_small := true
+    else if s4 > 0 // 收敛
+        rec_small := true // 垃圾债/小盘
 
     // 5. 流动性
-    if s5 == -1.0
-        safe_assets := append_unique(safe_assets, "现金")
-        veto_assets := append_unique(veto_assets, "风险资产")
-    else if s5 == -0.5
-        safe_assets := append_unique(safe_assets, "现金")
-        veto_assets := append_unique(veto_assets, "重资产")
-    else if s5 > 0
-        risk_assets := append_unique(risk_assets, "科技")
+    if s5 == -1.0 // 枯竭/空转
+        rec_cash := true
+        veto_risk_all := true // 现金为王
+    else if s5 == -0.5 // 紧缩
+        rec_cash := true, rec_core := true // 现金/红利
+        veto_cycle := true // 避重资产
+    else if s5 > 0 // 扩张
+        rec_tech := true
 
     // 6. 利润空间
-    if s6 == -1.0
-        risk_assets := append_unique(risk_assets, "必选消费")
-        veto_assets := append_unique(veto_assets, "周期")
-    else if s6 == -0.5
-        risk_assets := append_unique(risk_assets, "上游")
-        veto_assets := append_unique(veto_assets, "制造")
-    else if s6 > 0
-        risk_assets := append_unique(risk_assets, "消费")
+    if s6 == -1.0 // 过热/通缩
+        if region == "美国" and is_us_heat_state
+            rec_cash := true, rec_cycle := true // 能源抗通胀
+            veto_tech := true // 杀估值
+        else
+            // 通缩
+            rec_core := true // 必选消费
+            veto_cycle := true // 卖出周期
+    else if s6 == -0.5 // 亏损
+        rec_cycle := true // 上游资源 (防御属性)
+        veto_cycle := true // 这里的逻辑比较细：卖中游买上游。暂且只推上游
+    else if s6 > 0 // 躺赚/修复
+        rec_tech := true, rec_core := true // 消费
 
     // 7. 实体热度
-    if s7 == -1.0
-        safe_assets := append_unique(safe_assets, "美债")
-        veto_assets := append_unique(veto_assets, "风险资产")
-    else if s7 == -0.5
-        safe_assets := append_unique(safe_assets, "黄金")
-        veto_assets := append_unique(veto_assets, "强周期")
-    else if s7 > 0
-        risk_assets := append_unique(risk_assets, "工业品")
+    if s7 == -1.0 // 崩盘
+        rec_cash := true, rec_bond_l := true
+        veto_risk_all := true // 避险
+    else if s7 == -0.5 // 衰退
+        rec_gold := true, rec_bond_l := true
+        veto_cycle := true // 卖强周期
+    else if s7 > 0 // 复苏
+        rec_cycle := true // 工业品
 
     // 8. 萨姆规则
-    if s8 == -1.0
-        safe_assets := append_unique(safe_assets, "美债")
-        veto_assets := append_unique(veto_assets, "风险资产")
-    else if s8 == -0.5
-        safe_assets := append_unique(safe_assets, "现金")
-        warn_risks := append_unique(warn_risks, "衰退关注")
-    else if s8 > 0
-        risk_assets := append_unique(risk_assets, "消费")
+    if s8 == -1.0 // 熔断
+        rec_bond_l := true, rec_gold := true
+        veto_risk_all := true
+    else if s8 == -0.5 // 关注
+        rec_cash := true, rec_bond_l := true
+        // 停止加仓 -> 不推新的风险资产
+    else if s8 > 0 // 健康
+        rec_tech := true, rec_core := true // 消费
 
-    // 2. 构建最终建议文案 (双轨制)
-    string final_res = "", string line_risk = "", string line_safe = "", string line_warn = ""
+    // --- 执行否决逻辑 (The Veto) ---
+    // 这里的逻辑只负责剔除，不负责降仓位
+    if veto_risk_all
+        rec_tech := false
+        rec_cycle := false
+        rec_core := false
+        rec_small := false
+        rec_risk := false
+    
+    if veto_tech
+        rec_tech := false
+    
+    if veto_cycle
+        rec_cycle := false
+        
+    if veto_small
+        rec_small := false
+
+    // --- 构建最终字符串 ---
+    string risk_assets_str = ""
+    string safe_assets_str = ""
+    string veto_assets_str = ""
+
+    // 进攻组
+    if rec_tech
+        risk_assets_str := append_unique(risk_assets_str, "科技/成长")
+    if rec_cycle
+        risk_assets_str := append_unique(risk_assets_str, "周期/大宗")
+    if rec_small
+        risk_assets_str := append_unique(risk_assets_str, "小盘/垃圾债")
+    if rec_core
+        // 如果被 veto_risk_all，则红利也不推进攻，只在防御里推
+        if not veto_risk_all
+            risk_assets_str := append_unique(risk_assets_str, "消费/核心")
+    if rec_risk and risk_assets_str == ""
+        risk_assets_str := "优质资产" // 兜底
+
+    // 避险组
+    if rec_cash
+        safe_assets_str := append_unique(safe_assets_str, "美元/现金")
+    if rec_bond_l
+        safe_assets_str := append_unique(safe_assets_str, "长债")
+    if rec_bond_s
+        safe_assets_str := append_unique(safe_assets_str, "短债")
+    if rec_gold
+        safe_assets_str := append_unique(safe_assets_str, "黄金")
+    if rec_core and (total_score < 1.5) // 在震荡或衰退期，红利算避险/防御配置
+        safe_assets_str := append_unique(safe_assets_str, "红利/必选")
+
+    // 否决/警惕组
+    if veto_risk_all
+        veto_assets_str := append_unique(veto_assets_str, "风险资产(全)")
+    else
+        if veto_tech
+            veto_assets_str := append_unique(veto_assets_str, "高估值")
+        if veto_cycle
+            veto_assets_str := append_unique(veto_assets_str, "强周期")
+        if veto_small
+            veto_assets_str := append_unique(veto_assets_str, "垃圾债")
+
+    // 赋值给原始变量以兼容后续代码
+    risk_assets := risk_assets_str
+    safe_assets := safe_assets_str
+    veto_assets := veto_assets_str
+    warn_risks  := veto_assets_str // 警惕项主要展示被否决的
+
+    // 2. 构建最终建议文案 (双轨制 - 纯净版)
+    string final_res = ""
+    string line_veto = ""
+    string line_warn = ""
+    string line_risk = ""
+    string line_safe = ""
+    
     color final_bg = c_gray_dark
     color final_txt = c_white
     
-    // 熔断逻辑 (死刑)
+    // 仓位变量
+    string pos_risk = ""
+    string pos_safe = ""
+    
+    // --- 逻辑分支 ---
+    
+    // A. 熔断 (最高优先级 - 唯一能强制空仓的)
     if is_meltdown
         final_res := "【熔断】"
-        line_risk := "⚔️ 进攻 (0%): ⛔ 空仓"
-        line_safe := "🛡️ 避险 (100%): 黄金/美债"
-        line_warn := "⚠️ 警惕: 系统性崩盘"
         final_bg := c_super_red
         final_txt := c_yellow
-    
-    // 严重衰退逻辑 (局部否决)
-    else if total_score < -5.0
-        final_res := "危机模式"
-        line_risk := "⚔️ 进攻 (0-10%): " + (risk_assets == "" ? "仅底仓" : risk_assets)
-        line_safe := "🛡️ 避险 (90-100%): " + (safe_assets == "" ? "现金" : safe_assets)
-        line_warn := "⚠️ 警惕: " + (veto_assets == "" ? "深度衰退" : "否决" + veto_assets)
-        final_bg := c_red
-        final_txt := c_white
         
-    // 衰退预警
-    else if total_score < -1.5
-        final_res := "衰退预警"
-        line_risk := "⚔️ 进攻 (10-30%): " + (risk_assets == "" ? "核心底仓" : risk_assets)
-        line_safe := "🛡️ 避险 (70-90%): " + (safe_assets == "" ? "美债/现金" : safe_assets)
-        line_warn := "⚠️ 警惕: " + (veto_assets == "" ? "宏观转差" : "否决" + veto_assets)
-        final_bg := c_orange
-        final_txt := c_black
+        pos_risk := "0% (空仓)"
+        pos_safe := "100%"
         
-    // 震荡期
-    else if total_score < 1.5
-        final_res := "混沌震荡"
-        line_risk := "⚔️ 进攻 (30-50%): " + (risk_assets == "" ? "红利/底仓" : risk_assets)
-        line_safe := "🛡️ 避险 (50-70%): " + (safe_assets == "" ? "现金/黄金" : safe_assets)
-        line_warn := "⚠️ 警惕: 方向未定"
-        final_bg := c_yellow
-        final_txt := c_black
-        
-    // 复苏期
-    else if total_score <= 5.0
-        final_res := "温和增长"
-        line_risk := "⚔️ 进攻 (50-80%): " + (risk_assets == "" ? "优质股" : risk_assets)
-        line_safe := "🛡️ 避险 (20-50%): " + (safe_assets == "" ? "现金" : safe_assets)
-        line_warn := "⚠️ 警惕: " + (veto_assets == "" ? "追高" : "否决" + veto_assets)
-        final_bg := c_lime
-        final_txt := c_black
-        
-    // 全面复苏
-    else // > 5.0
-        final_res := "全面复苏"
-        line_risk := "⚔️ 进攻 (80-100%): " + (risk_assets == "" ? "核心股/商品" : risk_assets)
-        line_safe := "🛡️ 避险 (0-20%): " + (safe_assets == "" ? "现金" : safe_assets)
-        line_warn := "🚀 驱动: 全面共振"
-        final_bg := c_super_green
-        final_txt := c_white
+        // 强制清空进攻列表
+        risk_assets := "❌️禁止开仓"
 
+    // B. 正常评分逻辑 (含红色指标)
+    // 仓位完全由总分决定，红色指标只负责在上方过滤了 risk_assets 的内容
+    else
+        if total_score < -5.0
+            final_res := "危机模式"
+            final_bg := c_red
+            final_txt := c_white
+            pos_risk := "0-10%"
+            pos_safe := "90-100%"
+            if risk_assets == "" 
+                risk_assets := "仅底仓"
+                
+        else if total_score < -1.5
+            final_res := "衰退预警"
+            final_bg := c_orange
+            final_txt := c_black
+            pos_risk := "10-30%"
+            pos_safe := "70-90%"
+            if risk_assets == "" 
+                risk_assets := "核心底仓"
+                
+        else if total_score < 1.5
+            final_res := "混沌震荡"
+            final_bg := c_yellow
+            final_txt := c_black
+            pos_risk := "30-50%"
+            pos_safe := "50-70%"
+            if risk_assets == "" 
+                risk_assets := "红利/底仓"
+                
+        else if total_score <= 5.0
+            final_res := "温和增长"
+            final_bg := c_lime
+            final_txt := c_black
+            pos_risk := "50-80%"
+            pos_safe := "20-50%"
+            if risk_assets == "" 
+                // 关键修正：如果总分建议进攻，但所有进攻资产都被否决了
+                risk_assets := "暂无标的 (建议观望)"
+                // 这种情况下，虽然仓位是50-80%，但没东西买，用户自然会懂
+                
+        else // > 5.0
+            final_res := "全面复苏"
+            final_bg := c_super_green
+            final_txt := c_white
+            pos_risk := "80-100%"
+            pos_safe := "0-20%"
+            if risk_assets == "" 
+                risk_assets := "核心股/商品"
+
+    // --- 构建四行文案 ---
+    // 1. 否决行 (如果有)
+    if veto_assets != ""
+        line_veto := "⛔ 否决: " + veto_assets + "\n"
+        
+    // 2. 警惕行 (如果有)
+    // 如果有否决，通常不需要再重复警惕；除非有额外的 warn
+    if warn_risks != "" and warn_risks != veto_assets
+        line_warn := "⚠️ 警惕: " + warn_risks + "\n"
+    else if veto_risk_all and not is_meltdown
+        // 如果触发了全否决但未熔断（例如虹吸），提示原因
+        line_warn := "⚠️ 警惕: 宏观环境脆弱\n"
+
+    // 3. 进攻行
+    line_risk := "⚔️ 进攻 (" + pos_risk + "): " + risk_assets + "\n"
+    
+    // 4. 避险行
+    line_safe := "🛡️ 避险 (" + pos_safe + "): " + (safe_assets == "" ? "现金" : safe_assets)
+
+    string final_full_sugg = line_veto + line_warn + line_risk + line_safe
+
+    // --- Row 10: 最终诊断渲染 ---
+    float total_max_score = 8.0
+    float total_possible = max_score
+
+    // (0,1) 最终诊断
     table.cell(rpt, 0, 10, "最终诊断", bgcolor = c_bg, text_color = c_white), table.merge_cells(rpt, 0, 10, 1, 10)
     
-    string total_s_str = total_score == 0 ? "0" : str.tostring(total_score, "#.#")
-    table.cell(rpt, 2, 10, total_s_str, bgcolor = c_bg, text_color = final_bg)
+    // (2) 总分
+    color score_c = total_score > 0 ? c_lime : (total_score < 0 ? c_red : c_yellow)
+    table.cell(rpt, 2, 10, str.tostring(total_score, "0.0"), bgcolor = c_bg, text_color = score_c)
     
-    table.cell(rpt, 3, 10, str.tostring(max_score, "#.#"), bgcolor = c_bg, text_color = c_white)
+    // (3) 理论上限
+    table.cell(rpt, 3, 10, str.tostring(total_max_score, "0") + " (" + str.tostring(total_possible, "0") + ")", bgcolor = c_bg, text_color = c_white)
+    
+    // (4) 结论 (标签)
     table.cell(rpt, 4, 10, "结论", bgcolor = c_bg, text_color = c_white)
     
-    color final_bg_trans = color.new(final_bg, 25)
-    table.cell(rpt, 5, 10, final_res, bgcolor = final_bg_trans, text_color = final_txt)
+    // (5) 现状 (如: 全面复苏)
+    table.cell(rpt, 5, 10, final_res, bgcolor = final_bg, text_color = final_txt)
     
-    string final_full_sugg = line_risk + "\n" + line_safe + "\n" + line_warn
-    table.cell(rpt, 6, 10, final_full_sugg, bgcolor = final_bg_trans, text_color = final_txt, text_halign = text.align_left)
+    // (6) 详细建议
+    table.cell(rpt, 6, 10, final_full_sugg, bgcolor = final_bg, text_color = final_txt, text_halign = text.align_left)
 
     // --- 右表: 详情 ---
     string d_title="", string d_def="", string d_obs="", string d_logic="", string d_conf="", string d_w="", string d_cur_stat="", string d_cur_val="", string d_turn_val="", string d_cur_mean="", string d_risk="", string d_tactics="", string d_tactics_turn=""
