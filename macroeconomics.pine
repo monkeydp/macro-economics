@@ -873,7 +873,7 @@ else if s4 == -1.0
     t4_s := "严重恶化", t4_a := "【避险】 ⛔" + A_JUNK + "/" + A_SMALL + " 🛡️" + A_BOND_S
     t4_reason := "⛔[" + A_JUNK + "]: 市场风险偏好极度下降，抛售高风险债\n⛔[" + A_SMALL + "]: 流动性差的资产难变现，折价出售\n🛡️[" + A_BOND_S + "]: 短债流动性好且无本金风险"
 else if s4 == -0.5
-    t4_s := "风险走阔 ⚠️收缩", t4_a := "【防御】 ⛔" + A_JUNK + " ⚠️" + A_SMALL + " 🛡️" + A_CORE
+    t4_s := "风险走阔", t4_a := "【防御】 ⛔" + A_JUNK + " ⚠️" + A_SMALL + " 🛡️" + A_CORE
     t4_reason := "⛔[" + A_JUNK + "]: 资金避险情绪升温，抛售高风险债\n⚠️[" + A_SMALL + "]: 融资成本上升，小盘股经营压力大\n🛡️[" + A_CORE + "]: 现金流充沛的企业更受青睐"
 else if s4 == 0.0
     if oas_val < 3.5
