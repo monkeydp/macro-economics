@@ -1751,7 +1751,7 @@ if barstate.islast and show_report
     
     if mode == "1. 基准利率"
         d_title := "基准利率\n[EFFR]", d_def := "美联储联邦基金有效利率\n全球资金成本的总阀门。"
-        d_obs := "10月 (EMA)", d_logic := "🔴 救火: ≥50bp\n🟠 加息: >EMA\n🟡 震荡: ≈EMA\n🟢 降息: <EMA", d_conf := "FOMC公布日确认\n" + next_fomc_time
+        d_obs := "10月 (EMA)", d_logic := "🔴 救火: ≥50bp\n🟠 加息: >EMA\n🟡 震荡: ≈EMA\n🟢 降息: <EMA", d_conf := "FOMC公布日确认\n\n" + next_fomc_time
         d_w := w1 > 1.0 ? "x2" : "x1"
         d_cur_stat := t1_s
         d_cur_val := str.tostring(effr_live, "0.00") + "% | " + last_fomc_time
