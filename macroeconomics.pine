@@ -696,61 +696,45 @@ if is_us
     // 逻辑分层
     if is_us_heat_state
         s6 := -1.0, w6 := 2.0 // 过热
-        t6_s := "通胀过热 (政策收紧)", t6_a := "【避险】 ⛔" + A_GROWTH + " | ✅" + A_CASH_ONLY + "/" + A_ENERGY
     else if is_us_deflation_state
         s6 := -1.0 // 通缩
-        t6_s := "深度通缩 (需求崩塌)", t6_a := "【避险】 ⛔" + A_CYCLE_S + " | ✅必选" + A_CONS
     else if is_sustained(us_profit_gap < 0, bars_prof_state)
         if is_us_widening_state
             s6 := 0.5 // 困境反转 (亏损收窄)
-            t6_s := "困境反转 (亏损收窄)", t6_a := "【进攻】 ⛔防御股 | ✅反转股"
         else
             s6 := -0.5 // 亏损恶化 (成本倒挂)
-            t6_s := "亏损恶化 (成本倒挂)", t6_a := "【防御】 ⛔" + A_CYCLE_MID + " | ✅" + A_CYCLE_UP
     else if is_sustained(us_profit_gap > 0, bars_prof_state)
         // 分支：走阔(躺赚) vs 其他(承压)
         if is_us_widening_state
             s6 := 1.0 // 利润走阔 (躺赚时刻)
-            t6_s := "利润走阔 (躺赚时刻)", t6_a := "【进攻】 ⛔" + A_CYCLE_UP + " | ✅" + A_CONS + "/中下游"
         else
             // 收窄 或 走平
             s6 := 0.0 // 🟡 利润承压 (增长停滞)
-            t6_s := "利润承压 (增长停滞)", t6_a := "【观察】 ⛔同质化 | ✅提价权龙头"
     else
         // 震荡区 (正负切换期间，或未满2个月确认期)
         s6 := 0.0 
-        t6_s := "利润震荡 (方向不明)"
-        t6_a := "【观察】 多看少做" 
 
 else // CN
     if is_cn_heat_state
         s6 := -1.0, w6 := 2.0 // 过热
-        t6_s := "通胀过热 (政策收紧)", t6_a := "【避险】 ⛔" + A_GROWTH + " | ✅" + A_CASH_ONLY + "/" + A_ENERGY
     else if is_cn_deflation_state
         s6 := -1.0 // 通缩
-        t6_s := "深度通缩 (需求崩塌)", t6_a := "【避险】 ⛔" + A_CYCLE + "/" + A_CONS + " | ✅" + A_DIV + "/国债"
     else if is_sustained(cn_profit_gap < 0, bars_prof_state)
         // 分支：收窄(修复) vs 走阔(恶化)
         if is_cn_widening_state
             s6 := 0.5 // 困境反转
-            t6_s := "困境反转 (亏损收窄)", t6_a := "【进攻】 ⛔防御股 | ✅反转股"
         else
             s6 := -0.5 // 亏损恶化
-            t6_s := "亏损恶化 (成本倒挂)", t6_a := "【防御】 ⛔" + A_CYCLE_MID + " | ✅" + A_CYCLE_UP
     else if is_sustained(cn_profit_gap > 0, bars_prof_state)
         // 分支：走阔(躺赚) vs 其他(承压)
         if is_cn_widening_state
             s6 := 1.0 // 利润走阔
-            t6_s := "利润走阔 (躺赚时刻)", t6_a := "【进攻】 ⛔" + A_CYCLE_UP + " | ✅" + A_CONS + "/中下游"
         else
             // 收窄 或 走平
             s6 := 0.0 // 🟡 利润承压 (增长停滞)
-            t6_s := "利润承压 (增长停滞)", t6_a := "【观察】 ⛔同质化 | ✅提价权龙头"
     else
         // 震荡区 (正负切换期间，或未满2个月确认期)
-        s6 := 0.0 
-        t6_s := "利润震荡 (方向不明)"
-        t6_a := "【观察】 多看少做"
+        s6 := 0.0
 
 // 7. 实体热度
 // 引入连续确认逻辑 (连续 N 日)
@@ -809,20 +793,6 @@ bool is_meltdown = (s3 == -1.0 and w3 > 1.0) or (s4 == -1.0 and w4 > 1.0) or (s8
 // ==========================================
 
 // --- 状态文本生成器 ---
-get_act_txt(score, w, meltdown_label, red_label, orange_label, yellow_label, green_label, assets_sell, assets_buy) =>
-    // 熔断处理
-    if score == -1.0 and w > 1.0
-        "【清仓】 卖出" + assets_sell + "，买入" + assets_buy
-    else if score == -1.0
-        "【避险】 卖出" + assets_sell + "，买入" + assets_buy
-    else if score == -0.5
-        "【防御】 卖出" + assets_sell + "，买入" + assets_buy
-    else if score == 0.0
-        "【观察】 多看少做"
-    else if score == 0.5
-        "【进攻】 卖出" + assets_sell + "，买入" + assets_buy // 修复/弱进攻
-    else
-        "【进攻】 卖出" + assets_sell + "，买入" + assets_buy
 
 // --- 颜色辅助函数 ---
 get_score_col(s) =>
@@ -917,67 +887,67 @@ else
     t4_reason := "⚔️[" + A_JUNK + "]: 资金泛滥追逐高收益，高弹性资产受益"
 
 // 5. 流动性 (M2)
-    if s5 == -1.0 // 熔断
-        t5_s := is_us ? "流动性枯竭" : "严重空转"
-        t5_a := "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + " 🛡️" + A_CASH
-        t5_reason := "⛔[" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + "]: 市场流动性枯竭，无差别杀跌\n🛡️[" + A_CASH + "]: 现金为王，保住本金"
-    else if s5 == -0.5
-        t5_s := is_us ? "收缩" : "资金空转"
-        t5_a := "【防御】 ⛔" + A_CYCLE + "/" + A_SMALL + " 🛡️" + A_CORE
-        t5_reason := "⛔[" + A_CYCLE + "]: 货币供应量收缩，总需求下降杀业绩\n⚠️[" + A_EDGE_SMALL + "]: 缺乏流动性支持，估值回归\n🛡️[" + A_CORE + "]: 股息提供安全垫，抗跌属性强"
-    else if s5 == 0.0
-        if is_us
-            t5_s := "市场增量不足", t5_a := "【观察】 ⚠️" + A_EDGE_SMALL
-            t5_reason := "⚠️[" + A_EDGE_SMALL + "]: 股市缺乏活水注入，边缘资产无人问津"
-        else
-            t5_s := "存款搬家停滞", t5_a := "【观察】 ⚠️" + A_SLOW_BEAR
-            t5_reason := "⚠️[" + A_SLOW_BEAR + "]: 股市缺乏活水"
+if s5 == -1.0 // 熔断
+    t5_s := is_us ? "流动性枯竭" : "严重空转"
+    t5_a := "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + " 🛡️" + A_CASH
+    t5_reason := "⛔[" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + "]: 市场流动性枯竭，无差别杀跌\n🛡️[" + A_CASH + "]: 现金为王，保住本金"
+else if s5 == -0.5
+    t5_s := is_us ? "收缩" : "资金空转"
+    t5_a := "【防御】 ⛔" + A_CYCLE + "/" + A_SMALL + " 🛡️" + A_CORE
+    t5_reason := "⛔[" + A_CYCLE + "]: 货币供应量收缩，总需求下降杀业绩\n⚠️[" + A_EDGE_SMALL + "]: 缺乏流动性支持，估值回归\n🛡️[" + A_CORE + "]: 股息提供安全垫，抗跌属性强"
+else if s5 == 0.0
+    if is_us
+        t5_s := "市场增量不足", t5_a := "【观察】 ⚠️" + A_EDGE_SMALL
+        t5_reason := "⚠️[" + A_EDGE_SMALL + "]: 股市缺乏活水注入，边缘资产无人问津"
     else
-        t5_s := is_us ? "扩张" : "资金活化"
-        t5_a := "【进攻】 ⚔️" + A_TECH + "/" + A_CORE
-        t5_reason := "⚔️[" + A_CORE + "]: 资金充裕推升资产价格，核心资产率先受益"
+        t5_s := "存款搬家停滞", t5_a := "【观察】 ⚠️" + A_SLOW_BEAR
+        t5_reason := "⚠️[" + A_SLOW_BEAR + "]: 股市缺乏活水"
+else
+    t5_s := is_us ? "扩张" : "资金活化"
+    t5_a := "【进攻】 ⚔️" + A_TECH + "/" + A_CORE
+    t5_reason := "⚔️[" + A_CORE + "]: 资金充裕推升资产价格，核心资产率先受益"
 
-    // 6. 利润空间 (CPI-PPI)
-    if s6 == -2.0 // 过热
-        t6_s := "通胀过热", t6_a := "【防御】 ⛔" + A_TECH + " ⚔️" + A_CYCLE + " 🛡️" + A_CASH
-        t6_reason := "⛔[" + A_TECH + "]: 联储加息预期升温，杀高估值\n⚔️[" + A_CYCLE + "]: 通胀环境利好资源品涨价\n🛡️[" + A_CASH + "]: 现金抗波动，等待通胀降温"
-    else if s6 == -1.0 // 通缩
-        t6_s := "深度通缩", t6_a := "【避险】 ⛔" + A_CYCLE + " 🛡️" + A_CORE
-        t6_reason := "⛔[" + A_CYCLE + "]: 需求崩塌，企业利润全线暴跌杀业绩\n🛡️[" + A_CORE + "]: 必选消费需求刚性，受经济周期影响小"
-    else if s6 == -0.5 // 亏损
-        t6_s := "亏损恶化", t6_a := "【防御】 ⛔" + A_CYCLE_MID + " ⚔️" + A_CYCLE_UP
-        t6_reason := "⛔[" + A_CYCLE_MID + "]: 成本高企、售价难涨，两头受挤压\n⚔️[" + A_CYCLE_UP + "]: 涨价受益方，利润向.上游集中"
-    else if s6 == 0.0
-        if is_us
-            t6_s := "企业增长停滞", t6_a := "【观察】 ⚠️" + A_HOMOG
-            t6_reason := "⚠️[" + A_HOMOG + "]: 价格战侵蚀企业利润，无护城河企业出清"
-        else
-            t6_s := "行业内卷加剧", t6_a := "【观察】 ⚠️" + A_HOMOG
-            t6_reason := "⚠️[" + A_HOMOG + "]: 价格战侵蚀利润"
-    else if s6 == 0.5
-        t6_s := "困境反转", t6_a := "【进攻】 ⚔️" + A_CYCLE_MID
-        t6_reason := "⚔️[" + A_CYCLE_MID + "]: 成本下降或需求回暖，盈利触底回升弹性大"
+// 6. 利润空间 (CPI-PPI)
+if s6 == -1.0 and w6 > 1.0 // 过热
+    t6_s := "通胀过热", t6_a := "【防御】 ⛔" + A_TECH + " ⚔️" + A_CYCLE + " 🛡️" + A_CASH
+    t6_reason := "⛔[" + A_TECH + "]: 联储加息预期升温，杀高估值\n⚔️[" + A_CYCLE + "]: 通胀环境利好资源品涨价\n🛡️[" + A_CASH + "]: 现金抗波动，等待通胀降温"
+else if s6 == -1.0 // 通缩
+    t6_s := "深度通缩", t6_a := "【避险】 ⛔" + A_CYCLE + " 🛡️" + A_CORE
+    t6_reason := "⛔[" + A_CYCLE + "]: 需求崩塌，企业利润全线暴跌杀业绩\n🛡️[" + A_CORE + "]: 必选消费需求刚性，受经济周期影响小"
+else if s6 == -0.5 // 亏损
+    t6_s := "亏损恶化", t6_a := "【防御】 ⛔" + A_CYCLE_MID + " ⚔️" + A_CYCLE_UP
+    t6_reason := "⛔[" + A_CYCLE_MID + "]: 成本高企、售价难涨，两头受挤压\n⚔️[" + A_CYCLE_UP + "]: 涨价受益方，利润向.上游集中"
+else if s6 == 0.0
+    if is_us
+        t6_s := "企业增长停滞", t6_a := "【观察】 ⚠️" + A_HOMOG
+        t6_reason := "⚠️[" + A_HOMOG + "]: 价格战侵蚀企业利润，无护城河企业出清"
     else
-        t6_s := "利润走阔", t6_a := "【进攻】 ⚔️" + A_TECH + "/" + A_CORE
-        t6_reason := "⚔️[" + A_TECH + "]: 业绩驱动股价上涨，享受戴维斯双击"
+        t6_s := "行业内卷加剧", t6_a := "【观察】 ⚠️" + A_HOMOG
+        t6_reason := "⚠️[" + A_HOMOG + "]: 价格战侵蚀利润"
+else if s6 == 0.5
+    t6_s := "困境反转", t6_a := "【进攻】 ⚔️" + A_CYCLE_MID
+    t6_reason := "⚔️[" + A_CYCLE_MID + "]: 成本下降或需求回暖，盈利触底回升弹性大"
+else
+    t6_s := "利润走阔", t6_a := "【进攻】 ⚔️" + A_TECH + "/" + A_CORE
+    t6_reason := "⚔️[" + A_TECH + "]: 业绩驱动股价上涨，享受戴维斯双击"
 
-    // 7. 实体热度 (铜金)
-    if s7 == -1.0 // 崩盘
-        t7_s := "实体崩盘", t7_a := "【避险】 ⛔" + A_CYCLE + "/" + A_SMALL + " ⚠️" + A_CYCLE + " 🛡️" + A_BOND_US + "/" + A_GOLD
-        t7_reason := "⛔[" + A_CYCLE + "]: 实体需求信心崩塌，杀业绩主跌浪\n⛔[" + A_SMALL + "]: 信用收缩风险传导\n🛡️[" + A_BOND_US + "/" + A_GOLD + "]: 避险买盘涌入，对冲经济下行风险"
-    else if s7 == -0.5
-        if cg_ratio < cg_ratio[1] // 衰退
-            t7_s := "衰退交易", t7_a := "【防御】 ⛔" + A_CYCLE + " 🛡️" + A_GOLD
-            t7_reason := "⛔[" + A_CYCLE + "]: 制造业景气度下行，需求不足\n🛡️[" + A_GOLD + "]: 经济下行压力下，黄金具备对冲属性"
-        else // 伪复苏
-            t7_s := "伪复苏", t7_a := "【观察】 ⚠️" + A_CYCLE
-            t7_reason := "⚠️[" + A_CYCLE + "]: 仅金价上涨掩盖铜价疲软，非真实需求改善"
-    else if s7 == 0.0
-        t7_s := "下游需求不明", t7_a := "【观察】 ⚠️" + A_CYCLE_STRONG
-        t7_reason := "⚠️[" + A_CYCLE_STRONG + "]: 工厂补库意愿疲弱，缺乏上涨动力"
-    else
-        t7_s := "复苏", t7_a := "【进攻】 ⚔️" + A_CYCLE
-        t7_reason := "⚔️[" + A_CYCLE + "]: 工业生产供销两旺，量价齐升利好周期股"
+// 7. 实体热度 (铜金)
+if s7 == -1.0 // 崩盘
+    t7_s := "实体崩盘", t7_a := "【避险】 ⛔" + A_CYCLE + "/" + A_SMALL + " ⚠️" + A_CYCLE + " 🛡️" + A_BOND_US + "/" + A_GOLD
+    t7_reason := "⛔[" + A_CYCLE + "]: 实体需求信心崩塌，杀业绩主跌浪\n⛔[" + A_SMALL + "]: 信用收缩风险传导\n🛡️[" + A_BOND_US + "/" + A_GOLD + "]: 避险买盘涌入，对冲经济下行风险"
+else if s7 == -0.5
+    if cg_ratio < cg_ratio[1] // 衰退
+        t7_s := "衰退交易", t7_a := "【防御】 ⛔" + A_CYCLE + " 🛡️" + A_GOLD
+        t7_reason := "⛔[" + A_CYCLE + "]: 制造业景气度下行，需求不足\n🛡️[" + A_GOLD + "]: 经济下行压力下，黄金具备对冲属性"
+    else // 伪复苏
+        t7_s := "伪复苏", t7_a := "【观察】 ⚠️" + A_CYCLE
+        t7_reason := "⚠️[" + A_CYCLE + "]: 仅金价上涨掩盖铜价疲软，非真实需求改善"
+else if s7 == 0.0
+    t7_s := "下游需求不明", t7_a := "【观察】 ⚠️" + A_CYCLE_STRONG
+    t7_reason := "⚠️[" + A_CYCLE_STRONG + "]: 工厂补库意愿疲弱，缺乏上涨动力"
+else
+    t7_s := "复苏", t7_a := "【进攻】 ⚔️" + A_CYCLE
+    t7_reason := "⚔️[" + A_CYCLE + "]: 工业生产供销两旺，量价齐升利好周期股"
 
 // 8. 萨姆规则
 if s8 == -1.0
