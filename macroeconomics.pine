@@ -807,9 +807,9 @@ else
 // 2. 真实利率
 if s2 == -1.0
     if rgdp_val < 0
-        t2_s := "滞胀/萧条 (负利率陷阱)", t2_a := "【避险】 ⛔所有风险资产 | ✅美元/黄金"
+        t2_s := "滞胀/萧条 (负利率陷阱)", t2_a := "【避险】 ⛔风险资产 | ✅美元/黄金"
     else
-        t2_s := "虹吸", t2_a := "【避险】 ⛔所有风险资产 | ✅美元/短债"
+        t2_s := "虹吸", t2_a := "【避险】 ⛔风险资产 | ✅美元/短债"
 else if s2 == -0.5
     t2_s := "杀估值", t2_a := "【防御】 ⛔高估值/加密 | ✅核心/红利"
 else if s2 == 0.0
@@ -850,7 +850,7 @@ else
 // 5. 流动性
 if region == "美国"
     if s5 == -1.0 // 严重收缩 (熔断)
-        t5_s := "严重收缩 (水位见底)", t5_a := "【清仓】 ⛔所有风险资产 | ✅美元现金"
+        t5_s := "严重收缩 (水位见底)", t5_a := "【清仓】 ⛔风险资产 | ✅美元现金"
     else if s5 == -0.5
         t5_s := "紧缩 (水位下降)", t5_a := "【防御】 ⛔风险资产 | ✅现金"
     else if s5 == 0.0
@@ -859,7 +859,7 @@ if region == "美国"
         t5_s := "扩张 (水位上涨)", t5_a := "【进攻】 ⛔美元 | ✅科技/成长"
 else
     if s5 == -1.0 // 严重空转 (熔断)
-        t5_s := "严重空转 (活水断流)", t5_a := "【清仓】 ⛔所有资产 | ✅现金"
+        t5_s := "严重空转 (活水断流)", t5_a := "【清仓】 ⛔风险资产 | ✅现金"
     else if s5 == -0.5
         t5_s := "资金空转 (活水变少)", t5_a := "【防御】 ⛔重资产 | ✅高股息/红利"
     else if s5 == 0.0
@@ -874,7 +874,7 @@ else
 
 // 7. 实体热度
 if s7 == -1.0
-    t7_s := "实体崩盘 (信心崩溃)", t7_a := "【避险】 ⛔所有资产 | ✅美元/美债"
+    t7_s := "实体崩盘 (信心崩溃)", t7_a := "【避险】 ⛔风险资产 | ✅美元/美债"
 else if s7 == -0.5
     if is_cg_fake_recovery
         t7_s := "伪复苏 (金价暴跌)", t7_a := "【防御】 ⛔工业品/铜 | ✅黄金/美债"
@@ -1362,7 +1362,7 @@ if barstate.islast and show_report
     // 5. 流动性
     if s5 == -1.0
         safe_assets := append_unique(safe_assets, "现金")
-        veto_assets := append_unique(veto_assets, "所有资产")
+        veto_assets := append_unique(veto_assets, "风险资产")
     else if s5 == -0.5
         safe_assets := append_unique(safe_assets, "现金")
         veto_assets := append_unique(veto_assets, "重资产")
@@ -1382,7 +1382,7 @@ if barstate.islast and show_report
     // 7. 实体热度
     if s7 == -1.0
         safe_assets := append_unique(safe_assets, "美债")
-        veto_assets := append_unique(veto_assets, "所有资产")
+        veto_assets := append_unique(veto_assets, "风险资产")
     else if s7 == -0.5
         safe_assets := append_unique(safe_assets, "黄金")
         veto_assets := append_unique(veto_assets, "强周期")
@@ -1524,7 +1524,7 @@ if barstate.islast and show_report
         if s2 == -1.0
             if rgdp_val < 0 // 滞胀
                 d_cur_mean := "经济停滞，物价飞涨\n(负利率陷阱)"
-                d_tactics  := "现金为王，卖出所有资产\n买入美元/黄金"
+                d_tactics  := "现金为王，卖出风险资产\n买入美元/黄金"
                 d_turn_val := "RGDP 转正 (经济复苏)"
                 d_tactics_turn := "经济复苏，重仓股票\n关注周期反转"
             else // 虹吸
@@ -1822,7 +1822,7 @@ if barstate.islast and show_report
             
         // 7. 实体含义与拐点战术
         if s7 == -1.0 // 崩盘
-            d_cur_mean := "信心崩塌，抛售一切"
+            d_cur_mean := "信心崩塌，抛售风险资产"
             d_tactics_turn := "恐慌盘杀出，短线反弹\n轻仓抢反弹"
         else if s7 == -0.5 
             if is_cg_fake_recovery // 伪复苏
@@ -1850,7 +1850,7 @@ if barstate.islast and show_report
         else // 复苏
             d_risk := "衰退开始"
             
-        d_tactics := (s7 < 0 ? (is_cg_crash ? "极度恐慌，抛售一切资产\n只有美元和美债最安全" : (is_cg_fake_recovery ? "铜比金强但都在跌，衰退假象\n不要被比值上涨迷惑" : "实体疲软，避险主导\n买黄金/美债，规避强周期")) : (s7 > 0 ? "实体需求旺盛，风险偏好上升\n买周期股、工业大宗商品" : "方向不明，多看少做"))
+        d_tactics := (s7 < 0 ? (is_cg_crash ? "极度恐慌，抛售风险资产\n只有美元和美债最安全" : (is_cg_fake_recovery ? "铜比金强但都在跌，衰退假象\n不要被比值上涨迷惑" : "实体疲软，避险主导\n买黄金/美债，规避强周期")) : (s7 > 0 ? "实体需求旺盛，风险偏好上升\n买周期股、工业大宗商品" : "方向不明，多看少做"))
 
     else if mode == "8. 萨姆规则"
         string next_nfp_date = calc_next_nfp_status(sahm_time, timenow)
