@@ -850,7 +850,7 @@ else if s2 == 1.0
 
 // 3. 利差结构
 if s3 == -1.0
-    t3_s := "牛陡 ", t3_a := "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + " ⚠️全市场 🛡️" + A_BOND_US + "/" + A_GOLD
+    t3_s := "牛陡 ", t3_a := "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + " 🛡️" + A_BOND_US + "/" + A_GOLD
     t3_reason := "⛔[" + A_CYCLE + "]: 衰退确认，需求断崖式下跌杀业绩\n⛔[" + A_TECH + "]: 市场恐慌抛售一切风险资产\n⛔[" + A_SMALL + "]: 流动性枯竭，无差别杀跌\n🛡️[" + A_BOND_US + "]: 资金涌入避险，且降息预期推升债价"
 else if s3 == -0.5
     t3_s := "倒挂 ", t3_a := "【防御】 ⛔" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + " 🛡️" + A_CASH_ONLY + "/" + A_DIV
@@ -867,7 +867,7 @@ else
 
 // 4. 信用风险
 if s4 == -1.0 and w4 > 1.0
-    t4_s := "信用崩盘", t4_a := "【清仓】 ⛔" + A_JUNK + "/" + A_SMALL + " ⚠️全市场 🛡️" + A_CASH
+    t4_s := "信用崩盘", t4_a := "【清仓】 ⛔" + A_JUNK + "/" + A_SMALL + " 🛡️" + A_CASH
     t4_reason := "⛔[" + A_JUNK + "]: 企业融资链条断裂，违约风险剧增\n⛔[" + A_SMALL + "]: 信用收缩首当其冲\n🛡️[" + A_CASH + "]: 现金最安全，等待危机解除"
 else if s4 == -1.0
     t4_s := "严重恶化", t4_a := "【避险】 ⛔" + A_JUNK + "/" + A_SMALL + " 🛡️" + A_BOND_S
@@ -933,7 +933,7 @@ else
 
 // 7. 实体热度 (铜金)
 if s7 == -1.0 // 崩盘
-    t7_s := "实体崩盘", t7_a := "【避险】 ⛔" + A_CYCLE + "/" + A_SMALL + " ⚠️" + A_CYCLE + " 🛡️" + A_BOND_US + "/" + A_GOLD
+    t7_s := "实体崩盘", t7_a := "【避险】 ⛔" + A_CYCLE + "/" + A_SMALL + " 🛡️" + A_BOND_US + "/" + A_GOLD
     t7_reason := "⛔[" + A_CYCLE + "]: 实体需求信心崩塌，杀业绩主跌浪\n⛔[" + A_SMALL + "]: 信用收缩风险传导\n🛡️[" + A_BOND_US + "/" + A_GOLD + "]: 避险买盘涌入，对冲经济下行风险"
 else if s7 == -0.5
     if cg_ratio < cg_ratio[1] // 衰退
@@ -951,8 +951,8 @@ else
 
 // 8. 萨姆规则
 if s8 == -1.0
-    t8_s := "衰退确认", t8_a := "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + " ⚠️全市场 🛡️" + A_BOND_US
-    t8_reason := "⛔[" + A_CYCLE + "/" + A_TECH + "]: 失业率飙升确认衰退，杀业绩叠加杀估值\n⚠️[全市场]: 泥沙俱下，系统性风险爆发\n🛡️[" + A_BOND_US + "]: 衰退期唯一确定的避险资产"
+    t8_s := "衰退确认", t8_a := "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + " 🛡️" + A_BOND_US
+    t8_reason := "⛔[" + A_CYCLE + "/" + A_TECH + "]: 失业率飙升确认衰退，杀业绩叠加杀估值\n🛡️[" + A_BOND_US + "]: 衰退期唯一确定的避险资产"
 else if s8 == -0.5
     if sahm_val >= 0.3
         t8_s := "风险关注", t8_a := "【防御】 ⛔" + A_CYCLE + "/" + A_RISK + " 🛡️" + A_BOND_US
