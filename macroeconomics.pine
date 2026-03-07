@@ -1,5 +1,5 @@
 //@version=6
-indicator("[薯仔] 宏观经济审计看板", overlay = false, precision = 2, max_labels_count = 500)
+indicator("[薯仔] 宏观经济", overlay = false, precision = 2, max_labels_count = 500)
 
 // ==========================================
 // 1. 设置与参数
