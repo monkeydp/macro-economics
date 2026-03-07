@@ -104,28 +104,31 @@ c_black        = color.black
 // ==========================================
 
 // --- 资产常量定义 (Global) ---
-string A_RISK       = "风险资产"
+// 根据地区动态调整资产名称
+bool is_cn = region == "中国"
+
+string A_RISK       = is_cn ? "A股/港股" : "风险资产"
 string A_SAFE       = "避险资产"
-string A_CASH       = "美元/现金"
+string A_CASH       = is_cn ? "现金/美债" : "美元/现金"
 string A_USD        = "美元"
 string A_CASH_ONLY  = "现金"
-string A_BOND_S     = "短债"
-string A_BOND_L     = "长债"
+string A_BOND_S     = is_cn ? "短债/理财" : "短债"
+string A_BOND_L     = is_cn ? "中国长债" : "美债"
 string A_BOND_US    = "美债"
 string A_GOLD       = "黄金"
 
-string A_TECH       = "科技/成长"
-string A_GROWTH     = "成长股"
-string A_CYCLE      = "周期/大宗"
+string A_TECH       = is_cn ? "科创/创业板" : "科技/成长"
+string A_GROWTH     = is_cn ? "成长股" : "成长股"
+string A_CYCLE      = is_cn ? "顺周期/资源" : "周期/大宗"
 string A_CYCLE_STRONG = "强周期"
 string A_CYCLE_S    = "周期股"
 string A_COMM       = "大宗"
-string A_CORE       = "核心/红利" // 包含消费/必选
-string A_DIV        = "红利"
+string A_CORE       = is_cn ? "A50/沪深300" : "核心/红利" // 包含消费/必选
+string A_DIV        = is_cn ? "红利低波" : "红利"
 string A_CONS       = "消费"
-string A_SMALL      = "小盘/垃圾债"
-string A_JUNK       = "垃圾债"
-string A_SMALL_S    = "小盘"
+string A_SMALL      = is_cn ? "微盘/中证2000" : "小盘/垃圾债"
+string A_JUNK       = is_cn ? "垃圾债" : "垃圾债"
+string A_SMALL_S    = is_cn ? "微盘股" : "小盘"
 
 string A_HIGH_VAL   = "高估值"
 string A_CRYPTO     = "加密"
