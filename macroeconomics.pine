@@ -1185,8 +1185,8 @@ if is_sahm_melt and not is_sahm_melt[1] and show_markers
     label.new(bar_index, plot_val + 0.1, "💀\n衰退", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
 
 // 萨姆规则阈值线
-hline(0.50, "衰退熔断", color = mode == "8. 萨姆规则" ? c_super_red : na, linestyle = hline.style_solid, linewidth = 2)
-hline(0.30, "衰退关注", color = mode == "8. 萨姆规则" ? c_orange : na, linestyle = hline.style_dashed)
+plot(mode == "8. 萨姆规则" ? 0.50 : na, "衰退熔断线", color = c_super_red, linewidth = 2, style = plot.style_line)
+plot(mode == "8. 萨姆规则" ? 0.30 : na, "衰退关注线", color = c_orange, linewidth = 1, style = plot.style_circles)
 
 // 萨姆规则标签
 if mode == "8. 萨姆规则" and barstate.islast
