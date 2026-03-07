@@ -1,5 +1,5 @@
 //@version=6
-indicator("[薯仔] 宏观经济v3.0", overlay = false, precision = 2, max_labels_count = 500)
+indicator("[薯仔] 宏观经济", overlay = false, precision = 2, max_labels_count = 500)
 
 // ==========================================
 // 1. 设置与参数
@@ -836,121 +836,163 @@ get_score_col(s) =>
         c_lime // +0.5 or +1.0
 
 // --- 全局文案生成 ---
-// 优化：三列联动结构
-// Col 5: 现状 ⚠️警惕原因
 // Col 6: 【操作】
-// Col 7: ⛔否决资产 ⚠️警惕资产 ✅推荐资产
+// Col 7: ⛔否决资产 ⚠️警惕资产 ⚔️进攻资产 🛡️避险资产 (ToolTip: 理由)
+
+// 定义理由变量
+string t1_reason="", string t2_reason="", string t3_reason="", string t4_reason="", string t5_reason="", string t6_reason="", string t7_reason="", string t8_reason=""
 
 // 1. 基准利率
-
 if s1 == -1.0
-    t1_s := "救火降息 ⚠️硬着陆", t1_a := "【避险】 ⛔" + A_CYCLE_STRONG + " ✅" + A_GOLD + "/" + A_BOND_L + " | 衰退恐慌蔓延"
+    t1_s := "救火降息", t1_a := "【避险】 ⛔" + A_CYCLE_STRONG + "/" + A_TECH + " 🛡️" + A_GOLD + "/" + A_BOND_L
+    t1_reason := "⛔[" + A_CYCLE_STRONG + "]: 经济硬着陆杀业绩\n⛔[" + A_TECH + "]: 估值未定警惕杀估值\n🛡️[" + A_GOLD + "/" + A_BOND_L + "]: 避险资金涌入"
 else if s1 == -0.5
-    t1_s := "加息周期 ⚠️抽水", t1_a := "【防御】 ⛔" + A_BOND_L + "/" + A_GROWTH + " ✅" + A_BOND_S + "/" + A_USD + " | 流动性收紧"
+    t1_s := "加息周期", t1_a := "【防御】 ⛔" + A_BOND_L + "/" + A_GROWTH + " ⚠️" + A_RATE_SENS + " 🛡️" + A_BOND_S + "/" + A_USD
+    t1_reason := "⛔[" + A_BOND_L + "]: 杀久期\n⛔[" + A_GROWTH + "]: 杀估值\n⚠️[" + A_RATE_SENS + "]: 利率敏感资产承压\n🛡️[" + A_BOND_S + "]: 现金为王吃利息"
 else if s1 == 0.0
-    t1_s := "央行态度暧昧", t1_a := "【观察】 ⚠️" + A_RATE_SENS + " | 降息预期落空风险"
+    t1_s := "央行态度暧昧", t1_a := "【观察】 ⚠️" + A_RATE_SENS
+    t1_reason := "⚠️[" + A_RATE_SENS + "]: 降息预期可能落空，波动加大"
 else
-    t1_s := "降息周期", t1_a := "【进攻】 ✅" + A_TECH + "/" + A_BOND_L
+    t1_s := "降息周期", t1_a := "【进攻】 ⚔️" + A_TECH + "/" + A_BOND_L
+    t1_reason := "⚔️[" + A_TECH + "/" + A_BOND_L + "]: 资金变便宜，分母端逻辑改善"
 
 // 2. 真实利率
 if s2 == -1.0
     if rgdp_val < 0
-        t2_s := "滞胀萧条 ⚠️流动性陷阱", t2_a := "【避险】 ⛔" + A_CYCLE + "/" + A_TECH + " ✅" + A_USD + "/" + A_GOLD + " | 经济停滞通胀起"
+        t2_s := "滞胀萧条", t2_a := "【避险】 ⛔" + A_CYCLE + "/" + A_TECH + " 🛡️" + A_USD + "/" + A_GOLD
+        t2_reason := "⛔[" + A_CYCLE + "]: 经济停滞杀业绩\n⛔[" + A_TECH + "]: 高通胀杀估值\n🛡️[" + A_GOLD + "]: 股债双杀，实物抗通胀"
     else
-        t2_s := "虹吸效应", t2_a := "【避险】 ⛔" + A_HIGH_VAL + "/" + A_GROWTH + " ✅" + A_USD + "/" + A_BOND_S + " | 股市严重失血"
+        t2_s := "虹吸效应", t2_a := "【避险】 ⛔" + A_HIGH_VAL + "/" + A_TECH + " 🛡️" + A_USD + "/" + A_BOND_S
+        t2_reason := "⛔[" + A_HIGH_VAL + "]: 无风险收益过高虹吸资金\n⛔[" + A_TECH + "]: 科技股压力大\n🛡️[" + A_USD + "]: 回流美元现金"
 else if s2 == -0.5
-    t2_s := "杀估值 ⚠️泡沫破裂", t2_a := "【防御】 ⛔" + A_HIGH_VAL + " ✅" + A_CORE + " | 估值回归基本面"
+    t2_s := "杀估值 ", t2_a := "【防御】 ⛔" + A_HIGH_VAL + "/" + A_TECH + " 🛡️" + A_CORE
+    t2_reason := "⛔[" + A_HIGH_VAL + "]: 实际资金成本过高压制估值\n⛔[" + A_TECH + "]: 科技股承压\n🛡️[" + A_CORE + "]: 防御性资产抗跌"
 else if s2 == 0.0
-    t2_s := "资金成本变贵", t2_a := "【观察】 ⚠️" + A_HIGH_VAL + " | 业绩撑不住估值"
+    t2_s := "资金成本变贵", t2_a := "【观察】 ⚠️" + A_HIGH_VAL
+    t2_reason := "⚠️[" + A_HIGH_VAL + "]: 资金成本上升未见顶，风险累积"
 else if s2 == 1.0
     if tips_live < 0
-        t2_s := "负利率", t2_a := "【进攻】 ✅" + A_GOLD + "/" + A_CRYPTO
+        t2_s := "负利率", t2_a := "【进攻】 ⚔️" + A_GOLD + "/" + A_CRYPTO
+        t2_reason := "⚔️[" + A_GOLD + "/" + A_CRYPTO + "]: 货币贬值，资产泡沫化，抗贬值资产受益"
     else
-        t2_s := "健康支撑", t2_a := "【进攻】 ✅" + A_TECH + "/" + A_GROWTH
+        t2_s := "健康支撑", t2_a := "【进攻】 ⚔️" + A_TECH + "/" + A_GROWTH
+        t2_reason := "⚔️[" + A_TECH + "]: 实际利率低位，利好股市估值扩张"
 
 // 3. 利差结构
 if s3 == -1.0
-    t3_s := "牛陡 ⚠️经济衰退", t3_a := "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + " ✅" + A_BOND_US + "/" + A_GOLD + " | 衰退恐慌极值"
+    t3_s := "牛陡 ", t3_a := "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + " ⚠️全市场 🛡️" + A_BOND_US + "/" + A_GOLD
+    t3_reason := "⛔[" + A_CYCLE + "]: 衰退确认杀业绩\n⛔[" + A_TECH + "]: 恐慌抛售杀估值\n⚠️[全市场]: 泥沙俱下\n🛡️[" + A_BOND_US + "]: 避险买美债"
 else if s3 == -0.5
-    t3_s := "倒挂 ⚠️盈利恶化", t3_a := "【防御】 ⛔" + A_CYCLE_STRONG + " ✅" + A_CASH_ONLY + "/" + A_DIV + " | 衰退前兆确认"
+    t3_s := "倒挂 ", t3_a := "【防御】 ⛔" + A_CYCLE_STRONG + "/" + A_TECH + " 🛡️" + A_CASH_ONLY + "/" + A_DIV
+    t3_reason := "⛔[" + A_CYCLE_STRONG + "]: 长期经济前景堪忧杀周期\n⛔[" + A_TECH + "]: 衰退初期杀估值\n🛡️[" + A_CASH_ONLY + "]: 收缩战线防御"
 else if s3 == 0.0
-    t3_s := "长短债博弈激烈", t3_a := "【观察】 ⚠️" + A_BOND_LONG + " | 谨防通胀反弹杀跌"
+    t3_s := "长短债博弈激烈", t3_a := "【观察】 ⚠️" + A_BOND_LONG
+    t3_reason := "⚠️[" + A_BOND_LONG + "]: 通胀反弹风险未除，波动大"
 else if s3 == 0.5
-    t3_s := "陡峭", t3_a := "【进攻】 ✅" + A_TECH + "/" + A_CORE + " | 经济温和复苏"
+    t3_s := "陡峭", t3_a := "【进攻】 ⚔️" + A_TECH + "/" + A_CORE
+    t3_reason := "⚔️[" + A_CORE + "]: 宏观环境回归常态，利好核心资产"
 else
-    t3_s := "熊陡", t3_a := "【进攻】 ✅" + A_CYCLE_S + "/" + A_COMM + " | 经济复苏确认"
+    t3_s := "熊陡", t3_a := "【进攻】 ⚔️" + A_CYCLE_S + "/" + A_COMM
+    t3_reason := "⚔️[" + A_CYCLE_S + "]: 通胀回升，经济强劲，利好商品和周期股"
 
 // 4. 信用风险
 if s4 == -1.0 and w4 > 1.0
-    t4_s := "信用崩盘 ⚠️违约潮", t4_a := "【清仓】 ⛔" + A_JUNK + " ✅" + A_CASH + " | 违约潮爆发"
+    t4_s := "信用崩盘", t4_a := "【清仓】 ⛔" + A_JUNK + " ⚠️全市场 🛡️" + A_CASH
+    t4_reason := "⛔[" + A_JUNK + "]: 企业融资链条断裂\n⚠️[全市场]: 流动性危机波及全场\n🛡️[" + A_CASH + "]: 现金最安全"
 else if s4 == -1.0
-    t4_s := "严重恶化 ⚠️流动性", t4_a := "【避险】 ⛔" + A_JUNK + " ✅" + A_BOND_S + " | 流动性严重恶化"
+    t4_s := "严重恶化", t4_a := "【避险】 ⛔" + A_JUNK + "/" + A_SMALL_S + " 🛡️" + A_BOND_S
+    t4_reason := "⛔[" + A_JUNK + "]: 市场风险偏好极度下降\n⛔[" + A_SMALL_S + "]: 流动性差的资产难变现\n🛡️[" + A_BOND_S + "]: 短债流动性好"
 else if s4 == -0.5
-    t4_s := "风险走阔 ⚠️收缩", t4_a := "【防御】 ⛔" + A_JUNK + " ✅" + A_CORE + " | 信用利差走阔"
+    t4_s := "风险走阔 ⚠️收缩", t4_a := "【防御】 ⛔" + A_JUNK + " ⚠️" + A_SMALL_S + " 🛡️" + A_CORE
+    t4_reason := "⛔[" + A_JUNK + "]: 资金避险情绪升温，抛售高风险债\n⚠️[" + A_SMALL_S + "]: 小盘股融资难\n🛡️[" + A_CORE + "]: 红利股稳健"
 else if s4 == 0.0
     if oas_val < 3.5
-        t4_s := "底部回升 ⚠️信用拐点", t4_a := "【观察】 ⚠️" + A_JUNK + " | 等待OAS确认拐点"
+        t4_s := "底部回升", t4_a := "【观察】 ⚠️" + A_JUNK
+        t4_reason := "⚠️[" + A_JUNK + "]: 信用风险触底反弹，压力显现"
     else
-        t4_s := "局部压力 ⚠️信用分化", t4_a := "【观察】 ⚠️伪成长 | 等待压力缓解"
+        t4_s := "局部压力", t4_a := "【观察】 ⚠️伪成长"
+        t4_reason := "⚠️[伪成长]: 部分企业融资困难，面临出清"
 else
-    t4_s := "风险收敛", t4_a := "【进攻】 ✅" + A_JUNK + "/" + A_SMALL_S
+    t4_s := "风险收敛", t4_a := "【进攻】 ⚔️" + A_JUNK + "/" + A_SMALL_S
+    t4_reason := "⚔️[" + A_JUNK + "]: 资金泛滥追逐高收益，弹性大"
 
 // 5. 流动性 (M2)
     if s5 == -1.0 // 熔断
-        t5_s := is_us ? "严重收缩" : "严重空转"
-        t5_a := "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + " ✅" + A_CASH + " | " + (is_us ? "严重收缩" : "严重空转")
+        t5_s := is_us ? "流动性枯竭" : "严重空转"
+        t5_a := "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + " 🛡️" + A_CASH
+        t5_reason := "⛔[" + A_CYCLE + "/" + A_TECH + "]: 市场流动性枯竭，无差别杀跌\n🛡️[" + A_CASH + "]: 现金为王"
     else if s5 == -0.5
         t5_s := is_us ? "收缩" : "资金空转"
-        t5_a := "【防御】 ⛔" + A_CYCLE + " ✅" + A_CORE + " | " + (is_us ? "央行缩表" : "资金空转")
+        t5_a := "【防御】 ⛔" + A_CYCLE + " ⚠️" + A_EDGE_SMALL + " 🛡️" + A_CORE
+        t5_reason := "⛔[" + A_CYCLE + "]: 货币供应量收缩杀业绩\n⚠️[" + A_EDGE_SMALL + "]: 缺乏流动性\n🛡️[" + A_CORE + "]: 红利股抗跌"
     else if s5 == 0.0
         if is_us
-            t5_s := "市场增量不足", t5_a := "【观察】 ⚠️" + A_EDGE_SMALL + " | 缺乏流动性支撑"
+            t5_s := "市场增量不足", t5_a := "【观察】 ⚠️" + A_EDGE_SMALL
+            t5_reason := "⚠️[" + A_EDGE_SMALL + "]: 股市缺乏活水注入，边缘资产无人问津"
         else
-            t5_s := "存款搬家停滞", t5_a := "【观察】 ⚠️" + A_SLOW_BEAR + " | 股市缺乏活水"
+            t5_s := "存款搬家停滞", t5_a := "【观察】 ⚠️" + A_SLOW_BEAR
+            t5_reason := "⚠️[" + A_SLOW_BEAR + "]: 股市缺乏活水"
     else
         t5_s := is_us ? "扩张" : "资金活化"
-        t5_a := "【进攻】 ✅" + A_TECH + "/" + A_CORE
+        t5_a := "【进攻】 ⚔️" + A_TECH + "/" + A_CORE
+        t5_reason := "⚔️[" + A_CORE + "]: 资金充裕推升资产价格，核心资产受益"
 
     // 6. 利润空间 (CPI-PPI)
     if s6 == -2.0 // 过热
-        t6_s := "通胀过热", t6_a := "【防御】 ⛔" + A_TECH + " ✅" + A_CYCLE + " | 央行加息抗通胀"
+        t6_s := "通胀过热", t6_a := "【防御】 ⛔" + A_TECH + " ⚔️" + A_CYCLE + " 🛡️" + A_CASH
+        t6_reason := "⛔[" + A_TECH + "]: 联储加息预期杀高估值\n⚔️[" + A_CYCLE + "]: 通胀利好资源品\n🛡️[" + A_CASH + "]: 现金抗波动"
     else if s6 == -1.0 // 通缩
-        t6_s := "深度通缩", t6_a := "【避险】 ⛔" + A_CYCLE + " ✅" + A_CORE + " | 需求端严重萎缩"
+        t6_s := "深度通缩", t6_a := "【避险】 ⛔" + A_CYCLE + " 🛡️" + A_CORE
+        t6_reason := "⛔[" + A_CYCLE + "]: 企业利润全线暴跌杀周期\n🛡️[" + A_CORE + "]: 必选消费需求刚性"
     else if s6 == -0.5 // 亏损
-        t6_s := "亏损恶化", t6_a := "【防御】 ⛔" + A_CYCLE_MID + " ✅" + A_CYCLE_UP + " | 上下游利润倒挂"
+        t6_s := "亏损恶化", t6_a := "【防御】 ⛔" + A_CYCLE_MID + " ⚔️" + A_CYCLE_UP
+        t6_reason := "⛔[" + A_CYCLE_MID + "]: 成本高企挤压中游利润\n⚔️[" + A_CYCLE_UP + "]: 上游资源涨价受益"
     else if s6 == 0.0
         if is_us
-            t6_s := "企业增长停滞", t6_a := "【观察】 ⚠️" + A_HOMOG + " | 企业缺乏提价权"
+            t6_s := "企业增长停滞", t6_a := "【观察】 ⚠️" + A_HOMOG
+            t6_reason := "⚠️[" + A_HOMOG + "]: 价格战侵蚀企业利润，同质化竞争惨烈"
         else
-            t6_s := "行业内卷加剧", t6_a := "【观察】 ⚠️" + A_HOMOG + " | 价格战侵蚀利润"
+            t6_s := "行业内卷加剧", t6_a := "【观察】 ⚠️" + A_HOMOG
+            t6_reason := "⚠️[" + A_HOMOG + "]: 价格战侵蚀利润"
     else if s6 == 0.5
-        t6_s := "困境反转", t6_a := "【进攻】 ✅" + A_CYCLE_MID
+        t6_s := "困境反转", t6_a := "【进攻】 ⚔️" + A_CYCLE_MID
+        t6_reason := "⚔️[" + A_CYCLE_MID + "]: 企业盈利触底回升，中游修复弹性大"
     else
-        t6_s := "利润走阔", t6_a := "【进攻】 ✅" + A_TECH + "/" + A_CORE
+        t6_s := "利润走阔", t6_a := "【进攻】 ⚔️" + A_TECH + "/" + A_CORE
+        t6_reason := "⚔️[" + A_TECH + "]: 业绩驱动股价上涨，戴维斯双击"
 
     // 7. 实体热度 (铜金)
     if s7 == -1.0 // 崩盘
-        t7_s := "实体崩盘", t7_a := "【避险】 ⛔" + A_CYCLE_STRONG + " ✅" + A_BOND_US + "/" + A_GOLD + " | 铜金比崩盘"
+        t7_s := "实体崩盘", t7_a := "【避险】 ⛔" + A_CYCLE_STRONG + "/" + A_CYCLE + " 🛡️" + A_BOND_US + "/" + A_GOLD
+        t7_reason := "⛔[" + A_CYCLE_STRONG + "]: 实体需求信心崩塌杀周期\n⛔[" + A_CYCLE + "]: 衰退预期浓厚\n🛡️[" + A_BOND_US + "]: 避险买债金"
     else if s7 == -0.5
         if cg_ratio < cg_ratio[1] // 衰退
-            t7_s := "衰退交易", t7_a := "【防御】 ⛔" + A_CYCLE + " ✅" + A_GOLD + " | 实体需求转弱"
+            t7_s := "衰退交易", t7_a := "【防御】 ⛔" + A_CYCLE + " 🛡️" + A_GOLD
+            t7_reason := "⛔[" + A_CYCLE + "]: 市场交易衰退预期杀周期\n🛡️[" + A_GOLD + "]: 黄金对冲衰退"
         else // 伪复苏
-            t7_s := "伪复苏", t7_a := "【观察】 ⚠️" + A_CYCLE + " | 需等待铜价确认"
+            t7_s := "伪复苏", t7_a := "【观察】 ⚠️" + A_CYCLE
+            t7_reason := "⚠️[" + A_CYCLE + "]: 仅金价上涨非真实需求，反弹不可持续"
     else if s7 == 0.0
-        t7_s := "下游需求不明", t7_a := "【观察】 ⚠️" + A_CYCLE_STRONG + " | 工厂补库意愿弱"
+        t7_s := "下游需求不明", t7_a := "【观察】 ⚠️" + A_CYCLE_STRONG
+        t7_reason := "⚠️[" + A_CYCLE_STRONG + "]: 工厂补库意愿疲弱，难有表现"
     else
-        t7_s := "复苏", t7_a := "【进攻】 ✅" + A_CYCLE
+        t7_s := "复苏", t7_a := "【进攻】 ⚔️" + A_CYCLE
+        t7_reason := "⚔️[" + A_CYCLE + "]: 工业生产供销两旺，利好周期股"
 
 // 8. 萨姆规则
 if s8 == -1.0
-    t8_s := "衰退确认 ⚠️失业潮", t8_a := "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + " ✅" + A_BOND_US + " | 历史级衰退信号"
+    t8_s := "衰退确认", t8_a := "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + " ⚠️全市场 🛡️" + A_BOND_US
+    t8_reason := "⛔[" + A_CYCLE + "/" + A_TECH + "]: 失业率飙升确认衰退，杀业绩杀估值\n⚠️[全市场]: 泥沙俱下\n🛡️[" + A_BOND_US + "]: 美债避险"
 else if s8 == -0.5
     if sahm_val >= 0.3
-        t8_s := "风险关注 ⚠️衰退前夜", t8_a := "【防御】 ⛔" + A_CYCLE + " ✅" + A_BOND_US + " | 衰退概率激增"
+        t8_s := "风险关注", t8_a := "【防御】 ⛔" + A_CYCLE + "/" + A_RISK + " 🛡️" + A_BOND_US
+        t8_reason := "⛔[" + A_CYCLE + "]: 萨姆法则触发临界点，周期股最先反应\n⛔[" + A_RISK + "]: 风险资产承压\n🛡️[" + A_BOND_US + "]: 美债避险"
     else
-        t8_s := "ICSA预警 ⚠️就业恶化", t8_a := "【防御】 ⛔" + A_CONS + " ✅" + A_CASH_ONLY + " | 就业市场裂痕"
+        t8_s := "ICSA预警", t8_a := "【防御】 ⛔" + A_CONS + " 🛡️" + A_CASH_ONLY
+        t8_reason := "⛔[" + A_CONS + "]: 失业人数超预期恶化，打击消费意愿\n🛡️[" + A_CASH_ONLY + "]: 现金观望"
 else
-    t8_s := "就业健康", t8_a := "【进攻】 ✅" + A_TECH + "/" + A_CONS
+    t8_s := "就业健康", t8_a := "【进攻】 ⚔️" + A_TECH + "/" + A_CONS
+    t8_reason := "⚔️[" + A_TECH + "/" + A_CONS + "]: 居民收入支撑消费，经济强劲利好科技"
 
 // 绘制主图曲线
 float plot_val = 0.0
@@ -1275,7 +1317,7 @@ var table rpt = table.new(position.middle_left, 8, 11, bgcolor = c_bg, border_wi
 var table info = table.new(position.middle_right, 4, 6, bgcolor = c_bg, border_width = 1, border_color = color.gray)
 
 // Helper to fill row
-fill_row(r, name, val_str, s, w, meta, status, action, is_melt) =>
+fill_row(r, name, val_str, s, w, meta, status, action, reason, is_melt) =>
     c_s = get_score_col(s)
     w_str = w > 1.0 ? "x2" : ""
     float final_s = s * w
@@ -1299,8 +1341,9 @@ fill_row(r, name, val_str, s, w, meta, status, action, is_melt) =>
     string act_head = sp_idx != -1 ? str.substring(action, 0, sp_idx) : action
     string act_body = sp_idx != -1 ? str.substring(action, sp_idx + 1) : ""
     
-    table.cell(rpt, 6, r, act_head, text_color = c_s, bgcolor = c_bg)
-    table.cell(rpt, 7, r, act_body, text_color = c_white, bgcolor = c_bg, text_halign = text.align_left)
+    // 显示 Tooltip
+    table.cell(rpt, 6, r, act_head, text_color = c_s, bgcolor = c_bg, tooltip = reason)
+    table.cell(rpt, 7, r, act_body, text_color = c_white, bgcolor = c_bg, text_halign = text.align_left, tooltip = reason)
 
 if barstate.islast and show_report
     // --- 左表: 报告 ---
@@ -1314,19 +1357,19 @@ if barstate.islast and show_report
     table.cell(rpt, 6, 0, "操作", text_color = c_white, bgcolor = c_header)
     table.cell(rpt, 7, 0, "建议", text_color = c_white, bgcolor = c_header)
 
-    fill_row(1, "1.基准利率", str.tostring(effr_live, "0.00")+"%", s1, w1, "总水坝闸门", t1_s, t1_a, false)
-    fill_row(2, "2.真实利率", str.tostring(tips_live, "0.00")+"%", s2, w2, "水厂回购价", t2_s, t2_a, false)
-    fill_row(3, "3.利差结构", str.tostring(yc_val, "0.00"), s3, w3, "天气预报", t3_s, t3_a, s3 == -1.0 and w3 > 1.0)
-    fill_row(4, "4.信用风险", str.tostring(oas_val, "0.00")+"%", s4, w4, "风险保证金", t4_s, t4_a, s4 == -1.0 and w4 > 1.0)
+    fill_row(1, "1.基准利率", str.tostring(effr_live, "0.00")+"%", s1, w1, "总水坝闸门", t1_s, t1_a, t1_reason, false)
+    fill_row(2, "2.真实利率", str.tostring(tips_live, "0.00")+"%", s2, w2, "水厂回购价", t2_s, t2_a, t2_reason, false)
+    fill_row(3, "3.利差结构", str.tostring(yc_val, "0.00"), s3, w3, "天气预报", t3_s, t3_a, t3_reason, s3 == -1.0 and w3 > 1.0)
+    fill_row(4, "4.信用风险", str.tostring(oas_val, "0.00")+"%", s4, w4, "风险保证金", t4_s, t4_a, t4_reason, s4 == -1.0 and w4 > 1.0)
     
     string l5_v = is_us ? str.tostring(us_m2_yoy, "0.00")+"%" : str.tostring(cn_gap, "0.00")+"%"
-    fill_row(5, "5.流动性", l5_v, s5, w5, "鱼池活水率", t5_s, t5_a, s5 == -1.0)
+    fill_row(5, "5.流动性", l5_v, s5, w5, "鱼池活水率", t5_s, t5_a, t5_reason, s5 == -1.0)
     
     string l6_v = is_us ? str.tostring(us_profit_gap, "0.00")+"%" : str.tostring(cn_profit_gap, "0.00")+"%"
-    fill_row(6, "6.利润空间", l6_v, s6, w6, "养鱼账本", t6_s, t6_a, false)
+    fill_row(6, "6.利润空间", l6_v, s6, w6, "养鱼账本", t6_s, t6_a, t6_reason, false)
     
-    fill_row(7, "7.实体热度", str.tostring(cg_ratio, "0.00"), s7, w7, "鱼池扩建率", t7_s, t7_a, false)
-    fill_row(8, "8.萨姆规则", str.tostring(sahm_val, "0.00")+"%", s8, w8, "失业信号", t8_s, t8_a, s8 == -1.0 and w8 > 1.0)
+    fill_row(7, "7.实体热度", str.tostring(cg_ratio, "0.00"), s7, w7, "鱼池扩建率", t7_s, t7_a, t7_reason, false)
+    fill_row(8, "8.萨姆规则", str.tostring(sahm_val, "0.00")+"%", s8, w8, "失业信号", t8_s, t8_a, t8_reason, s8 == -1.0 and w8 > 1.0)
 
     // Row 9: 宏观对冲策略
     // 逻辑: US (Liquidity + Rate), CN (Liquidity)
@@ -1388,6 +1431,7 @@ if barstate.islast and show_report
     // 定义资产否决开关 (Veto)
     bool veto_tech  = false
     bool veto_cycle = false
+    bool veto_cycle_mid = false // 否决中游
     bool veto_core  = false
     bool veto_small = false
     bool veto_bond_l = false // 否决长债
@@ -1487,7 +1531,7 @@ if barstate.islast and show_report
             veto_cycle := true 
     else if s6 == -0.5 // 亏损
         rec_cycle := true // 上游资源 (防御属性)
-        veto_cycle := true // 这里的逻辑比较细：卖中游买上游。暂且只推上游
+        veto_cycle_mid := true // 这里的逻辑比较细：卖中游买上游。暂且只推上游
     else if s6 > 0 // 躺赚/修复
         rec_tech := true, rec_core := true // 消费
 
@@ -1509,7 +1553,8 @@ if barstate.islast and show_report
         veto_risk_all := true
     else if s8 == -0.5 // 关注
         rec_cash := true, rec_bond_l := true
-        // 停止加仓 -> 不推新的风险资产
+        veto_cycle := true // 否决周期
+        veto_risk_all := true // 萨姆临界点，否决所有风险资产
     else if s8 > 0 // 健康
         rec_tech := true, rec_core := true // 消费
 
@@ -1570,18 +1615,24 @@ if barstate.islast and show_report
         veto_assets_str := append_unique(veto_assets_str, A_TECH + "/" + A_CYCLE + "/" + A_SMALL)
     else
         if veto_tech
-            veto_assets_str := append_unique(veto_assets_str, A_HIGH_VAL)
+            veto_assets_str := append_unique(veto_assets_str, A_TECH)
         if veto_cycle
-            veto_assets_str := append_unique(veto_assets_str, A_CYCLE_STRONG)
+            veto_assets_str := append_unique(veto_assets_str, A_CYCLE)
+        if veto_cycle_mid
+            veto_assets_str := append_unique(veto_assets_str, A_CYCLE_MID)
         if veto_small
-            veto_assets_str := append_unique(veto_assets_str, A_JUNK)
+            veto_assets_str := append_unique(veto_assets_str, A_SMALL)
+        if veto_core
+            veto_assets_str := append_unique(veto_assets_str, A_CORE)
+        if veto_bond_l
+            veto_assets_str := append_unique(veto_assets_str, A_BOND_L)
             
     // 警惕组 (Warn) - 收集黄灯维度的瑕疵资产 (仅资产，不含原因)
     // 逻辑：s=0.0 的维度对应资产
     if s1 == 0.0 
         warn_assets_str := append_unique(warn_assets_str, A_RATE_SENS)
     if s2 == 0.0 
-        warn_assets_str := append_unique(warn_assets_str, A_STORY)
+        warn_assets_str := append_unique(warn_assets_str, A_HIGH_VAL)
     if s3 == 0.0 
         warn_assets_str := append_unique(warn_assets_str, A_BOND_LONG)
     if s4 == 0.0 
@@ -1592,7 +1643,7 @@ if barstate.islast and show_report
     if s6 == 0.0 
         warn_assets_str := append_unique(warn_assets_str, A_HOMOG)
     if s7 == 0.0 
-        warn_assets_str := append_unique(warn_assets_str, A_CYCLE_S)
+        warn_assets_str := append_unique(warn_assets_str, A_CYCLE_STRONG)
 
     // 过滤逻辑：从进攻组剔除否决组
     // Pine Script 字符串处理较弱，这里用简单包含判断
@@ -1613,16 +1664,78 @@ if barstate.islast and show_report
             risk_assets_str := str.replace(risk_assets_str, "/" + A_CYCLE, "")
             risk_assets_str := str.replace(risk_assets_str, A_CYCLE + "/", "")
             risk_assets_str := str.replace(risk_assets_str, A_CYCLE, "")
+        if veto_cycle_mid
+            risk_assets_str := str.replace(risk_assets_str, "/" + A_CYCLE_MID, "")
+            risk_assets_str := str.replace(risk_assets_str, A_CYCLE_MID + "/", "")
+            risk_assets_str := str.replace(risk_assets_str, A_CYCLE_MID, "")
         if veto_small
             risk_assets_str := str.replace(risk_assets_str, "/" + A_SMALL, "")
             risk_assets_str := str.replace(risk_assets_str, A_SMALL + "/", "")
             risk_assets_str := str.replace(risk_assets_str, A_SMALL, "")
-            
-    // 清理多余斜杠
+        if veto_core
+            risk_assets_str := str.replace(risk_assets_str, "/" + A_CORE, "")
+            risk_assets_str := str.replace(risk_assets_str, A_CORE + "/", "")
+            risk_assets_str := str.replace(risk_assets_str, A_CORE, "")
+
+    // 过滤逻辑：从警惕组剔除否决组 (如果已否决，无需再警惕)
+    if veto_risk_all
+        warn_assets_str := ""
+    else
+        if veto_tech
+            warn_assets_str := str.replace(warn_assets_str, "/" + A_TECH, "")
+            warn_assets_str := str.replace(warn_assets_str, A_TECH + "/", "")
+            warn_assets_str := str.replace(warn_assets_str, A_TECH, "")
+        if veto_cycle
+            warn_assets_str := str.replace(warn_assets_str, "/" + A_CYCLE, "")
+            warn_assets_str := str.replace(warn_assets_str, A_CYCLE + "/", "")
+            warn_assets_str := str.replace(warn_assets_str, A_CYCLE, "")
+        if veto_small
+            warn_assets_str := str.replace(warn_assets_str, "/" + A_SMALL, "")
+            warn_assets_str := str.replace(warn_assets_str, A_SMALL + "/", "")
+            warn_assets_str := str.replace(warn_assets_str, A_SMALL, "")
+        // ... 其他警惕项过滤
+
+    // 过滤逻辑：从进攻组剔除警惕组 (互斥原则：警惕的不进攻)
+    // 1. 别名过滤 (Alias Filter)
+    if str.contains(warn_assets_str, A_RATE_SENS)
+        risk_assets_str := str.replace(risk_assets_str, A_TECH, "") // 利率敏感 ≈ 科技
+        risk_assets_str := str.replace(risk_assets_str, A_GROWTH, "")
+    if str.contains(warn_assets_str, A_HIGH_VAL)
+        risk_assets_str := str.replace(risk_assets_str, A_TECH, "") // 高估值 ≈ 科技
+        risk_assets_str := str.replace(risk_assets_str, A_GROWTH, "")
+    if str.contains(warn_assets_str, A_JUNK)
+        risk_assets_str := str.replace(risk_assets_str, A_JUNK, "")
+    if str.contains(warn_assets_str, A_SMALL) or str.contains(warn_assets_str, A_EDGE_SMALL)
+        risk_assets_str := str.replace(risk_assets_str, A_SMALL, "")
+    if str.contains(warn_assets_str, A_CYCLE) or str.contains(warn_assets_str, A_CYCLE_STRONG)
+        risk_assets_str := str.replace(risk_assets_str, A_CYCLE, "")
+
+    // 2. 同名过滤 (Direct Filter) - 确保 Warn 中出现的资产绝对不会出现在 Risk 中
+    // 遍历所有核心资产常量
+    if str.contains(warn_assets_str, A_TECH)
+        risk_assets_str := str.replace(risk_assets_str, A_TECH, "")
+    if str.contains(warn_assets_str, A_CYCLE)
+        risk_assets_str := str.replace(risk_assets_str, A_CYCLE, "")
+    if str.contains(warn_assets_str, A_CORE)
+        risk_assets_str := str.replace(risk_assets_str, A_CORE, "")
+    if str.contains(warn_assets_str, A_SMALL)
+        risk_assets_str := str.replace(risk_assets_str, A_SMALL, "")
+    if str.contains(warn_assets_str, A_BOND_L)
+        risk_assets_str := str.replace(risk_assets_str, A_BOND_L, "")
+
+    // 再次清理多余斜杠
+    // ... (保持原有的清理逻辑)
     if str.startswith(risk_assets_str, "/")
         risk_assets_str := str.substring(risk_assets_str, 1)
     if str.endswith(risk_assets_str, "/")
         risk_assets_str := str.substring(risk_assets_str, 0, str.length(risk_assets_str) - 1)
+    
+    // 清理多余斜杠 (Warn)
+    if str.startswith(warn_assets_str, "/")
+        warn_assets_str := str.substring(warn_assets_str, 1)
+    if str.endswith(warn_assets_str, "/")
+        warn_assets_str := str.substring(warn_assets_str, 0, str.length(warn_assets_str) - 1)
+
         
     // 兜底：如果进攻组被剔除空了，显示暂无
     if risk_assets_str == "" and total_score >= 1.5
@@ -1764,22 +1877,22 @@ if barstate.islast and show_report
         // 1. 基准利率含义与战术 (全状态覆盖)
         if s1 == -1.0 // 救火
             d_cur_mean := "衰退确信，初期伴随暴跌"
-            d_tactics  := "此时降息预期极强\n买长债对冲股票下跌"
+            d_tactics  := "此时降息预期极强\n🛡️买长债对冲股票下跌"
             d_turn_val := "降幅收窄 (恐慌消退)"
-            d_tactics_turn := "恐慌消退，尝试左侧建仓\n买入超跌资产"
+            d_tactics_turn := "恐慌消退，尝试左侧建仓\n⚔️买入超跌资产"
         else if s1 == -0.5 // 加息
             d_cur_mean := "资金变贵，现金为王"
-            d_tactics  := "买短债吃高息，等跌\n规避久期敏感资产"
+            d_tactics  := "🛡️买短债吃高息，等跌\n规避久期敏感资产"
             d_turn_val := "跌破 EMA (停止加息)"
-            d_tactics_turn := "停止加息，资金面转宽\n满仓买入利率敏感资产"
+            d_tactics_turn := "停止加息，资金面转宽\n⚔️满仓买入利率敏感资产"
         else if s1 == 0.0 // 震荡
             d_cur_mean := "政策观望，方向未定"
-            d_tactics  := "政策方向不明朗，观察期\n多看少动"
+            d_tactics  := "政策方向不明朗，观察期\n多看少做"
             d_turn_val := "跌破 EMA (开始降息)"
-            d_tactics_turn := "确认降息周期开启\n加大杠杆做多"
+            d_tactics_turn := "确认降息周期开启\n⚔️加大杠杆做多"
         else // 降息
             d_cur_mean := "资金便宜，利好成长"
-            d_tactics  := "布局科技、加密和生物医药\n利好利率敏感资产"
+            d_tactics  := "⚔️布局科技、加密和生物医药\n利好利率敏感资产"
             d_turn_val := "上穿 EMA (停止降息)"
             d_tactics_turn := "降息结束，利好出尽\n落袋为安，防范通胀反弹"
             
@@ -1803,33 +1916,33 @@ if barstate.islast and show_report
         if s2 == -1.0
             if rgdp_val < 0 // 滞胀
                 d_cur_mean := "经济停滞，物价飞涨\n(负利率陷阱)"
-                d_tactics  := "现金为王，卖出风险资产\n买入美元/黄金"
+                d_tactics  := "🛡️现金为王，卖出风险资产\n买入美元/黄金"
                 d_turn_val := "RGDP 转正 (经济复苏)"
-                d_tactics_turn := "经济复苏，重仓股票\n关注周期反转"
+                d_tactics_turn := "经济复苏，重仓股票\n⚔️关注周期反转"
             else // 虹吸
                 d_cur_mean := "无风险收益极高，虹吸一切"
-                d_tactics  := "只有美元现金最安全\n卖出风险资产"
+                d_tactics  := "🛡️只有美元现金最安全\n卖出风险资产"
                 d_turn_val := "跌破 RGDP"
-                d_tactics_turn := "虹吸效应结束，配置核心资产\n资金重回股市"
+                d_tactics_turn := "虹吸效应结束，配置核心资产\n⚔️资金重回股市"
         else if s2 == -0.5 // 杀估值
             d_cur_mean := "实际资金成本过高，压制估值"
-            d_tactics  := "买低估值红利股\n规避高估值成长股"
+            d_tactics  := "🛡️买低估值红利股\n规避高估值成长股"
             d_turn_val := "跌破 0.75 RGDP"
             d_tactics_turn := "估值压制解除，进入震荡\n多看少做"
         else if s2 == 0.0 // 资金成本上升
             d_cur_mean := "资金成本上升，尚未杀估值"
             d_tactics  := "环境开始变差\n多看少做"
             d_turn_val := "跌破 0.5 RGDP (健康)"
-            d_tactics_turn := "资金成本适宜，买入成长股\n科技股迎来春天"
+            d_tactics_turn := "资金成本适宜，买入成长股\n⚔️科技股迎来春天"
         else if s2 == 1.0
             if tips_live < 0 // 负利率
                 d_cur_mean := "实际利率为负，资产泡沫化"
-                d_tactics  := "实物资产/数字黄金抗贬值\n满仓风险资产"
+                d_tactics  := "⚔️实物资产/数字黄金抗贬值\n满仓风险资产"
                 d_turn_val := "利率转正"
                 d_tactics_turn := "泡沫退潮，卖出黄金/加密\n转入防御性资产"
             else // 健康
                 d_cur_mean := "资金成本适宜，利好股市"
-                d_tactics  := "安心持有成长股\n享受估值溢价"
+                d_tactics  := "⚔️安心持有成长股\n享受估值溢价"
                 d_turn_val := tips_live >= 0.5 * rgdp_val ? "突破 0.5 RGDP（确认中）" : "突破 0.5 RGDP"
                 d_tactics_turn := "实际利率上行，转入震荡\n多看少做"
             
@@ -1860,27 +1973,27 @@ if barstate.islast and show_report
         // 3. 利差含义与战术
         if s3 == -1.0 // 牛陡
             d_cur_mean := "衰退迫在眉睫，恐慌蔓延"
-            d_tactics  := "立刻清空股票\n避险资金涌入，买美债/黄金"
+            d_tactics  := "立刻清空股票\n🛡️避险资金涌入，买美债/黄金"
             d_turn_val := "短债企稳 (恐慌消退)"
-            d_tactics_turn := "恐慌消退，尝试左侧建仓\n买入超跌资产"
+            d_tactics_turn := "恐慌消退，尝试左侧建仓\n⚔️买入超跌资产"
         else if s3 == -0.5 // 倒挂
             d_cur_mean := "长期前景堪忧，资金避险"
-            d_tactics  := "衰退倒计时，收缩战线\n买防御性资产，避激进投资"
+            d_tactics  := "衰退倒计时，收缩战线\n🛡️买防御性资产，避激进投资"
             d_turn_val := "重新转正 (解除警报)"
-            d_tactics_turn := "警报解除，右侧确认买入\n加仓风险资产"
+            d_tactics_turn := "警报解除，右侧确认买入\n⚔️加仓风险资产"
         else if s3 == 0.0 // 平坦
             d_cur_mean := "经济方向未定，多空博弈"
             d_tactics  := "倒挂/走阔转换期\n方向未定，多看少做"
             d_turn_val := "重新转正 (复苏确认)"
-            d_tactics_turn := "复苏确认，加仓周期股\n做多商品"
+            d_tactics_turn := "复苏确认，加仓周期股\n⚔️做多商品"
         else if s3 == 0.5 // 陡峭 (常态)
             d_cur_mean := "经济正向运转，借短贷长获利"
-            d_tactics  := "宏观环境无虞，持有风险资产\n只要不是倒挂，安心赚钱"
+            d_tactics  := "⚔️宏观环境无虞，持有风险资产\n只要不是倒挂，安心赚钱"
             d_turn_val := "重新倒挂"
             d_tactics_turn := "再次倒挂，清仓离场\n转入防御"
         else // 熊陡
             d_cur_mean := "经济复苏强劲，预期乐观"
-            d_tactics  := "经济复苏，通胀回升\n卖美债，买周期股和大宗商品"
+            d_tactics  := "经济复苏，通胀回升\n⚔️卖美债，买周期股和大宗商品"
             d_turn_val := "重新倒挂"
             d_tactics_turn := "再次倒挂，清仓离场\n转入防御"
             
@@ -1905,38 +2018,38 @@ if barstate.islast and show_report
         // 4. 信用含义与战术
         if s4 == -1.0 and w4 > 1.0 // 熔断
             d_cur_mean := "融资断裂，破产潮来袭"
-            d_tactics  := "信用市场冻结\n仅美元现金/短债安全"
+            d_tactics  := "信用市场冻结\n🛡️仅美元现金/短债安全"
             d_turn_val := "回落至 10% 下 (危机解除)"
-            d_tactics_turn := "危机解除，报复性反弹\n买入超跌垃圾债"
+            d_tactics_turn := "危机解除，报复性反弹\n⚔️买入超跌垃圾债"
             d_risk := "危机解除"
         else if s4 == -1.0 // 恶化
             d_cur_mean := "融资成本极高，企业失血\n(信用枯竭)"
-            d_tactics  := "绝对风险过高，下降也不碰\n抛售垃圾债和小盘股"
+            d_tactics  := "绝对风险过高，下降也不碰\n🛡️抛售垃圾债和小盘股"
             d_turn_val := "回落至 6% 下 (流动性恢复)"
-            d_tactics_turn := "流动性恢复，买入小盘股\n关注困境反转"
+            d_tactics_turn := "流动性恢复，买入小盘股\n⚔️关注困境反转"
             d_risk := "流动性恢复"
         else if s4 == -0.5 // 走阔
             d_cur_mean := "避险升温，资金嫌贫爱富\n(信用收缩)"
-            d_tactics  := "减少风险资产配置\n退守大盘股或美债"
+            d_tactics  := "减少风险资产配置\n🛡️退守大盘股或美债"
             d_turn_val := "趋势向下 (压力缓解)"
-            d_tactics_turn := "压力缓解，关注信用债\n配置可转债"
+            d_tactics_turn := "压力缓解，关注信用债\n⚔️配置可转债"
             d_risk := "压力缓解"
         else if s4 == 0.0 // 压力/底部回升
             if oas_val < 3.5 // 底部回升
                 d_cur_mean := "虽在变差，但环境仍宽松\n(关注)"
                 d_tactics  := "环境宽松，无需过度紧张\n保持关注"
                 d_turn_val := "趋势向下 (虚惊一场)"
-                d_tactics_turn := "虚惊一场，继续奏乐\n维持进攻"
+                d_tactics_turn := "虚惊一场，继续奏乐\n⚔️维持进攻"
                 d_risk := "虚惊一场"
             else // 局部压力
                 d_cur_mean := "虽有压力但未失控\n(信用摇摆)"
                 d_tactics  := "金融环境尚可\n(多看少做)"
                 d_turn_val := "回落至 3.5% 下 (环境宽松)"
-                d_tactics_turn := "环境宽松，大胆加杠杆\n全仓进攻"
+                d_tactics_turn := "环境宽松，大胆加杠杆\n⚔️全仓进攻"
                 d_risk := "环境宽松"
         else // 收敛
             d_cur_mean := "资金泛滥，融资容易\n(信用扩张)"
-            d_tactics  := "风险偏好提升，资金泛滥\n买入垃圾债"
+            d_tactics  := "⚔️风险偏好提升，资金泛滥\n买入垃圾债"
             d_turn_val := "突破 3.5% (环境收紧)"
             d_tactics_turn := "环境收紧，降低杠杆\n卖出垃圾债"
             d_risk := "环境收紧"
@@ -1952,22 +2065,22 @@ if barstate.islast and show_report
             // 5. 流动性含义与战术
             if s5 == -1.0 // 枯竭
                 d_cur_mean := "极度紧缩，资产崩盘\n(水位见底)"
-                d_tactics  := "历史级货币收缩，资产重估\n极度危险，必须离场"
+                d_tactics  := "历史级货币收缩，资产重估\n🛡️极度危险，必须离场"
                 d_turn_val := "跌幅收窄 (止血)"
-                d_tactics_turn := "悲观修正，尝试性建仓\n布局错杀资产"
+                d_tactics_turn := "悲观修正，尝试性建仓\n⚔️布局错杀资产"
             else if s5 == -0.5 // 紧缩
                 d_cur_mean := "总量收缩，水位下降"
-                d_tactics  := "货币供应收缩，资金枯竭\n空仓或持有现金"
+                d_tactics  := "货币供应收缩，资金枯竭\n🛡️空仓或持有现金"
                 d_turn_val := "突破 0 轴 (开始放水)"
-                d_tactics_turn := "放水开启，全仓买入\n普涨行情起点"
+                d_tactics_turn := "放水开启，全仓买入\n⚔️普涨行情起点"
             else if s5 == 0.0 // 存量
                 d_cur_mean := "存量博弈，结构行情\n(水位震荡)"
                 d_tactics  := "资金无明显增量\n多看少做"
                 d_turn_val := "突破 0 轴 (活水注入)"
-                d_tactics_turn := "活水注入，加仓核心资产\n享受贝塔收益"
+                d_tactics_turn := "活水注入，加仓核心资产\n⚔️享受贝塔收益"
             else // 扩张
                 d_cur_mean := "流动性泛滥，万物普涨\n(水位上涨)"
-                d_tactics  := "资金充裕，美国放水\n闭眼买核心资产"
+                d_tactics  := "资金充裕，美国放水\n⚔️闭眼买核心资产"
                 d_turn_val := "跌破 0 轴 (开始抽水)"
                 d_tactics_turn := "放水结束，逐步撤退\n转入防御"
                 
@@ -1988,7 +2101,7 @@ if barstate.islast and show_report
             d_turn_val := s5 > 0 ? "跌破 0 轴" : "突破 0 轴"
             d_cur_mean := s5 > 0 ? "存款搬家进股市" : "躺平吃利息"
             d_risk := s5 < 0 ? "活水注入" : "资金空转"
-            d_tactics := (s5 < 0 ? (cn_gap < -5.0 ? "活期存款断崖下跌，现金流枯竭\n现金为王，回避一切风险资产" : "资金定期化，躺平存钱\n回避重资产，关注高股息") : (s5 > 0 ? "存款活期化，流向消费/投资\n挑真正受益于资金活化的板块" : "资金结构稳定，多看少做"))
+            d_tactics := (s5 < 0 ? (cn_gap < -5.0 ? "活期存款断崖下跌，现金流枯竭\n🛡️现金为王，回避一切风险资产" : "资金定期化，躺平存钱\n🛡️回避重资产，关注高股息") : (s5 > 0 ? "⚔️存款活期化，流向消费/投资\n挑真正受益于资金活化的板块" : "资金结构稳定，多看少做"))
             d_tactics_turn := "剪刀差收窄是第一步，转正即冲锋"
 
     else if mode == "6. 利润空间"
