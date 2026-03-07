@@ -695,9 +695,9 @@ is_cn_widening_state := cn_widening_raw
 if is_us
     // 逻辑分层
     if is_us_heat_state
-        s6 := -1.0, w6 := 2.0 // 过热
+        s6 := -1.0, w6 := 2.0 // 过热 (权重翻倍)
     else if is_us_deflation_state
-        s6 := -1.0 // 通缩
+        s6 := -1.0 // 通缩 (权重不翻倍)
     else if is_sustained(us_profit_gap < 0, bars_prof_state)
         if is_us_widening_state
             s6 := 0.5 // 困境反转 (亏损收窄)
@@ -716,9 +716,9 @@ if is_us
 
 else // CN
     if is_cn_heat_state
-        s6 := -1.0, w6 := 2.0 // 过热
+        s6 := -1.0, w6 := 2.0 // 过热 (权重翻倍)
     else if is_cn_deflation_state
-        s6 := -1.0 // 通缩
+        s6 := -1.0 // 通缩 (权重不翻倍)
     else if is_sustained(cn_profit_gap < 0, bars_prof_state)
         // 分支：收窄(修复) vs 走阔(恶化)
         if is_cn_widening_state
@@ -909,8 +909,8 @@ else
 
 // 6. 利润空间 (CPI-PPI)
 if s6 == -1.0 and w6 > 1.0 // 过热
-    t6_s := "通胀过热", t6_a := "【防御】 ⛔" + A_TECH + " ⚔️" + A_CYCLE + " 🛡️" + A_CASH
-    t6_reason := "⛔[" + A_TECH + "]: 联储加息预期升温，杀高估值\n⚔️[" + A_CYCLE + "]: 通胀环境利好资源品涨价\n🛡️[" + A_CASH + "]: 现金抗波动，等待通胀降温"
+    t6_s := "通胀过热", t6_a := "【避险】 ⛔" + A_TECH + " 🛡️" + A_CASH + "/" + A_ENERGY
+    t6_reason := "⛔[" + A_TECH + "]: 联储加息预期升温，杀高估值\n🛡️[" + A_CASH + "/" + A_ENERGY + "]: 现金抗波动，拥抱抗通胀资产"
 else if s6 == -1.0 // 通缩
     t6_s := "深度通缩", t6_a := "【避险】 ⛔" + A_CYCLE + " 🛡️" + A_CORE
     t6_reason := "⛔[" + A_CYCLE + "]: 需求崩塌，企业利润全线暴跌杀业绩\n🛡️[" + A_CORE + "]: 必选消费需求刚性，受经济周期影响小"
