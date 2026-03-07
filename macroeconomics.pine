@@ -990,7 +990,7 @@ float rgdp_plot = math.max(math.min(rgdp_val, 10.0), -10.0)
 
 plot(mode == "2. 真实利率" ? plot_val : na, "TIPS", color = dyn_c, linewidth = 2)
 plot(mode == "2. 真实利率" ? rgdp_plot : na, "RGDP", color = color.gray, linewidth = 1, style = plot.style_stepline)
-plot(mode == "2. 真实利率" ? 0.5 * rgdp_plot : na, "0.5 RGDP", color = color.new(c_yellow, 50), style = plot.style_circles)
+plot(mode == "2. 真实利率" ? 0.5 * rgdp_plot : na, "0.5 RGDP", color = color.new(c_orange, 50), style = plot.style_circles)
 
 // 真实利率风险标记 (状态切换时绘制一次性标签)
 // 逻辑: 仅在状态首次触发时，在曲线下方绘制图标+文字
@@ -1070,7 +1070,7 @@ if barstate.islast and mode == "2. 真实利率"
     
     // 0.5 RGDP 标签
     label.new(bar_index, 0.5 * rgdp_plot, "0.5 RGDP", 
-              color = color.orange, 
+              color = c_orange, 
               style = label.style_label_upper_left, 
               textcolor = c_white, 
               size = size.small, 
