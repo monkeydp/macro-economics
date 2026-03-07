@@ -120,6 +120,41 @@ calc_slope_linreg(src, len) =>
 
 calc_yoy(src, len) => (src / src[len] - 1) * 100
 
+// 计算下一次非农日期 (基于数据时间推算)
+calc_next_nfp_status(data_time, current_time) =>
+    // data_time 是当前数据的月份 (例如 1月1日)
+    // 1月数据 -> 2月发布
+    // 下一次发布(2月数据) -> 3月发布
+    // 所以目标月份 = data_time + 2个月
+    
+    int next_m = month(data_time) + 2
+    int next_y = year(data_time)
+    
+    // 处理跨年 (可能跨1年或2年，比如11月+2=13 -> 1月; 12月+2=14 -> 2月)
+    if next_m > 12
+        next_m := next_m - 12
+        next_y := next_y + 1
+        
+    // 计算该月1号
+    int t_first = timestamp(next_y, next_m, 1, 0, 0, 0)
+    int dow = dayofweek(t_first)
+    int days_add = 0
+    // dow: Sun=1 ... Fri=6 ... Sat=7
+    if dow <= 6
+        days_add := 6 - dow
+    else 
+        days_add := 6 // 周六 -> 下周五 (+6天)
+    
+    int t_next_nfp = t_first + days_add * 86400000
+    
+    // 判定是否延迟
+    // 给一点缓冲时间 (16小时)，覆盖发布时间(08:30 EST)和时区差异
+    string status = ""
+    if current_time > t_next_nfp + 57600000 
+        status := " (待同步)"
+        
+    fmt_ymd(t_next_nfp) + status
+
 float sec_per_bar = timeframe.in_seconds(timeframe.period)
 float sec_per_day = 86400
 
@@ -1685,7 +1720,7 @@ if barstate.islast and show_report
             else // 扩张
                 d_risk := "开始抽水"
         else
-            d_title := "流动性增速差\n[M1增速 - M2增速]", d_def := "M1增速 - M2增速 (信贷脉搏)\n正: 活水注入; 负: 资金空转(定期化)。"
+            d_title := "流动性增速差\n[M1增速 - M2增速]", d_def := "公式：M1增速 - M2增速 (信贷脉搏)\n正: 活水注入; 负: 资金空转(定期化)。"
             d_obs := "12月 (同比)", d_logic := "🔴 严重空转: <-5%\n🟠 空转: <0\n🟡 震荡: ≈0\n🟢 活化: >0", d_conf := "连续2个月确认"
             d_w := w5 > 1.0 ? "x2" : "x1"
             d_cur_stat := t5_s
@@ -1739,7 +1774,7 @@ if barstate.islast and show_report
             d_risk := "趋势变化"
                 
         else
-            d_title := "利润空间\n[CPI-PPI]", d_def := "CPI(售价) - PPI(成本) \n中国是全球最大制造国，重点看PPI(对应全球需求)"
+            d_title := "利润空间\n[CPI-PPI]", d_def := "公式：CPI(售价) - PPI(成本) \n中国是全球最大制造国，重点看PPI(对应全球需求)"
             d_obs := "12月 (同比)", d_logic := "🔴 过热: CPI>3%\n🔴 通缩: 双负\n🟠 亏损: <0\n🟡 承压: >0 但收窄/平\n🟢 修复: <0 但走阔\n🟢 躺赚: >0 且走阔", d_conf := "状态 2 个月确认\n\n趋势 3 个月确认"
             d_w := w6 > 1.0 ? "x2" : "x1"
             d_cur_stat := t6_s
@@ -1837,8 +1872,9 @@ if barstate.islast and show_report
         d_tactics := (s7 < 0 ? (is_cg_crash ? "极度恐慌，抛售一切资产\n只有美元和美债最安全" : (is_cg_fake_recovery ? "铜比金强但都在跌，衰退假象\n不要被比值上涨迷惑" : "实体疲软，避险主导\n买黄金/美债，规避强周期")) : (s7 > 0 ? "实体需求旺盛，风险偏好上升\n买周期股、工业大宗商品" : "方向不明，多看少做"))
 
     else if mode == "8. 萨姆规则"
-        d_title := "衰退预警\n[萨姆规则]", d_def := "实时萨姆衰退指标 | 衰退确认信号\n失业率飙升 = 消费萎缩 = 经济衰退\n历史100%准确的衰退指标"
-        d_obs := "12月 (低点)", d_logic := "🛑 衰退: ≥0.5%\n🟠 关注: ≥0.3%\n🟠 预警: ICSA>15%\n🟢 健康: <0.3%", d_conf := "非农发布日确认"
+        string next_nfp_date = calc_next_nfp_status(sahm_time, timenow)
+        d_title := "衰退预警\n[萨姆规则]", d_def := "实时萨姆衰退指标 | 衰退确认信号\n公式：失业率3月均值 - 过去12个月低点\n失业率飙升 = 消费萎缩 = 经济衰退\n历史100%准确的衰退指标"
+        d_obs := "12月 (低点)", d_logic := "🛑 衰退: ≥0.5%\n🟠 关注: ≥0.3%\n🟠 预警: ICSA>15%\n🟢 健康: <0.3%", d_conf := "非农发布日确认\n\n下次: " + next_nfp_date
         d_w := w8 > 1.0 ? "x2" : "x1"
         d_cur_stat := t8_s
         d_cur_val := str.tostring(sahm_val, "0.00") + "% | " + fmt_ym(sahm_time)
