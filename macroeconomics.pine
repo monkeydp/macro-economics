@@ -844,87 +844,87 @@ string t1_reason="", string t2_reason="", string t3_reason="", string t4_reason=
 
 // 1. 基准利率
 if s1 == -1.0
-    t1_s := "救火降息", t1_a := "【避险】 ⛔" + A_CYCLE_STRONG + "/" + A_TECH + " 🛡️" + A_GOLD + "/" + A_BOND_L
-    t1_reason := "⛔[" + A_CYCLE_STRONG + "]: 经济硬着陆杀业绩\n⛔[" + A_TECH + "]: 估值未定警惕杀估值\n🛡️[" + A_GOLD + "/" + A_BOND_L + "]: 避险资金涌入"
+    t1_s := "救火降息", t1_a := "【避险】 ⛔" + A_CYCLE + "/" + A_TECH + " 🛡️" + A_GOLD + "/" + A_BOND_L
+    t1_reason := "⛔[" + A_CYCLE + "]: 经济硬着陆确认，需求冰封杀业绩\n⛔[" + A_TECH + "]: 衰退初期风险溢价飙升，杀估值\n🛡️[" + A_GOLD + "/" + A_BOND_L + "]: 避险资金涌入，降息预期利好美债"
 else if s1 == -0.5
     t1_s := "加息周期", t1_a := "【防御】 ⛔" + A_BOND_L + "/" + A_GROWTH + " ⚠️" + A_RATE_SENS + " 🛡️" + A_BOND_S + "/" + A_USD
-    t1_reason := "⛔[" + A_BOND_L + "]: 杀久期\n⛔[" + A_GROWTH + "]: 杀估值\n⚠️[" + A_RATE_SENS + "]: 利率敏感资产承压\n🛡️[" + A_BOND_S + "]: 现金为王吃利息"
+    t1_reason := "⛔[" + A_BOND_L + "]: 利率上行直接杀久期\n⛔[" + A_GROWTH + "]: 贴现率上升压制DCF估值分母端\n⚠️[" + A_RATE_SENS + "]: 房产/公用事业等高负债行业承压\n🛡️[" + A_BOND_S + "/" + A_USD + "]: 现金为王，无风险收益率极具吸引力"
 else if s1 == 0.0
     t1_s := "央行态度暧昧", t1_a := "【观察】 ⚠️" + A_RATE_SENS
-    t1_reason := "⚠️[" + A_RATE_SENS + "]: 降息预期可能落空，波动加大"
+    t1_reason := "⚠️[" + A_RATE_SENS + "]: 降息预期反复博弈，资产波动加大"
 else
     t1_s := "降息周期", t1_a := "【进攻】 ⚔️" + A_TECH + "/" + A_BOND_L
-    t1_reason := "⚔️[" + A_TECH + "/" + A_BOND_L + "]: 资金变便宜，分母端逻辑改善"
+    t1_reason := "⚔️[" + A_TECH + "/" + A_BOND_L + "]: 资金成本下降，分母端逻辑改善，利好久期资产"
 
 // 2. 真实利率
 if s2 == -1.0
     if rgdp_val < 0
         t2_s := "滞胀萧条", t2_a := "【避险】 ⛔" + A_CYCLE + "/" + A_TECH + " 🛡️" + A_USD + "/" + A_GOLD
-        t2_reason := "⛔[" + A_CYCLE + "]: 经济停滞杀业绩\n⛔[" + A_TECH + "]: 高通胀杀估值\n🛡️[" + A_GOLD + "]: 股债双杀，实物抗通胀"
+        t2_reason := "⛔[" + A_CYCLE + "]: 经济停滞导致需求端杀业绩\n⛔[" + A_TECH + "]: 高通胀推高名义利率，杀估值\n🛡️[" + A_GOLD + "]: 股债双杀，实物黄金抗通胀且无违约风险"
     else
         t2_s := "虹吸效应", t2_a := "【避险】 ⛔" + A_HIGH_VAL + "/" + A_TECH + " 🛡️" + A_USD + "/" + A_BOND_S
-        t2_reason := "⛔[" + A_HIGH_VAL + "]: 无风险收益过高虹吸资金\n⛔[" + A_TECH + "]: 科技股压力大\n🛡️[" + A_USD + "]: 回流美元现金"
+        t2_reason := "⛔[" + A_HIGH_VAL + "]: 无风险收益过高(TIPS>RGDP)，资金回流债市\n⛔[" + A_TECH + "]: 风险溢价不足以补偿持有成本\n🛡️[" + A_USD + "/" + A_BOND_S + "]: 回流美元现金，坐享高息"
 else if s2 == -0.5
     t2_s := "杀估值 ", t2_a := "【防御】 ⛔" + A_HIGH_VAL + "/" + A_TECH + " 🛡️" + A_CORE
-    t2_reason := "⛔[" + A_HIGH_VAL + "]: 实际资金成本过高压制估值\n⛔[" + A_TECH + "]: 科技股承压\n🛡️[" + A_CORE + "]: 防御性资产抗跌"
+    t2_reason := "⛔[" + A_HIGH_VAL + "]: 实际资金成本过高，压制高PE板块\n⛔[" + A_TECH + "]: 成长股对资金成本最敏感\n🛡️[" + A_CORE + "]: 低估值、高股息资产具备防御属性"
 else if s2 == 0.0
     t2_s := "资金成本变贵", t2_a := "【观察】 ⚠️" + A_HIGH_VAL
-    t2_reason := "⚠️[" + A_HIGH_VAL + "]: 资金成本上升未见顶，风险累积"
+    t2_reason := "⚠️[" + A_HIGH_VAL + "]: 资金成本上升未见顶，风险收益比下降"
 else if s2 == 1.0
     if tips_live < 0
         t2_s := "负利率", t2_a := "【进攻】 ⚔️" + A_GOLD + "/" + A_CRYPTO
-        t2_reason := "⚔️[" + A_GOLD + "/" + A_CRYPTO + "]: 货币贬值，资产泡沫化，抗贬值资产受益"
+        t2_reason := "⚔️[" + A_GOLD + "/" + A_CRYPTO + "]: 货币购买力贬值，资产泡沫化，抗贬值资产受益"
     else
         t2_s := "健康支撑", t2_a := "【进攻】 ⚔️" + A_TECH + "/" + A_GROWTH
-        t2_reason := "⚔️[" + A_TECH + "]: 实际利率低位，利好股市估值扩张"
+        t2_reason := "⚔️[" + A_TECH + "]: 实际利率低位(TIPS<0.5RGDP)，利好股市估值扩张"
 
 // 3. 利差结构
 if s3 == -1.0
     t3_s := "牛陡 ", t3_a := "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + " ⚠️全市场 🛡️" + A_BOND_US + "/" + A_GOLD
-    t3_reason := "⛔[" + A_CYCLE + "]: 衰退确认杀业绩\n⛔[" + A_TECH + "]: 恐慌抛售杀估值\n⚠️[全市场]: 泥沙俱下\n🛡️[" + A_BOND_US + "]: 避险买美债"
+    t3_reason := "⛔[" + A_CYCLE + "]: 衰退确认，需求断崖式下跌杀业绩\n⛔[" + A_TECH + "]: 市场恐慌抛售一切风险资产\n⚠️[全市场]: 泥沙俱下，覆巢之下无完卵\n🛡️[" + A_BOND_US + "]: 资金涌入避险，且降息预期推升债价"
 else if s3 == -0.5
-    t3_s := "倒挂 ", t3_a := "【防御】 ⛔" + A_CYCLE_STRONG + "/" + A_TECH + " 🛡️" + A_CASH_ONLY + "/" + A_DIV
-    t3_reason := "⛔[" + A_CYCLE_STRONG + "]: 长期经济前景堪忧杀周期\n⛔[" + A_TECH + "]: 衰退初期杀估值\n🛡️[" + A_CASH_ONLY + "]: 收缩战线防御"
+    t3_s := "倒挂 ", t3_a := "【防御】 ⛔" + A_CYCLE + "/" + A_TECH + " 🛡️" + A_CASH_ONLY + "/" + A_DIV
+    t3_reason := "⛔[" + A_CYCLE + "]: 长期经济前景堪忧，提前计价衰退\n⛔[" + A_TECH + "]: 衰退初期杀估值逻辑主导\n🛡️[" + A_CASH_ONLY + "]: 收缩战线，配置防御性资产过冬"
 else if s3 == 0.0
     t3_s := "长短债博弈激烈", t3_a := "【观察】 ⚠️" + A_BOND_LONG
-    t3_reason := "⚠️[" + A_BOND_LONG + "]: 通胀反弹风险未除，波动大"
+    t3_reason := "⚠️[" + A_BOND_LONG + "]: 通胀反弹风险未除，长端利率波动大"
 else if s3 == 0.5
     t3_s := "陡峭", t3_a := "【进攻】 ⚔️" + A_TECH + "/" + A_CORE
-    t3_reason := "⚔️[" + A_CORE + "]: 宏观环境回归常态，利好核心资产"
+    t3_reason := "⚔️[" + A_CORE + "]: 宏观环境回归常态，利好核心资产稳健增长"
 else
     t3_s := "熊陡", t3_a := "【进攻】 ⚔️" + A_CYCLE_S + "/" + A_COMM
-    t3_reason := "⚔️[" + A_CYCLE_S + "]: 通胀回升，经济强劲，利好商品和周期股"
+    t3_reason := "⚔️[" + A_CYCLE_S + "]: 通胀温和回升，经济强劲，利好上游资源"
 
 // 4. 信用风险
 if s4 == -1.0 and w4 > 1.0
     t4_s := "信用崩盘", t4_a := "【清仓】 ⛔" + A_JUNK + " ⚠️全市场 🛡️" + A_CASH
-    t4_reason := "⛔[" + A_JUNK + "]: 企业融资链条断裂\n⚠️[全市场]: 流动性危机波及全场\n🛡️[" + A_CASH + "]: 现金最安全"
+    t4_reason := "⛔[" + A_JUNK + "]: 企业融资链条断裂，违约风险剧增\n⚠️[全市场]: 流动性危机波及全场，无差别抛售\n🛡️[" + A_CASH + "]: 现金最安全，等待危机解除"
 else if s4 == -1.0
     t4_s := "严重恶化", t4_a := "【避险】 ⛔" + A_JUNK + "/" + A_SMALL_S + " 🛡️" + A_BOND_S
-    t4_reason := "⛔[" + A_JUNK + "]: 市场风险偏好极度下降\n⛔[" + A_SMALL_S + "]: 流动性差的资产难变现\n🛡️[" + A_BOND_S + "]: 短债流动性好"
+    t4_reason := "⛔[" + A_JUNK + "]: 市场风险偏好极度下降，抛售高风险债\n⛔[" + A_SMALL_S + "]: 流动性差的资产难变现，折价出售\n🛡️[" + A_BOND_S + "]: 短债流动性好且无本金风险"
 else if s4 == -0.5
     t4_s := "风险走阔 ⚠️收缩", t4_a := "【防御】 ⛔" + A_JUNK + " ⚠️" + A_SMALL_S + " 🛡️" + A_CORE
-    t4_reason := "⛔[" + A_JUNK + "]: 资金避险情绪升温，抛售高风险债\n⚠️[" + A_SMALL_S + "]: 小盘股融资难\n🛡️[" + A_CORE + "]: 红利股稳健"
+    t4_reason := "⛔[" + A_JUNK + "]: 资金避险情绪升温，抛售高风险债\n⚠️[" + A_SMALL_S + "]: 融资成本上升，小盘股经营压力大\n🛡️[" + A_CORE + "]: 现金流充沛的企业更受青睐"
 else if s4 == 0.0
     if oas_val < 3.5
         t4_s := "底部回升", t4_a := "【观察】 ⚠️" + A_JUNK
-        t4_reason := "⚠️[" + A_JUNK + "]: 信用风险触底反弹，压力显现"
+        t4_reason := "⚠️[" + A_JUNK + "]: 信用风险触底反弹，利差有走阔压力"
     else
         t4_s := "局部压力", t4_a := "【观察】 ⚠️伪成长"
-        t4_reason := "⚠️[伪成长]: 部分企业融资困难，面临出清"
+        t4_reason := "⚠️[伪成长]: 部分企业融资困难，面临出清风险"
 else
     t4_s := "风险收敛", t4_a := "【进攻】 ⚔️" + A_JUNK + "/" + A_SMALL_S
-    t4_reason := "⚔️[" + A_JUNK + "]: 资金泛滥追逐高收益，弹性大"
+    t4_reason := "⚔️[" + A_JUNK + "]: 资金泛滥追逐高收益，高弹性资产受益"
 
 // 5. 流动性 (M2)
     if s5 == -1.0 // 熔断
         t5_s := is_us ? "流动性枯竭" : "严重空转"
         t5_a := "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + " 🛡️" + A_CASH
-        t5_reason := "⛔[" + A_CYCLE + "/" + A_TECH + "]: 市场流动性枯竭，无差别杀跌\n🛡️[" + A_CASH + "]: 现金为王"
+        t5_reason := "⛔[" + A_CYCLE + "/" + A_TECH + "]: 市场流动性枯竭，无差别杀跌\n🛡️[" + A_CASH + "]: 现金为王，保住本金"
     else if s5 == -0.5
         t5_s := is_us ? "收缩" : "资金空转"
         t5_a := "【防御】 ⛔" + A_CYCLE + " ⚠️" + A_EDGE_SMALL + " 🛡️" + A_CORE
-        t5_reason := "⛔[" + A_CYCLE + "]: 货币供应量收缩杀业绩\n⚠️[" + A_EDGE_SMALL + "]: 缺乏流动性\n🛡️[" + A_CORE + "]: 红利股抗跌"
+        t5_reason := "⛔[" + A_CYCLE + "]: 货币供应量收缩，总需求下降杀业绩\n⚠️[" + A_EDGE_SMALL + "]: 缺乏流动性支持，估值回归\n🛡️[" + A_CORE + "]: 股息提供安全垫，抗跌属性强"
     else if s5 == 0.0
         if is_us
             t5_s := "市场增量不足", t5_a := "【观察】 ⚠️" + A_EDGE_SMALL
@@ -935,64 +935,64 @@ else
     else
         t5_s := is_us ? "扩张" : "资金活化"
         t5_a := "【进攻】 ⚔️" + A_TECH + "/" + A_CORE
-        t5_reason := "⚔️[" + A_CORE + "]: 资金充裕推升资产价格，核心资产受益"
+        t5_reason := "⚔️[" + A_CORE + "]: 资金充裕推升资产价格，核心资产率先受益"
 
     // 6. 利润空间 (CPI-PPI)
     if s6 == -2.0 // 过热
         t6_s := "通胀过热", t6_a := "【防御】 ⛔" + A_TECH + " ⚔️" + A_CYCLE + " 🛡️" + A_CASH
-        t6_reason := "⛔[" + A_TECH + "]: 联储加息预期杀高估值\n⚔️[" + A_CYCLE + "]: 通胀利好资源品\n🛡️[" + A_CASH + "]: 现金抗波动"
+        t6_reason := "⛔[" + A_TECH + "]: 联储加息预期升温，杀高估值\n⚔️[" + A_CYCLE + "]: 通胀环境利好资源品涨价\n🛡️[" + A_CASH + "]: 现金抗波动，等待通胀降温"
     else if s6 == -1.0 // 通缩
         t6_s := "深度通缩", t6_a := "【避险】 ⛔" + A_CYCLE + " 🛡️" + A_CORE
-        t6_reason := "⛔[" + A_CYCLE + "]: 企业利润全线暴跌杀周期\n🛡️[" + A_CORE + "]: 必选消费需求刚性"
+        t6_reason := "⛔[" + A_CYCLE + "]: 需求崩塌，企业利润全线暴跌杀业绩\n🛡️[" + A_CORE + "]: 必选消费需求刚性，受经济周期影响小"
     else if s6 == -0.5 // 亏损
         t6_s := "亏损恶化", t6_a := "【防御】 ⛔" + A_CYCLE_MID + " ⚔️" + A_CYCLE_UP
-        t6_reason := "⛔[" + A_CYCLE_MID + "]: 成本高企挤压中游利润\n⚔️[" + A_CYCLE_UP + "]: 上游资源涨价受益"
+        t6_reason := "⛔[" + A_CYCLE_MID + "]: 成本高企、售价难涨，两头受挤压\n⚔️[" + A_CYCLE_UP + "]: 涨价受益方，利润向.上游集中"
     else if s6 == 0.0
         if is_us
             t6_s := "企业增长停滞", t6_a := "【观察】 ⚠️" + A_HOMOG
-            t6_reason := "⚠️[" + A_HOMOG + "]: 价格战侵蚀企业利润，同质化竞争惨烈"
+            t6_reason := "⚠️[" + A_HOMOG + "]: 价格战侵蚀企业利润，无护城河企业出清"
         else
             t6_s := "行业内卷加剧", t6_a := "【观察】 ⚠️" + A_HOMOG
             t6_reason := "⚠️[" + A_HOMOG + "]: 价格战侵蚀利润"
     else if s6 == 0.5
         t6_s := "困境反转", t6_a := "【进攻】 ⚔️" + A_CYCLE_MID
-        t6_reason := "⚔️[" + A_CYCLE_MID + "]: 企业盈利触底回升，中游修复弹性大"
+        t6_reason := "⚔️[" + A_CYCLE_MID + "]: 成本下降或需求回暖，盈利触底回升弹性大"
     else
         t6_s := "利润走阔", t6_a := "【进攻】 ⚔️" + A_TECH + "/" + A_CORE
-        t6_reason := "⚔️[" + A_TECH + "]: 业绩驱动股价上涨，戴维斯双击"
+        t6_reason := "⚔️[" + A_TECH + "]: 业绩驱动股价上涨，享受戴维斯双击"
 
     // 7. 实体热度 (铜金)
     if s7 == -1.0 // 崩盘
-        t7_s := "实体崩盘", t7_a := "【避险】 ⛔" + A_CYCLE_STRONG + "/" + A_CYCLE + " 🛡️" + A_BOND_US + "/" + A_GOLD
-        t7_reason := "⛔[" + A_CYCLE_STRONG + "]: 实体需求信心崩塌杀周期\n⛔[" + A_CYCLE + "]: 衰退预期浓厚\n🛡️[" + A_BOND_US + "]: 避险买债金"
+        t7_s := "实体崩盘", t7_a := "【避险】 ⛔" + A_CYCLE + " ⚠️" + A_CYCLE + " 🛡️" + A_BOND_US + "/" + A_GOLD
+        t7_reason := "⛔[" + A_CYCLE + "]: 实体需求信心崩塌，杀业绩主跌浪\n⛔[" + A_CYCLE + "]: 市场一致性交易衰退预期\n🛡️[" + A_BOND_US + "/" + A_GOLD + "]: 避险买盘涌入，对冲经济下行风险"
     else if s7 == -0.5
         if cg_ratio < cg_ratio[1] // 衰退
             t7_s := "衰退交易", t7_a := "【防御】 ⛔" + A_CYCLE + " 🛡️" + A_GOLD
-            t7_reason := "⛔[" + A_CYCLE + "]: 市场交易衰退预期杀周期\n🛡️[" + A_GOLD + "]: 黄金对冲衰退"
+            t7_reason := "⛔[" + A_CYCLE + "]: 制造业景气度下行，需求不足\n🛡️[" + A_GOLD + "]: 经济下行压力下，黄金具备对冲属性"
         else // 伪复苏
             t7_s := "伪复苏", t7_a := "【观察】 ⚠️" + A_CYCLE
-            t7_reason := "⚠️[" + A_CYCLE + "]: 仅金价上涨非真实需求，反弹不可持续"
+            t7_reason := "⚠️[" + A_CYCLE + "]: 仅金价上涨掩盖铜价疲软，非真实需求改善"
     else if s7 == 0.0
         t7_s := "下游需求不明", t7_a := "【观察】 ⚠️" + A_CYCLE_STRONG
-        t7_reason := "⚠️[" + A_CYCLE_STRONG + "]: 工厂补库意愿疲弱，难有表现"
+        t7_reason := "⚠️[" + A_CYCLE_STRONG + "]: 工厂补库意愿疲弱，缺乏上涨动力"
     else
         t7_s := "复苏", t7_a := "【进攻】 ⚔️" + A_CYCLE
-        t7_reason := "⚔️[" + A_CYCLE + "]: 工业生产供销两旺，利好周期股"
+        t7_reason := "⚔️[" + A_CYCLE + "]: 工业生产供销两旺，量价齐升利好周期股"
 
 // 8. 萨姆规则
 if s8 == -1.0
     t8_s := "衰退确认", t8_a := "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + " ⚠️全市场 🛡️" + A_BOND_US
-    t8_reason := "⛔[" + A_CYCLE + "/" + A_TECH + "]: 失业率飙升确认衰退，杀业绩杀估值\n⚠️[全市场]: 泥沙俱下\n🛡️[" + A_BOND_US + "]: 美债避险"
+    t8_reason := "⛔[" + A_CYCLE + "/" + A_TECH + "]: 失业率飙升确认衰退，杀业绩叠加杀估值\n⚠️[全市场]: 泥沙俱下，系统性风险爆发\n🛡️[" + A_BOND_US + "]: 衰退期唯一确定的避险资产"
 else if s8 == -0.5
     if sahm_val >= 0.3
         t8_s := "风险关注", t8_a := "【防御】 ⛔" + A_CYCLE + "/" + A_RISK + " 🛡️" + A_BOND_US
-        t8_reason := "⛔[" + A_CYCLE + "]: 萨姆法则触发临界点，周期股最先反应\n⛔[" + A_RISK + "]: 风险资产承压\n🛡️[" + A_BOND_US + "]: 美债避险"
+        t8_reason := "⛔[" + A_CYCLE + "]: 萨姆法则触发临界点，强周期板块最先反应\n⛔[" + A_RISK + "]: 衰退预期升温，风险偏好逆转\n🛡️[" + A_BOND_US + "]: 避险买盘提前布局降息预期"
     else
         t8_s := "ICSA预警", t8_a := "【防御】 ⛔" + A_CONS + " 🛡️" + A_CASH_ONLY
-        t8_reason := "⛔[" + A_CONS + "]: 失业人数超预期恶化，打击消费意愿\n🛡️[" + A_CASH_ONLY + "]: 现金观望"
+        t8_reason := "⛔[" + A_CONS + "]: 失业人数超预期恶化，打击居民收入与消费意愿\n🛡️[" + A_CASH_ONLY + "]: 局势不明朗，现金观望"
 else
     t8_s := "就业健康", t8_a := "【进攻】 ⚔️" + A_TECH + "/" + A_CONS
-    t8_reason := "⚔️[" + A_TECH + "/" + A_CONS + "]: 居民收入支撑消费，经济强劲利好科技"
+    t8_reason := "⚔️[" + A_TECH + "/" + A_CONS + "]: 居民收入增长支撑消费，经济强劲利好科技基本面"
 
 // 绘制主图曲线
 float plot_val = 0.0
