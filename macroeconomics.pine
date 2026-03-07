@@ -639,51 +639,62 @@ is_cn_widening_state := cn_widening_raw
 if region == "美国"
     // 逻辑分层
     if is_us_heat_state
-        s6 := -1.0 // 通胀过热 (政策收紧)
-        w6 := 2.0  // 熔断级关注
+        s6 := -1.0, w6 := 2.0 // 过热
+        t6_s := "通胀过热 (政策收紧)", t6_a := "【避险】 ⛔成长股 | ✅现金/能源"
     else if is_us_deflation_state
-        s6 := -1.0 // 深度通缩 (需求崩塌)
+        s6 := -1.0 // 通缩
+        t6_s := "深度通缩 (需求崩塌)", t6_a := "【避险】 ⛔周期股 | ✅必选消费"
     else if is_sustained(us_profit_gap < 0, bars_prof_state)
         if is_us_widening_state
             s6 := 0.5 // 困境反转 (亏损收窄)
+            t6_s := "困境反转 (亏损收窄)", t6_a := "【进攻】 ⛔防御股 | ✅反转股"
         else
             s6 := -0.5 // 亏损恶化 (成本倒挂)
+            t6_s := "亏损恶化 (成本倒挂)", t6_a := "【防御】 ⛔中游制造 | ✅上游资源"
     else if is_sustained(us_profit_gap > 0, bars_prof_state)
         // 分支：走阔(躺赚) vs 其他(承压)
         if is_us_widening_state
             s6 := 1.0 // 利润走阔 (躺赚时刻)
+            t6_s := "利润走阔 (躺赚时刻)", t6_a := "【进攻】 ⛔上游资源 | ✅消费/中下游"
         else
             // 收窄 或 走平
             s6 := 0.0 // 🟡 利润承压 (增长停滞)
+            t6_s := "利润承压 (增长停滞)", t6_a := "【观察】 ⛔同质化 | ✅提价权龙头"
     else
         // 震荡区 (正负切换期间，或未满2个月确认期)
         s6 := 0.0 
+        t6_s := "利润震荡 (方向不明)"
+        t6_a := "【观察】 多看少做" 
 
 else // CN
     if is_cn_heat_state
-        s6 := -1.0 
-        w6 := 2.0
+        s6 := -1.0, w6 := 2.0 // 过热
         t6_s := "通胀过热 (政策收紧)", t6_a := "【避险】 ⛔成长股 | ✅现金/能源"
     else if is_cn_deflation_state
-        s6 := -1.0
-        t6_s := "深度通缩 (需求崩塌)", t6_a := "【避险】 ⛔周期股 | ✅必选消费"
-    else if is_sustained(cn_profit_gap < 0, bars_prof_state) // 亏损
-        if is_cn_widening_state // 亏损收窄
-            s6 := 0.5
+        s6 := -1.0 // 通缩
+        t6_s := "深度通缩 (需求崩塌)", t6_a := "【避险】 ⛔周期/消费 | ✅红利/国债"
+    else if is_sustained(cn_profit_gap < 0, bars_prof_state)
+        // 分支：收窄(修复) vs 走阔(恶化)
+        if is_cn_widening_state
+            s6 := 0.5 // 困境反转
             t6_s := "困境反转 (亏损收窄)", t6_a := "【进攻】 ⛔防御股 | ✅反转股"
         else
-            s6 := -0.5
+            s6 := -0.5 // 亏损恶化
             t6_s := "亏损恶化 (成本倒挂)", t6_a := "【防御】 ⛔中游制造 | ✅上游资源"
-    else if is_sustained(cn_profit_gap > 0, bars_prof_state) // 盈利
-        if is_cn_widening_state // 走阔
-            s6 := 1.0
+    else if is_sustained(cn_profit_gap > 0, bars_prof_state)
+        // 分支：走阔(躺赚) vs 其他(承压)
+        if is_cn_widening_state
+            s6 := 1.0 // 利润走阔
             t6_s := "利润走阔 (躺赚时刻)", t6_a := "【进攻】 ⛔上游资源 | ✅消费/中下游"
         else
-            s6 := 0.0
+            // 收窄 或 走平
+            s6 := 0.0 // 🟡 利润承压 (增长停滞)
             t6_s := "利润承压 (增长停滞)", t6_a := "【观察】 ⛔同质化 | ✅提价权龙头"
     else
-        s6 := 0.0
-        t6_s := "利润承压 (震荡)", t6_a := "【观察】 多看少做"
+        // 震荡区 (正负切换期间，或未满2个月确认期)
+        s6 := 0.0 
+        t6_s := "利润震荡 (方向不明)"
+        t6_a := "【观察】 多看少做"
 
 // 7. 实体热度
 // 引入连续确认逻辑 (连续 N 日)
@@ -860,38 +871,6 @@ else
 // 逻辑移至计算模块，因为涉及复杂的趋势判定
 // t6_s, t6_a 已在上方赋值，这里需要重新根据新格式覆盖
 
-// 重新处理利润空间文案 (为了统一格式)
-if region == "美国"
-    if is_us_heat_state
-        t6_a := "【避险】 ⛔成长股 | ✅现金/能源"
-    else if is_us_deflation_state
-        t6_a := "【避险】 ⛔周期股 | ✅必选消费"
-    else if s6 == 0.5 // 困境反转
-        t6_a := "【进攻】 ⛔防御股 | ✅反转股"
-    else if s6 == -0.5 // 亏损恶化
-        t6_a := "【防御】 ⛔中游制造 | ✅上游资源"
-    else if s6 == 1.0 // 利润走阔
-        t6_a := "【进攻】 ⛔上游资源 | ✅消费/中下游"
-    else if s6 == 0.0 and us_profit_gap > 0 // 利润承压
-        t6_a := "【观察】 ⛔同质化 | ✅提价权龙头"
-    else
-        t6_a := "【观察】 多看少做"
-else // CN
-    if is_cn_heat_state
-        t6_a := "【避险】 ⛔成长股 | ✅现金/能源"
-    else if is_cn_deflation_state
-        t6_a := "【避险】 ⛔周期股 | ✅必选消费"
-    else if s6 == 0.5 // 困境反转
-        t6_a := "【进攻】 ⛔防御股 | ✅反转股"
-    else if s6 == -0.5 // 亏损恶化
-        t6_a := "【防御】 ⛔中游制造 | ✅上游资源"
-    else if s6 == 1.0 // 利润走阔
-        t6_a := "【进攻】 ⛔上游资源 | ✅消费/中下游"
-    else if s6 == 0.0 and cn_profit_gap > 0 // 利润承压
-        t6_a := "【观察】 ⛔同质化 | ✅提价权龙头"
-    else
-        t6_a := "【观察】 多看少做"
-
 
 // 7. 实体热度
 if s7 == -1.0
@@ -902,7 +881,7 @@ else if s7 == -0.5
     else
         t7_s := "实体衰退 (弃修鱼池)", t7_a := "【防御】 ⛔强周期 | ✅黄金/美债"
 else if s7 == 0.0
-    t7_s := "实体震荡", t7_a := "【观察】 多看少做"
+    t7_s := "实体震荡", t7_a := "【观察】 方向未定 | ⚠️多看少做"
 else
     t7_s := "实体复苏 (扩建鱼池)", t7_a := "【进攻】 ⛔避险资产 | ✅周期股/工业品"
 
