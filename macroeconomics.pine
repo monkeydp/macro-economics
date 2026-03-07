@@ -1490,15 +1490,6 @@ if barstate.islast and show_report
     color final_bg_trans = color.new(final_bg, 25)
     table.cell(rpt, 5, 10, final_res, bgcolor = final_bg_trans, text_color = final_txt)
     
-    // 组合双轨制建议
-    // 截断过长的字符串 (简单的截断，防止UI撑爆)
-    if str.length(line_risk) > 25
-        line_risk := str.substring(line_risk, 0, 25) + "..."
-    if str.length(line_safe) > 25
-        line_safe := str.substring(line_safe, 0, 25) + "..."
-    if str.length(line_warn) > 25
-        line_warn := str.substring(line_warn, 0, 25) + "..."
-    
     string final_full_sugg = line_risk + "\n" + line_safe + "\n" + line_warn
     table.cell(rpt, 6, 10, final_full_sugg, bgcolor = final_bg_trans, text_color = final_txt, text_halign = text.align_left)
 
