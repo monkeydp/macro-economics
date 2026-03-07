@@ -501,8 +501,10 @@ if is_sustained(rgdp_val < 0, bars_tips_conf)
     s2 := -1.0 // 滞胀/萧条
 else if is_sustained(tips_live >= rgdp_val, bars_tips_conf)
     s2 := -1.0 // 虹吸
-else if is_sustained(tips_live >= 0.5 * rgdp_val, bars_tips_conf)
+else if is_sustained(tips_live >= 0.75 * rgdp_val, bars_tips_conf)
     s2 := -0.5 // 杀估值
+else if is_sustained(tips_live >= 0.5 * rgdp_val, bars_tips_conf)
+    s2 := 0.0  // 资金成本上升
 else if is_sustained(tips_live < 0, bars_tips_conf)
     s2 := 1.0  // 负利率
 else
@@ -799,6 +801,8 @@ if s2 == -1.0
         t2_s := "虹吸", t2_a := "【避险】 ⛔所有风险资产 | ✅美元/短债"
 else if s2 == -0.5
     t2_s := "杀估值", t2_a := "【防御】 ⛔高估值/加密 | ✅核心/红利"
+else if s2 == 0.0
+    t2_s := "资金成本上升", t2_a := "【观察】 多看少做"
 else if s2 == 1.0
     if tips_live < 0
         t2_s := "负利率", t2_a := "【进攻】 ⛔美元 | ✅黄金/加密"
@@ -986,7 +990,7 @@ float rgdp_plot = math.max(math.min(rgdp_val, 10.0), -10.0)
 
 plot(mode == "2. 真实利率" ? plot_val : na, "TIPS", color = dyn_c, linewidth = 2)
 plot(mode == "2. 真实利率" ? rgdp_plot : na, "RGDP", color = color.gray, linewidth = 1, style = plot.style_stepline)
-plot(mode == "2. 真实利率" ? 0.5 * rgdp_plot : na, "0.5 RGDP", color = color.new(color.orange, 50), style = plot.style_circles)
+plot(mode == "2. 真实利率" ? 0.5 * rgdp_plot : na, "0.5 RGDP", color = color.new(c_yellow, 50), style = plot.style_circles)
 
 // 真实利率风险标记 (状态切换时绘制一次性标签)
 // 逻辑: 仅在状态首次触发时，在曲线下方绘制图标+文字
@@ -1541,7 +1545,7 @@ if barstate.islast and show_report
 
     else if mode == "2. 真实利率"
         d_title := "真实利率\n[TIPS]", d_def := "10年期通胀保值债券收益率\nTIPS 上行 = 资金流出风险资产(买美债)\nTIPS 下行 = 资金流入风险资产(买股票)\nTIPS ≥ RGDP，会对风险资产产生‘虹吸效应’"
-        d_obs := "日线 (实时)", d_logic := "🔴 滞胀: RGDP < 0\n🔴 虹吸: ≥ RGDP\n🟠 杀估值: ≥ 0.5RGDP\n🟢 健康: < 0.5RGDP\n🟢 负利率: < 0", d_conf := "连续5日确认"
+        d_obs := "日线 (实时)", d_logic := "🔴 滞胀: RGDP < 0\n🔴 虹吸: ≥ RGDP\n🟠 杀估值: ≥ 0.75RGDP\n🟡 震荡: ≥ 0.5RGDP\n🟢 健康: < 0.5RGDP\n🟢 负利率: < 0", d_conf := "连续5日确认"
         d_w := w2 > 1.0 ? "x2" : "x1"
         d_cur_stat := t2_s
         d_cur_val := str.tostring(tips_live, "0.00") + "% | " + fmt_ymd(tips_time)
@@ -1561,8 +1565,13 @@ if barstate.islast and show_report
         else if s2 == -0.5 // 杀估值
             d_cur_mean := "实际资金成本过高，压制估值"
             d_tactics  := "买低估值红利股\n规避高估值成长股"
-            d_turn_val := "跌破 0.5 RGDP"
-            d_tactics_turn := "估值压制解除，买入成长股\n科技股迎来春天"
+            d_turn_val := "跌破 0.75 RGDP"
+            d_tactics_turn := "估值压制解除，进入震荡\n多看少做"
+        else if s2 == 0.0 // 资金成本上升
+            d_cur_mean := "资金成本上升，尚未杀估值"
+            d_tactics  := "环境开始变差\n多看少做"
+            d_turn_val := "跌破 0.5 RGDP (健康)"
+            d_tactics_turn := "资金成本适宜，买入成长股\n科技股迎来春天"
         else if s2 == 1.0
             if tips_live < 0 // 负利率
                 d_cur_mean := "实际利率为负，资产泡沫化"
@@ -1573,7 +1582,7 @@ if barstate.islast and show_report
                 d_cur_mean := "资金成本适宜，利好股市"
                 d_tactics  := "安心持有成长股\n享受估值溢价"
                 d_turn_val := tips_live >= 0.5 * rgdp_val ? "突破 0.5 RGDP（确认中）" : "突破 0.5 RGDP"
-                d_tactics_turn := "实际利率上行，减仓高估值\n切换至价值股"
+                d_tactics_turn := "实际利率上行，转入震荡\n多看少做"
             
         if s2 == -1.0
             if rgdp_val < 0 // 滞胀
@@ -1582,11 +1591,13 @@ if barstate.islast and show_report
                 d_risk := "压力缓解"
         else if s2 == -0.5 // 杀估值
             d_risk := "估值修复"
+        else if s2 == 0.0 // 震荡
+            d_risk := "压力缓解"
         else if s2 == 1.0
             if tips_live < 0 // 负利率
                 d_risk := "泡沫破裂"
             else // 健康
-                d_risk := "压力增大"
+                d_risk := "进入震荡"
         else
             d_risk := "方向未定"
 
@@ -1943,10 +1954,12 @@ if barstate.islast and show_report
                 turn_score_disp := 1.0
             else // 虹吸 -> 压力缓解/杀估值 (橙)
                 turn_score_disp := -0.5
-        else if s2 == -0.5 // 杀估值 -> 修复 (绿)
+        else if s2 == -0.5 // 杀估值 -> 震荡 (黄)
+            turn_score_disp := 0.0
+        else if s2 == 0.0 // 震荡 -> 健康 (绿)
             turn_score_disp := 1.0
-        else // 健康/负利率 -> 压力/泡沫退潮 (橙)
-            turn_score_disp := -0.5
+        else // 健康/负利率 -> 压力/泡沫退潮 (黄)
+            turn_score_disp := 0.0
             
     else if mode == "3. 利差结构"
         cur_score_disp := s3
