@@ -1730,7 +1730,8 @@ if barstate.islast and show_report
     table.cell(rpt, 0, 10, "最终诊断", bgcolor = c_bg, text_color = c_white), table.merge_cells(rpt, 0, 10, 1, 10)
     
     // (2) 总分
-    color score_c = total_score > 0 ? c_lime : (total_score < 0 ? c_red : c_yellow)
+    // 颜色逻辑需与最终诊断(final_res)的区间保持一致
+    color score_c = total_score > 5.0 ? c_super_green : (total_score >= 1.5 ? c_lime : (total_score >= -1.5 ? c_yellow : (total_score >= -5.0 ? c_orange : c_red)))
     table.cell(rpt, 2, 10, str.tostring(total_score, "0.0"), bgcolor = c_bg, text_color = score_c)
     
     // (3) 理论上限
