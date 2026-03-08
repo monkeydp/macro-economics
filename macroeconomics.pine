@@ -157,8 +157,8 @@ if barstate.isfirst
     // --- 1. 基准利率 (EFFR) ---
     // 救火: 避险(黄金/长债), 否决(周期/科技)
     register_state("S1_PANIC", -1.0, 1.0, "救火降息", "【避险】 ⛔" + A_CYCLE + "/" + A_TECH + " 🛡️" + A_GOLD + "/" + A_BOND_L, "⛔[" + A_CYCLE + "]: 经济硬着陆确认，需求冰封杀业绩\n⛔[" + A_TECH + "]: 衰退初期风险溢价飙升，杀估值\n🛡️[" + A_GOLD + "/" + A_BOND_L + "]: 避险资金涌入，降息预期利好美债", c_red)
-    // 加息: 防御(现金/短债), 否决(长债/科技), 警惕(科技/长债)
-    register_state("S1_HIKE",  -0.5, 1.0, "加息周期", "【防御】 ⛔" + A_BOND_L + "/" + A_TECH + " ⚠️" + A_SMALL + " 🛡️" + A_CASH, "⛔[" + A_BOND_L + "]: 利率上行直接杀久期\n⛔[" + A_TECH + "]: 贴现率上升压制DCF估值分母端\n⚠️[" + A_TECH + "]: 房产/公用事业等高负债行业承压\n🛡️[" + A_CASH + "]: 现金为王，无风险收益率极具吸引力", c_orange)
+    // 加息: 防御(现金/短债), 否决(长债/科技), 警惕(小盘)
+    register_state("S1_HIKE",  -0.5, 1.0, "加息周期", "【防御】 ⛔" + A_BOND_L + "/" + A_TECH + " ⚠️" + A_SMALL + " 🛡️" + A_CASH, "⛔[" + A_BOND_L + "]: 利率上行直接杀久期\n⛔[" + A_TECH + "]: 贴现率上升压制DCF估值分母端\n⚠️[" + A_SMALL + "]: 融资成本上升，小盘股承压\n🛡️[" + A_CASH + "]: 现金为王，无风险收益率极具吸引力", c_orange)
     // 震荡: 观察, 警惕(科技/长债)
     register_state("S1_NOISE",  0.0, 1.0, "央行态度暧昧", "【观察】 ⚠️" + A_TECH + "/" + A_BOND_L, "⚠️[" + A_TECH + "]: 降息预期反复博弈，资产波动加大", c_yellow)
     // 降息: 进攻(科技/长债)
@@ -167,20 +167,20 @@ if barstate.isfirst
     // --- 2. 真实利率 (TIPS) ---
     // 滞胀: 避险(美元/黄金), 否决(周期/科技)
     register_state("S2_STAG",   -1.0, 1.0, "滞胀萧条", "【避险】 ⛔" + A_CYCLE + "/" + A_TECH + " 🛡️" + A_USD + "/" + A_GOLD, "⛔[" + A_CYCLE + "]: 经济停滞导致需求端杀业绩\n⛔[" + A_TECH + "]: 高通胀推高名义利率，杀估值\n🛡️[" + A_GOLD + "]: 股债双杀，实物黄金抗通胀且无违约风险", c_red)
-    // 虹吸: 避险(美元/短债), 否决(高估值/小盘) -> 科技/小盘
+    // 虹吸: 避险(现金), 否决(科技/小盘)
     register_state("S2_SIPHON", -1.0, 1.0, "虹吸效应", "【避险】 ⛔" + A_TECH + "/" + A_SMALL + " 🛡️" + A_CASH, "⛔[" + A_TECH + "/" + A_SMALL + "]: 无风险收益过高(TIPS>RGDP)，资金回流债市\n⛔[" + A_TECH + "]: 风险溢价不足以补偿持有成本\n🛡️[" + A_CASH + "]: 回流美元现金，坐享高息", c_red)
     // 杀估值: 防御(红利/核心), 否决(科技)
     register_state("S2_KILL",   -0.5, 1.0, "杀估值", "【防御】 ⛔" + A_TECH + " 🛡️" + A_CORE + "/" + A_DIV, "⛔[" + A_TECH + "]: 实际资金成本过高，压制高PE板块\n⛔[" + A_TECH + "]: 成长股对资金成本最敏感\n🛡️[" + A_DIV + "]: 低估值、高股息资产具备防御属性", c_orange)
     // 资金贵: 观察, 警惕(科技)
     register_state("S2_RISE",    0.0, 1.0, "资金成本变贵", "【观察】 ⚠️" + A_TECH, "⚠️[" + A_TECH + "]: 资金成本上升未见顶，风险收益比下降", c_yellow)
-    // 负利率: 进攻(黄金/加密) -> 黄金在此处为进攻属性
+    // 负利率: 进攻(黄金/科技)
     register_state("S2_NEG",     1.0, 1.0, "负利率", "【进攻】 ⚔️" + A_GOLD + "/" + A_TECH, "⚔️[" + A_GOLD +"]: 货币购买力贬值，资产泡沫化，抗贬值资产受益", c_lime)
     // 健康: 进攻(科技)
     register_state("S2_HEALTH",  1.0, 1.0, "健康支撑", "【进攻】 ⚔️" + A_TECH, "⚔️[" + A_TECH + "]: 实际利率低位(TIPS<0.5RGDP)，利好股市估值扩张", c_lime)
 
     // --- 3. 利差结构 ---
-    // 牛陡: 清仓, 否决(周期/科技/小盘), 避险(美债/黄金)
-    register_state("S3_CRASH",  -1.0, 2.0, "牛陡", "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + " 🛡️" + A_BOND_US + "/" + A_GOLD, "⛔[" + A_CYCLE + "]: 衰退确认，需求断崖式下跌杀业绩\n⛔[" + A_TECH + "]: 市场恐慌抛售一切风险资产\n⛔[" + A_SMALL + "]: 流动性枯竭，无差别杀跌\n🛡️[" + A_BOND_US + "]: 资金涌入避险，且降息预期推升债价", c_super_red)
+    // 牛陡: 清仓, 否决(风险资产), 避险(美债/黄金)
+    register_state("S3_CRASH",  -1.0, 2.0, "牛陡", "【清仓】 ⛔" + A_RISK + " 🛡️" + A_BOND_US + "/" + A_GOLD, "⛔[" + A_RISK + "]: 衰退确认，需求断崖式下跌杀业绩\n🛡️[" + A_BOND_US + "]: 资金涌入避险，且降息预期推升债价", c_super_red)
     // 倒挂: 防御(现金/红利), 否决(周期/科技/小盘)
     register_state("S3_INVERT", -0.5, 1.0, "倒挂", "【防御】 ⛔" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + " 🛡️" + A_CASH_ONLY + "/" + A_DIV, "⛔[" + A_CYCLE + "]: 长期经济前景堪忧，提前计价衰退\n⛔[" + A_TECH + "/" + A_SMALL + "]: 衰退初期杀估值逻辑主导，小盘股风险溢价飙升\n🛡️[" + A_DIV + "]: 收缩战线，配置防御性资产过冬", c_orange)
     // 平坦: 观察, 警惕(长债)
@@ -191,8 +191,8 @@ if barstate.isfirst
     register_state("S3_BEAR",    1.0, 1.0, "熊陡", "【进攻】 ⚔️" + A_CYCLE + "/" + A_COMM, "⚔️[" + A_CYCLE + "]: 通胀温和回升，经济强劲，利好上游资源", c_lime)
 
     // --- 4. 信用风险 ---
-    // 崩盘: 清仓, 否决(垃圾债/小盘), 避险(现金)
-    register_state("S4_CRASH",  -1.0, 2.0, "信用崩盘", "【清仓】 ⛔" + A_JUNK + "/" + A_SMALL + " 🛡️" + A_CASH, "⛔[" + A_JUNK + "]: 企业融资链条断裂，违约风险剧增\n⛔[" + A_SMALL + "]: 信用收缩首当其冲\n🛡️[" + A_CASH + "]: 现金最安全，等待危机解除", c_super_red)
+    // 崩盘: 清仓, 否决(风险资产), 避险(现金)
+    register_state("S4_CRASH",  -1.0, 2.0, "信用崩盘", "【清仓】 ⛔" + A_RISK + " 🛡️" + A_CASH, "⛔[" + A_RISK + "]: 企业融资链条断裂，违约风险剧增\n🛡️[" + A_CASH + "]: 现金最安全，等待危机解除", c_super_red)
     // 恶化: 避险(短债), 否决(垃圾债/小盘)
     register_state("S4_BAD",    -1.0, 1.0, "严重恶化", "【避险】 ⛔" + A_JUNK + "/" + A_SMALL + " 🛡️" + A_BOND_S, "⛔[" + A_JUNK + "]: 市场风险偏好极度下降，抛售高风险债\n⛔[" + A_SMALL + "]: 流动性差的资产难变现，折价出售\n🛡️[" + A_BOND_S + "]: 短债流动性好且无本金风险", c_red)
     // 走阔: 防御(红利), 否决(垃圾债), 警惕(小盘)
@@ -206,51 +206,51 @@ if barstate.isfirst
 
     // --- 5. 流动性 ---
     // US
-    register_state("S5_US_CRASH", -1.0, 1.0, "流动性枯竭", "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + " 🛡️" + A_CASH, "⛔[" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + "]: 市场流动性枯竭，无差别杀跌\n🛡️[" + A_CASH + "]: 现金为王，保住本金", c_super_red)
-    register_state("S5_US_TIGHT", -0.5, 1.0, "收缩", "【防御】 ⛔" + A_CYCLE + "/" + A_SMALL + " 🛡️" + A_DIV, "⛔[" + A_CYCLE + "]: 货币供应量收缩，总需求下降杀业绩\n⚠️[" + A_SMALL + "]: 缺乏流动性支持，估值回归\n🛡️[" + A_DIV + "]: 股息提供安全垫，抗跌属性强", c_orange)
+    register_state("S5_US_CRASH", -1.0, 1.0, "流动性枯竭", "【清仓】 ⛔" + A_RISK + " 🛡️" + A_CASH, "⛔[" + A_RISK + "]: 市场流动性枯竭，无差别杀跌\n🛡️[" + A_CASH + "]: 现金为王，保住本金", c_super_red)
+    register_state("S5_US_TIGHT", -0.5, 1.0, "收缩", "【防御】 ⛔" + A_CYCLE + " ⚠️" + A_SMALL + " 🛡️" + A_DIV, "⛔[" + A_CYCLE + "]: 货币供应量收缩，总需求下降杀业绩\n⚠️[" + A_SMALL + "]: 缺乏流动性支持，估值回归\n🛡️[" + A_DIV + "]: 股息提供安全垫，抗跌属性强", c_orange)
     register_state("S5_US_NOISE",  0.0, 1.0, "市场增量不足", "【观察】 ⚠️" + A_SMALL, "⚠️[" + A_SMALL + "]: 股市缺乏活水注入，边缘资产无人问津", c_yellow)
-    register_state("S5_US_GOOD",   1.0, 1.0, "扩张", "【进攻】 ⚔️" + A_TECH + "/" + A_CORE, "⚔️[" + A_CORE + "]: 资金充裕推升资产价格，核心资产率先受益", c_lime)
+    register_state("S5_US_GOOD",   1.0, 1.0, "扩张", "【进攻】 ⚔️" + A_TECH + "/" + A_CORE + "/" + A_SMALL, "⚔️[" + A_CORE + "]: 资金充裕推升资产价格，核心资产率先受益", c_lime)
     // CN
-    register_state("S5_CN_CRASH", -1.0, 1.0, "严重空转", "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + " 🛡️" + A_CASH, "⛔[" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + "]: 市场流动性枯竭，无差别杀跌\n🛡️[" + A_CASH + "]: 现金为王，保住本金", c_super_red)
-    register_state("S5_CN_TIGHT", -0.5, 1.0, "资金空转", "【防御】 ⛔" + A_CYCLE + "/" + A_SMALL + " 🛡️" + A_DIV, "⛔[" + A_CYCLE + "]: 货币供应量收缩，总需求下降杀业绩\n⚠️[" + A_SMALL + "]: 缺乏流动性支持，估值回归\n🛡️[" + A_DIV + "]: 股息提供安全垫，抗跌属性强", c_orange)
+    register_state("S5_CN_CRASH", -1.0, 1.0, "严重空转", "【清仓】 ⛔" + A_RISK + " 🛡️" + A_CASH, "⛔[" + A_RISK + "]: 市场流动性枯竭，无差别杀跌\n🛡️[" + A_CASH + "]: 现金为王，保住本金", c_super_red)
+    register_state("S5_CN_TIGHT", -0.5, 1.0, "资金空转", "【防御】 ⛔" + A_CYCLE + " ⚠️" + A_SMALL + " 🛡️" + A_DIV, "⛔[" + A_CYCLE + "]: 货币供应量收缩，总需求下降杀业绩\n⚠️[" + A_SMALL + "]: 缺乏流动性支持，估值回归\n🛡️[" + A_DIV + "]: 股息提供安全垫，抗跌属性强", c_orange)
     register_state("S5_CN_NOISE",  0.0, 1.0, "存款搬家停滞", "【观察】 ⚠️" + A_SMALL, "⚠️[" + A_SMALL + "]: 股市缺乏活水", c_yellow)
-    register_state("S5_CN_GOOD",   1.0, 1.0, "资金活化", "【进攻】 ⚔️" + A_TECH + "/" + A_CORE, "⚔️[" + A_CORE + "]: 资金充裕推升资产价格，核心资产率先受益", c_lime)
+    register_state("S5_CN_GOOD",   1.0, 1.0, "资金活化", "【进攻】 ⚔️" + A_TECH + "/" + A_CORE + "/" + A_SMALL, "⚔️[" + A_CORE + "]: 资金充裕推升资产价格，核心资产率先受益", c_lime)
 
     // --- 6. 利润空间 ---
-    // 过热: 避险(现金/能源), 否决(科技)
-    register_state("S6_HEAT",     -1.0, 2.0, "通胀过热", "【避险】 ⛔" + A_TECH + " 🛡️" + A_CASH + "/" + A_ENERGY, "⛔[" + A_TECH + "]: 联储加息预期升温，杀高估值\n🛡️[" + A_CASH + "/" + A_ENERGY + "]: 现金抗波动，拥抱抗通胀资产", c_red)
-    // 通缩: 避险(必选), 否决(周期)
-    register_state("S6_DEFL",     -1.0, 1.0, "深度通缩", "【避险】 ⛔" + A_CYCLE + " 🛡️" + A_STAPLES, "⛔[" + A_CYCLE + "]: 需求崩塌，企业利润全线暴跌杀业绩\n🛡️[" + A_STAPLES + "]: 必选消费需求刚性，受经济周期影响小", c_red)
+    // 过热: 避险(现金/能源), 否决(科技/长债)
+    register_state("S6_HEAT",     -1.0, 2.0, "通胀过热", "【避险】 ⛔" + A_TECH + "/" + A_BOND_L + " 🛡️" + A_CASH + "/" + A_ENERGY, "⛔[" + A_TECH + "]: 联储加息预期升温，杀高估值\n🛡️[" + A_CASH + "/" + A_ENERGY + "]: 现金抗波动，拥抱抗通胀资产", c_red)
+    // 通缩: 避险(必选/长债), 否决(周期/科技/小盘)
+    register_state("S6_DEFL",     -1.0, 1.0, "深度通缩", "【避险】 ⛔" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + " 🛡️" + A_STAPLES + "/" + A_BOND_L, "⛔[" + A_CYCLE + "]: 需求崩塌，企业利润全线暴跌杀业绩\n🛡️[" + A_STAPLES + "]: 必选消费需求刚性，受经济周期影响小", c_red)
     // 亏损: 防御(上游), 否决(中游)
     register_state("S6_BAD",      -0.5, 1.0, "亏损恶化", "【防御】 ⛔" + A_CYCLE_MID + " ⚔️" + A_CYCLE_UP, "⛔[" + A_CYCLE_MID + "]: 成本高企、售价难涨，两头受挤压\n⚔️[" + A_CYCLE_UP + "]: 涨价受益方，利润向.上游集中", c_orange)
-    // 承压: 观察, 警惕(小盘/同质化)
+    // 承压: 观察, 警惕(小盘)
     register_state("S6_NOISE_US",  0.0, 1.0, "企业增长停滞", "【观察】 ⚠️" + A_SMALL, "⚠️[" + A_SMALL + "]: 价格战侵蚀企业利润，无护城河企业出清", c_yellow)
     register_state("S6_NOISE_CN",  0.0, 1.0, "行业内卷加剧", "【观察】 ⚠️" + A_SMALL, "⚠️[" + A_SMALL + "]: 价格战侵蚀利润", c_yellow)
-    // 反转: 进攻(中游/反转)
-    register_state("S6_TURN",      0.5, 1.0, "困境反转", "【进攻】 ⚔️" + A_CYCLE_MID, "⚔️[" + A_CYCLE_MID + "]: 成本下降或需求回暖，盈利触底回升弹性大", c_lime)
+    // 反转: 进攻(中游/小盘)
+    register_state("S6_TURN",      0.5, 1.0, "困境反转", "【进攻】 ⚔️" + A_CYCLE_MID + "/" + A_SMALL, "⚔️[" + A_CYCLE_MID + "]: 成本下降或需求回暖，盈利触底回升弹性大", c_lime)
     // 走阔: 进攻(科技/核心)
     register_state("S6_GOOD",      1.0, 1.0, "利润走阔", "【进攻】 ⚔️" + A_TECH + "/" + A_CORE, "⚔️[" + A_TECH + "]: 业绩驱动股价上涨，享受戴维斯双击", c_lime)
 
     // --- 7. 实体热度 ---
-    // 崩盘: 避险(美债/黄金), 否决(周期/小盘)
-    register_state("S7_CRASH",    -1.0, 1.0, "实体崩盘", "【避险】 ⛔" + A_CYCLE + "/" + A_SMALL + " 🛡️" + A_BOND_US + "/" + A_GOLD, "⛔[" + A_CYCLE + "]: 实体需求信心崩塌，杀业绩主跌浪\n⛔[" + A_SMALL + "]: 信用收缩风险传导\n🛡️[" + A_BOND_US + "/" + A_GOLD + "]: 避险买盘涌入，对冲经济下行风险", c_red)
-    // 衰退: 防御(黄金), 否决(周期)
-    register_state("S7_RECESS",   -0.5, 1.0, "衰退交易", "【防御】 ⛔" + A_CYCLE + " 🛡️" + A_GOLD, "⛔[" + A_CYCLE + "]: 制造业景气度下行，需求不足\n🛡️[" + A_GOLD + "]: 经济下行压力下，黄金具备对冲属性", c_orange)
+    // 崩盘: 避险(美债/黄金), 否决(周期/小盘/科技)
+    register_state("S7_CRASH",    -1.0, 1.0, "实体崩盘", "【避险】 ⛔" + A_CYCLE + "/" + A_SMALL + "/" + A_TECH + " 🛡️" + A_BOND_US + "/" + A_GOLD, "⛔[" + A_CYCLE + "]: 实体需求信心崩塌，杀业绩主跌浪\n⛔[" + A_SMALL + "]: 信用收缩风险传导\n🛡️[" + A_BOND_US + "/" + A_GOLD + "]: 避险买盘涌入，对冲经济下行风险", c_red)
+    // 衰退: 防御(黄金), 否决(周期/科技)
+    register_state("S7_RECESS",   -0.5, 1.0, "衰退交易", "【防御】 ⛔" + A_CYCLE + "/" + A_TECH + " 🛡️" + A_GOLD, "⛔[" + A_CYCLE + "]: 制造业景气度下行，需求不足\n🛡️[" + A_GOLD + "]: 经济下行压力下，黄金具备对冲属性", c_orange)
     // 伪复苏: 观察, 警惕(周期)
     register_state("S7_FAKE",     -0.5, 1.0, "伪复苏", "【观察】 ⚠️" + A_CYCLE, "⚠️[" + A_CYCLE + "]: 仅金价上涨掩盖铜价疲软，非真实需求改善", c_orange)
     // 震荡: 观察, 警惕(周期)
     register_state("S7_NOISE",     0.0, 1.0, "下游需求不明", "【观察】 ⚠️" + A_CYCLE, "⚠️[" + A_CYCLE + "]: 工厂补库意愿疲弱，缺乏上涨动力", c_yellow)
-    // 复苏: 进攻(周期)
-    register_state("S7_GOOD",      1.0, 1.0, "复苏", "【进攻】 ⚔️" + A_CYCLE, "⚔️[" + A_CYCLE + "]: 工业生产供销两旺，量价齐升利好周期股", c_lime)
+    // 复苏: 进攻(周期/科技)
+    register_state("S7_GOOD",      1.0, 1.0, "复苏", "【进攻】 ⚔️" + A_CYCLE + "/" + A_TECH, "⚔️[" + A_CYCLE + "]: 工业生产供销两旺，量价齐升利好周期股", c_lime)
 
     // --- 8. 萨姆规则 ---
-    // 熔断: 清仓, 否决(周期/科技), 避险(美债)
-    register_state("S8_CRASH",    -1.0, 2.0, "衰退确认", "【清仓】 ⛔" + A_CYCLE + "/" + A_TECH + " 🛡️" + A_BOND_US, "⛔[" + A_CYCLE + "/" + A_TECH + "]: 失业率飙升确认衰退，杀业绩叠加杀估值\n🛡️[" + A_BOND_US + "]: 衰退期唯一确定的避险资产", c_super_red)
+    // 熔断: 清仓, 否决(风险资产), 避险(美债/黄金)
+    register_state("S8_CRASH",    -1.0, 2.0, "衰退确认", "【清仓】 ⛔" + A_RISK + " 🛡️" + A_BOND_US + "/" + A_GOLD, "⛔[" + A_RISK + "]: 失业率飙升确认衰退，杀业绩叠加杀估值\n🛡️[" + A_BOND_US + "]: 衰退期唯一确定的避险资产", c_super_red)
     // 关注: 防御(美债), 否决(周期/科技)
     register_state("S8_RISK",     -0.5, 1.0, "风险关注", "【防御】 ⛔" + A_CYCLE + "/" + A_TECH + " 🛡️" + A_BOND_US, "⛔[" + A_CYCLE + "]: 萨姆法则触发临界点，强周期板块最先反应\n⛔[" + A_TECH + "]: 衰退预期升温，风险偏好逆转\n🛡️[" + A_BOND_US + "]: 避险买盘提前布局降息预期", c_orange)
-    // 预警: 防御(现金), 否决(消费) -> 消费归入核心，或单独列出
+    // 预警: 防御(现金), 否决(核心)
     register_state("S8_WARN",     -0.5, 1.0, "ICSA预警", "【防御】 ⛔" + A_CORE + " 🛡️" + A_CASH_ONLY, "⛔[" + A_CORE + "]: 失业人数超预期恶化，打击居民收入与消费意愿\n🛡️[" + A_CASH_ONLY + "]: 局势不明朗，现金观望", c_orange)
-    // 健康: 进攻(科技/消费)
+    // 健康: 进攻(科技/核心)
     register_state("S8_GOOD",      1.0, 1.0, "就业健康", "【进攻】 ⚔️" + A_TECH + "/" + A_CORE, "⚔️[" + A_TECH + "/" + A_CORE + "]: 居民收入增长支撑消费，经济强劲利好科技基本面", c_lime)
 
 // ==========================================
