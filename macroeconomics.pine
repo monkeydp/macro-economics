@@ -198,7 +198,7 @@ if barstate.isfirst
     register_state("S6_GOOD",      1.0, 1.0, "利润走阔", "【进攻】 ⚔️" + A_TECH + "/" + A_CORE, "⚔️[" + A_TECH + "/" + A_CORE + "]: 业绩驱动股价上涨，享受戴维斯双击", c_lime)
 
     // --- 7. 实体热度 ---
-    register_state("S7_CRASH",    -1.0, 1.0, "实体崩盘", "【避险】 ⛔" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + " 🛡️" + A_BOND_L + "/" + A_GOLD, "⛔[" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + "]: 实体需求信心崩塌，杀业绩主跌浪\n⛔[" + A_CYCLE + "]: 市场一致性交易衰退预期\n🛡️[" + A_BOND_L + "/" + A_GOLD + "]: 避险买盘涌入，对冲经济下行风险", c_red)
+    register_state("S7_CRASH",    -1.0, 1.0, "实体崩盘", "【清仓】 ⛔" + A_RISK + " 🛡️" + A_BOND_L + "/" + A_GOLD, "⛔[" + A_RISK + "]: 实体需求信心崩塌，杀业绩主跌浪\n🛡️[" + A_BOND_L + "/" + A_GOLD + "]: 避险买盘涌入，对冲经济下行风险", c_super_red)
     register_state("S7_RECESS",   -0.5, 1.0, "衰退交易", "【防御】 ⛔" + A_CYCLE + " 🛡️" + A_GOLD, "⛔[" + A_CYCLE + "]: 制造业景气度下行，需求不足\n🛡️[" + A_GOLD + "]: 经济下行压力下，黄金具备对冲属性", c_orange)
     register_state("S7_FAKE",     -0.5, 1.0, "伪复苏", "【观察】 ⚠️" + A_CYCLE, "⚠️[" + A_CYCLE + "]: 仅金价上涨掩盖铜价疲软，非真实需求改善", c_orange)
     register_state("S7_NOISE",     0.0, 1.0, "下游需求不明", "【观察】 ⚠️" + A_CYCLE, "⚠️[" + A_CYCLE + "]: 工厂补库意愿疲弱，缺乏上涨动力", c_yellow)
@@ -834,7 +834,7 @@ total_score = s1*w1 + s2*w2 + s3*w3 + s4*w4 + s5*w5 + s6*w6 + s7*w7 + s8*w8
 max_score   = w1 + w2 + w3 + w4 + w5 + w6 + w7 + w8
 
 // 熔断一票否决
-bool is_meltdown = (s3 == -1.0 and w3 > 1.0) or (s4 == -1.0 and w4 > 1.0) or (s8 == -1.0 and w8 > 1.0) or (s5 == -1.0)
+bool is_meltdown = (id3 == "S3_CRASH") or (id4 == "S4_CRASH") or (id8 == "S8_CRASH") or (id5 == "S5_US_CRASH" or id5 == "S5_CN_CRASH") or (id7 == "S7_CRASH")
 
 // ==========================================
 // 4. UI 渲染
@@ -865,19 +865,19 @@ else if mode == "6. 利润空间"
     dyn_c := s6 >= 0.5 ? c_lime : (s6 == -0.5 ? c_orange : (s6 <= -1.0 ? c_red : c_yellow))
 else if mode == "7. 实体热度"
     plot_val := cg_ratio
-    dyn_c := s7 == 1.0 ? c_lime : (s7 == -0.5 ? c_orange : (s7 == -1.0 ? c_red : c_yellow))
+    dyn_c := id7 == "S7_CRASH" ? c_super_red : (s7 == 1.0 ? c_lime : (s7 == -0.5 ? c_orange : c_yellow))
 else if mode == "8. 萨姆规则"
     plot_val := sahm_val
-    dyn_c := s8 == 1.0 ? c_lime : (s8 == -0.5 ? c_orange : (s8 == -1.0 ? c_super_red : c_yellow))
+    dyn_c := id8 == "S8_CRASH" ? c_super_red : (s8 == 1.0 ? c_lime : (s8 == -0.5 ? c_orange : c_yellow))
 
 // --- 状态文本生成器 ---
 
 // 实体热度崩盘背景高亮
-bool is_cg_crash_bg = mode == "7. 实体热度" and (s7 == -1.0 or ((timeframe.isweekly or timeframe.ismonthly) and cg_crash_scan))
-bgcolor(is_cg_crash_bg ? color.new(c_red, 80) : na, title="Copper Crash BG")
+bool is_cg_crash_bg = mode == "7. 实体热度" and (id7 == "S7_CRASH" or ((timeframe.isweekly or timeframe.ismonthly) and cg_crash_scan))
+bgcolor(is_cg_crash_bg ? color.new(c_super_red, 80) : na, title="Copper Crash BG")
 
 // 萨姆规则熔断背景高亮
-bgcolor(mode == "8. 萨姆规则" and s8 == -1.0 ? color.new(c_super_red, 80) : na, title="Sahm Meltdown BG")
+bgcolor(mode == "8. 萨姆规则" and id8 == "S8_CRASH" ? color.new(c_super_red, 80) : na, title="Sahm Meltdown BG")
 
 // 基准利率救火背景高亮 (全局作用域)
 bool is_effr_panic_bg = mode == "1. 基准利率" and (s1 == -1.0 or ((timeframe.isweekly or timeframe.ismonthly) and effr_drop >= 0.5))
@@ -1102,10 +1102,10 @@ if barstate.islast and mode == "6. 利润空间"
 // 7. 实体热度: 铜金比
 plot(mode == "7. 实体热度" ? plot_val : na, "Copper/Gold", color = dyn_c, linewidth = 2)
 
-// 崩盘标记
-bool is_cg_crash_mark = mode == "7. 实体热度" and s7 == -1.0
+// 实体热度崩盘标记
+bool is_cg_crash_mark = mode == "7. 实体热度" and id7 == "S7_CRASH"
 if is_cg_crash_mark and not is_cg_crash_mark[1] and show_markers
-    label.new(bar_index, plot_val + 0.1, "📉\n崩盘", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
+    label.new(bar_index, plot_val + 0.1, "📉\n熔断", color = color(na), style = label.style_none, textcolor = c_super_red, size = size.small, textalign = text.align_center)
 
 // 动态计算 EMA 周期
 // 日线: 60 (季度线)
@@ -1196,7 +1196,7 @@ if barstate.islast and show_report
     string l6_v = is_us ? str.tostring(us_profit_gap, "0.00")+"%" : str.tostring(cn_profit_gap, "0.00")+"%"
     fill_row(6, "6.利润空间", l6_v, s6, w6, "养鱼账本", t6_s, t6_a, t6_reason, false)
     
-    fill_row(7, "7.实体热度", str.tostring(cg_ratio, "0.00"), s7, w7, "鱼池扩建率", t7_s, t7_a, t7_reason, false)
+    fill_row(7, "7.实体热度", str.tostring(cg_ratio, "0.00"), s7, w7, "鱼池扩建率", t7_s, t7_a, t7_reason, id7 == "S7_CRASH")
     fill_row(8, "8.萨姆规则", str.tostring(sahm_val, "0.00")+"%", s8, w8, "失业信号", t8_s, t8_a, t8_reason, s8 == -1.0 and w8 > 1.0)
 
     // Row 9: 宏观对冲策略
@@ -1421,9 +1421,7 @@ if barstate.islast and show_report
     if s7 == -1.0 // 崩盘
         rec_bond_l := true
         rec_gold_def := true
-        veto_cycle := true
-        veto_tech := true
-        veto_small := true
+        veto_risk_all := true
     else if s7 == -0.5 // 衰退
         rec_gold_def := true
         veto_cycle := true
@@ -2042,7 +2040,7 @@ if barstate.islast and show_report
         d_title := "实体热度\n[铜金比]"
         d_def := "铜(工业) / 金(避险)\n比值涨=复苏; 比值跌=衰退"
         d_obs := "60日 (趋势)"
-        d_logic := "🔴 崩盘: 单日跌>3%\n🟠 衰退: 跌\n🟠 伪复苏: 涨，但铜跌\n🟡 震荡: 平\n🟢 复苏: 双涨"
+        d_logic := "🛑 崩盘: 单日跌>3%\n🟠 衰退: 跌\n🟠 伪复苏: 涨，但铜跌\n🟡 震荡: 平\n🟢 复苏: 双涨"
         d_conf := "连续5日确认"
         d_w := w7 > 1.0 ? "x2" : "x1"
         d_cur_stat := t7_s
@@ -2266,7 +2264,10 @@ if barstate.islast and show_report
     
     // 渲染右表
     // Row 3: 状态行 (含拐点)
-    table.cell(info, 1, 3, d_cur_val, bgcolor = c_bg, text_color = get_score_col(cur_score_disp)), table.merge_cells(info, 1, 3, 2, 3), table.cell_set_text_halign(info, 1, 3, text.align_left)
+    color cur_bg_col = (mode == "7. 实体热度" and id7 == "S7_CRASH") or (mode == "8. 萨姆规则" and id8 == "S8_CRASH") or (mode == "4. 信用风险" and id4 == "S4_CRASH") or (mode == "3. 利差结构" and id3 == "S3_CRASH") ? c_super_red : c_bg
+    color cur_txt_col = cur_bg_col == c_super_red ? c_yellow : get_score_col(cur_score_disp)
+
+    table.cell(info, 1, 3, d_cur_val, bgcolor = cur_bg_col, text_color = cur_txt_col, text_halign = text.align_left), table.merge_cells(info, 1, 3, 2, 3)
     table.cell(info, 3, 3, d_turn_val, bgcolor = c_bg, text_color = get_score_col(turn_score_disp), text_halign = text.align_left)
     
     // Row 4: 含义行
