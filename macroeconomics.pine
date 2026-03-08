@@ -155,53 +155,32 @@ string A_CYCLE_MID  = "中游制造"
 // 初始化所有状态 (只运行一次)
 if barstate.isfirst
     // --- 1. 基准利率 (EFFR) ---
-    // 救火: 避险(黄金/长债), 否决(周期/科技)
     register_state("S1_PANIC", -1.0, 1.0, "救火降息", "【避险】 ⛔" + A_CYCLE + "/" + A_TECH + " 🛡️" + A_GOLD + "/" + A_BOND_L, "⛔[" + A_CYCLE + "]: 经济硬着陆确认，需求冰封杀业绩\n⛔[" + A_TECH + "]: 衰退初期风险溢价飙升，杀估值\n🛡️[" + A_GOLD + "/" + A_BOND_L + "]: 避险资金涌入，降息预期利好美债", c_red)
-    // 加息: 防御(现金/短债), 否决(长债/科技), 警惕(小盘)
     register_state("S1_HIKE",  -0.5, 1.0, "加息周期", "【防御】 ⛔" + A_BOND_L + "/" + A_TECH + " ⚠️" + A_SMALL + " 🛡️" + A_CASH, "⛔[" + A_BOND_L + "]: 利率上行直接杀久期\n⛔[" + A_TECH + "]: 贴现率上升压制DCF估值分母端\n⚠️[" + A_SMALL + "]: 融资成本上升，小盘股承压\n🛡️[" + A_CASH + "]: 现金为王，无风险收益率极具吸引力", c_orange)
-    // 震荡: 观察, 警惕(科技/长债)
     register_state("S1_NOISE",  0.0, 1.0, "央行态度暧昧", "【观察】 ⚠️" + A_TECH + "/" + A_BOND_L, "⚠️[" + A_TECH + "]: 降息预期反复博弈，资产波动加大", c_yellow)
-    // 降息: 进攻(科技/长债)
     register_state("S1_CUT",    1.0, 1.0, "降息周期", "【进攻】 ⚔️" + A_TECH + "/" + A_BOND_L, "⚔️[" + A_TECH + "/" + A_BOND_L + "]: 资金成本下降，分母端逻辑改善，利好久期资产", c_lime)
 
     // --- 2. 真实利率 (TIPS) ---
-    // 滞胀: 避险(美元/黄金), 否决(周期/科技)
     register_state("S2_STAG",   -1.0, 1.0, "滞胀萧条", "【避险】 ⛔" + A_CYCLE + "/" + A_TECH + " 🛡️" + A_USD + "/" + A_GOLD, "⛔[" + A_CYCLE + "]: 经济停滞导致需求端杀业绩\n⛔[" + A_TECH + "]: 高通胀推高名义利率，杀估值\n🛡️[" + A_GOLD + "]: 股债双杀，实物黄金抗通胀且无违约风险", c_red)
-    // 虹吸: 避险(现金), 否决(科技/小盘)
     register_state("S2_SIPHON", -1.0, 1.0, "虹吸效应", "【避险】 ⛔" + A_TECH + "/" + A_SMALL + " 🛡️" + A_CASH, "⛔[" + A_TECH + "/" + A_SMALL + "]: 无风险收益过高(TIPS>RGDP)，资金回流债市\n⛔[" + A_TECH + "]: 风险溢价不足以补偿持有成本\n🛡️[" + A_CASH + "]: 回流美元现金，坐享高息", c_red)
-    // 杀估值: 防御(红利/核心), 否决(科技)
     register_state("S2_KILL",   -0.5, 1.0, "杀估值", "【防御】 ⛔" + A_TECH + " 🛡️" + A_CORE + "/" + A_DIV, "⛔[" + A_TECH + "]: 实际资金成本过高，压制高PE板块\n⛔[" + A_TECH + "]: 成长股对资金成本最敏感\n🛡️[" + A_DIV + "]: 低估值、高股息资产具备防御属性", c_orange)
-    // 资金贵: 观察, 警惕(科技)
     register_state("S2_RISE",    0.0, 1.0, "资金成本变贵", "【观察】 ⚠️" + A_TECH, "⚠️[" + A_TECH + "]: 资金成本上升未见顶，风险收益比下降", c_yellow)
-    // 负利率: 进攻(黄金/科技)
     register_state("S2_NEG",     1.0, 1.0, "负利率", "【进攻】 ⚔️" + A_GOLD + "/" + A_TECH, "⚔️[" + A_GOLD +"]: 货币购买力贬值，资产泡沫化，抗贬值资产受益", c_lime)
-    // 健康: 进攻(科技)
     register_state("S2_HEALTH",  1.0, 1.0, "健康支撑", "【进攻】 ⚔️" + A_TECH, "⚔️[" + A_TECH + "]: 实际利率低位(TIPS<0.5RGDP)，利好股市估值扩张", c_lime)
 
     // --- 3. 利差结构 ---
-    // 牛陡: 清仓, 否决(风险资产), 避险(美债/黄金)
     register_state("S3_CRASH",  -1.0, 2.0, "牛陡", "【清仓】 ⛔" + A_RISK + " 🛡️" + A_BOND_US + "/" + A_GOLD, "⛔[" + A_RISK + "]: 衰退确认，需求断崖式下跌杀业绩\n🛡️[" + A_BOND_US + "]: 资金涌入避险，且降息预期推升债价", c_super_red)
-    // 倒挂: 防御(现金/红利), 否决(周期/科技/小盘)
     register_state("S3_INVERT", -0.5, 1.0, "倒挂", "【防御】 ⛔" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + " 🛡️" + A_CASH_ONLY + "/" + A_DIV, "⛔[" + A_CYCLE + "]: 长期经济前景堪忧，提前计价衰退\n⛔[" + A_TECH + "/" + A_SMALL + "]: 衰退初期杀估值逻辑主导，小盘股风险溢价飙升\n🛡️[" + A_DIV + "]: 收缩战线，配置防御性资产过冬", c_orange)
-    // 平坦: 观察, 警惕(长债)
     register_state("S3_FLAT",    0.0, 1.0, "长短债博弈激烈", "【观察】 ⚠️" + A_BOND_L, "⚠️[" + A_BOND_L + "]: 通胀反弹风险未除，长端利率波动大", c_yellow)
-    // 陡峭: 进攻(科技/核心)
     register_state("S3_STEEP",   0.5, 1.0, "陡峭", "【进攻】 ⚔️" + A_TECH + "/" + A_CORE, "⚔️[" + A_CORE + "]: 宏观环境回归常态，利好核心资产稳健增长", c_lime)
-    // 熊陡: 进攻(周期/大宗)
     register_state("S3_BEAR",    1.0, 1.0, "熊陡", "【进攻】 ⚔️" + A_CYCLE + "/" + A_COMM, "⚔️[" + A_CYCLE + "]: 通胀温和回升，经济强劲，利好上游资源", c_lime)
 
     // --- 4. 信用风险 ---
-    // 崩盘: 清仓, 否决(风险资产), 避险(现金)
     register_state("S4_CRASH",  -1.0, 2.0, "信用崩盘", "【清仓】 ⛔" + A_RISK + " 🛡️" + A_CASH, "⛔[" + A_RISK + "]: 企业融资链条断裂，违约风险剧增\n🛡️[" + A_CASH + "]: 现金最安全，等待危机解除", c_super_red)
-    // 恶化: 避险(短债), 否决(垃圾债/小盘)
     register_state("S4_BAD",    -1.0, 1.0, "严重恶化", "【避险】 ⛔" + A_JUNK + "/" + A_SMALL + " 🛡️" + A_BOND_S, "⛔[" + A_JUNK + "]: 市场风险偏好极度下降，抛售高风险债\n⛔[" + A_SMALL + "]: 流动性差的资产难变现，折价出售\n🛡️[" + A_BOND_S + "]: 短债流动性好且无本金风险", c_red)
-    // 走阔: 防御(红利), 否决(垃圾债), 警惕(小盘)
     register_state("S4_WIDEN",  -0.5, 1.0, "风险走阔", "【防御】 ⛔" + A_JUNK + " ⚠️" + A_SMALL + " 🛡️" + A_DIV, "⛔[" + A_JUNK + "]: 资金避险情绪升温，抛售高风险债\n⚠️[" + A_SMALL + "]: 融资成本上升，小盘股经营压力大\n🛡️[" + A_DIV + "]: 现金流充沛的企业更受青睐", c_orange)
-    // 底部: 观察, 警惕(垃圾债)
     register_state("S4_BOTTOM",  0.0, 1.0, "底部回升", "【观察】 ⚠️" + A_JUNK, "⚠️[" + A_JUNK + "]: 信用风险触底反弹，利差有走阔压力", c_yellow)
-    // 局部: 观察, 警惕(小盘)
     register_state("S4_LOCAL",   0.0, 1.0, "局部压力", "【观察】 ⚠️" + A_SMALL, "⚠️[" + A_SMALL + "]: 部分企业融资困难，面临出清风险", c_yellow)
-    // 收敛: 进攻(垃圾债/小盘)
     register_state("S4_GOOD",    1.0, 1.0, "风险收敛", "【进攻】 ⚔️" + A_JUNK + "/" + A_SMALL, "⚔️[" + A_JUNK + "]: 资金泛滥追逐高收益，高弹性资产受益", c_lime)
 
     // --- 5. 流动性 ---
@@ -217,40 +196,25 @@ if barstate.isfirst
     register_state("S5_CN_GOOD",   1.0, 1.0, "资金活化", "【进攻】 ⚔️" + A_TECH + "/" + A_CORE + "/" + A_SMALL, "⚔️[" + A_CORE + "]: 资金充裕推升资产价格，核心资产率先受益", c_lime)
 
     // --- 6. 利润空间 ---
-    // 过热: 避险(现金/能源), 否决(科技/长债)
     register_state("S6_HEAT",     -1.0, 2.0, "通胀过热", "【避险】 ⛔" + A_TECH + "/" + A_BOND_L + " 🛡️" + A_CASH + "/" + A_ENERGY, "⛔[" + A_TECH + "]: 联储加息预期升温，杀高估值\n🛡️[" + A_CASH + "/" + A_ENERGY + "]: 现金抗波动，拥抱抗通胀资产", c_red)
-    // 通缩: 避险(必选/长债), 否决(周期/科技/小盘)
     register_state("S6_DEFL",     -1.0, 1.0, "深度通缩", "【避险】 ⛔" + A_CYCLE + "/" + A_TECH + "/" + A_SMALL + " 🛡️" + A_STAPLES + "/" + A_BOND_L, "⛔[" + A_CYCLE + "]: 需求崩塌，企业利润全线暴跌杀业绩\n🛡️[" + A_STAPLES + "]: 必选消费需求刚性，受经济周期影响小", c_red)
-    // 亏损: 防御(上游), 否决(中游)
     register_state("S6_BAD",      -0.5, 1.0, "亏损恶化", "【防御】 ⛔" + A_CYCLE_MID + " ⚔️" + A_CYCLE_UP, "⛔[" + A_CYCLE_MID + "]: 成本高企、售价难涨，两头受挤压\n⚔️[" + A_CYCLE_UP + "]: 涨价受益方，利润向.上游集中", c_orange)
-    // 承压: 观察, 警惕(小盘)
     register_state("S6_NOISE_US",  0.0, 1.0, "企业增长停滞", "【观察】 ⚠️" + A_SMALL, "⚠️[" + A_SMALL + "]: 价格战侵蚀企业利润，无护城河企业出清", c_yellow)
     register_state("S6_NOISE_CN",  0.0, 1.0, "行业内卷加剧", "【观察】 ⚠️" + A_SMALL, "⚠️[" + A_SMALL + "]: 价格战侵蚀利润", c_yellow)
-    // 反转: 进攻(中游/小盘)
     register_state("S6_TURN",      0.5, 1.0, "困境反转", "【进攻】 ⚔️" + A_CYCLE_MID + "/" + A_SMALL, "⚔️[" + A_CYCLE_MID + "]: 成本下降或需求回暖，盈利触底回升弹性大", c_lime)
-    // 走阔: 进攻(科技/核心)
     register_state("S6_GOOD",      1.0, 1.0, "利润走阔", "【进攻】 ⚔️" + A_TECH + "/" + A_CORE, "⚔️[" + A_TECH + "]: 业绩驱动股价上涨，享受戴维斯双击", c_lime)
 
     // --- 7. 实体热度 ---
-    // 崩盘: 避险(美债/黄金), 否决(周期/小盘/科技)
     register_state("S7_CRASH",    -1.0, 1.0, "实体崩盘", "【避险】 ⛔" + A_CYCLE + "/" + A_SMALL + "/" + A_TECH + " 🛡️" + A_BOND_US + "/" + A_GOLD, "⛔[" + A_CYCLE + "]: 实体需求信心崩塌，杀业绩主跌浪\n⛔[" + A_SMALL + "]: 信用收缩风险传导\n🛡️[" + A_BOND_US + "/" + A_GOLD + "]: 避险买盘涌入，对冲经济下行风险", c_red)
-    // 衰退: 防御(黄金), 否决(周期/科技)
     register_state("S7_RECESS",   -0.5, 1.0, "衰退交易", "【防御】 ⛔" + A_CYCLE + "/" + A_TECH + " 🛡️" + A_GOLD, "⛔[" + A_CYCLE + "]: 制造业景气度下行，需求不足\n🛡️[" + A_GOLD + "]: 经济下行压力下，黄金具备对冲属性", c_orange)
-    // 伪复苏: 观察, 警惕(周期)
     register_state("S7_FAKE",     -0.5, 1.0, "伪复苏", "【观察】 ⚠️" + A_CYCLE, "⚠️[" + A_CYCLE + "]: 仅金价上涨掩盖铜价疲软，非真实需求改善", c_orange)
-    // 震荡: 观察, 警惕(周期)
     register_state("S7_NOISE",     0.0, 1.0, "下游需求不明", "【观察】 ⚠️" + A_CYCLE, "⚠️[" + A_CYCLE + "]: 工厂补库意愿疲弱，缺乏上涨动力", c_yellow)
-    // 复苏: 进攻(周期/科技)
     register_state("S7_GOOD",      1.0, 1.0, "复苏", "【进攻】 ⚔️" + A_CYCLE + "/" + A_TECH, "⚔️[" + A_CYCLE + "]: 工业生产供销两旺，量价齐升利好周期股", c_lime)
 
     // --- 8. 萨姆规则 ---
-    // 熔断: 清仓, 否决(风险资产), 避险(美债/黄金)
     register_state("S8_CRASH",    -1.0, 2.0, "衰退确认", "【清仓】 ⛔" + A_RISK + " 🛡️" + A_BOND_US + "/" + A_GOLD, "⛔[" + A_RISK + "]: 失业率飙升确认衰退，杀业绩叠加杀估值\n🛡️[" + A_BOND_US + "]: 衰退期唯一确定的避险资产", c_super_red)
-    // 关注: 防御(美债), 否决(周期/科技)
     register_state("S8_RISK",     -0.5, 1.0, "风险关注", "【防御】 ⛔" + A_CYCLE + "/" + A_TECH + " 🛡️" + A_BOND_US, "⛔[" + A_CYCLE + "]: 萨姆法则触发临界点，强周期板块最先反应\n⛔[" + A_TECH + "]: 衰退预期升温，风险偏好逆转\n🛡️[" + A_BOND_US + "]: 避险买盘提前布局降息预期", c_orange)
-    // 预警: 防御(现金), 否决(核心)
     register_state("S8_WARN",     -0.5, 1.0, "ICSA预警", "【防御】 ⛔" + A_CORE + " 🛡️" + A_CASH_ONLY, "⛔[" + A_CORE + "]: 失业人数超预期恶化，打击居民收入与消费意愿\n🛡️[" + A_CASH_ONLY + "]: 局势不明朗，现金观望", c_orange)
-    // 健康: 进攻(科技/核心)
     register_state("S8_GOOD",      1.0, 1.0, "就业健康", "【进攻】 ⚔️" + A_TECH + "/" + A_CORE, "⚔️[" + A_TECH + "/" + A_CORE + "]: 居民收入增长支撑消费，经济强劲利好科技基本面", c_lime)
 
 // ==========================================
@@ -339,15 +303,12 @@ get_fomc_formatted_times() =>
         
         // --- 分支逻辑 ---
         if fomc_time <= time
-            // 【上一次 (已发布)】: 只显示日期，不要时间
             string fmt_past = is_same_year ? "MM-dd" : "yyyy-MM-dd"
             last_str := str.format_time(fomc_time, fmt_past, syminfo.timezone)
         else
-            // 【下一次 (即将发布)】: 显示日期 + 时间，精确到分
             string fmt_future = is_same_year ? "MM-dd HH:mm" : "yyyy-MM-dd HH:mm"
             next_str := str.format_time(fomc_time, fmt_future, syminfo.timezone)
-            
-            // 找到最近的一个未来时间后，立即退出循环
+
             break
             
     [last_str, next_str]
@@ -356,35 +317,24 @@ get_fomc_formatted_times() =>
 
 // --- 1. 基准利率 (EFFR) ---
 
-// 1. 获取日线实时数据
 [effr_live, effr_time, effr_chg] = request.security(sym_effr, "D", [close, time, close[1] - close], gaps = barmerge.gaps_off)
-// 2. 获取长期趋势 EMA (月线)
 effr_ema = request.security(sym_effr, "M", ta.ema(close, effr_ema_len), gaps = barmerge.gaps_off)
 
-// 3. 救火降息扫描
 float effr_drop_scan = 0.0
 if timeframe.isdaily
-    // 日线图：直接看当天跌幅
     effr_drop_scan := effr_chg
 else if timeframe.isweekly or timeframe.ismonthly
-    // 周/月线图：全量扫描日线跌幅
-    // request.security_lower_tf 返回的是本周期内的日线数据数组
     float[] drops = request.security_lower_tf(sym_effr, "D", close[1] - close)
     if array.size(drops) > 0
-        // 只要有一天跌幅超过 0.5，max 就会超过 0.5
         effr_drop_scan := array.max(drops)
 
-// 统一使用扫描结果
 effr_drop = effr_drop_scan
 
 // --- 2. 真实利率 (TIPS) ---
-// 确认时长: 连续 5 日
 [tips_live, tips_time] = request.security(sym_tips, "D", [close, time], gaps = barmerge.gaps_off)
 [rgdp_val, rgdp_time]  = request.security(sym_rgdp, "D", [close, time], gaps = barmerge.gaps_off)
 
 // --- 3. 利差结构 (10Y-2Y) ---
-// 确认时长: 即时生效 (基于 20 日趋势)
-// 强制在 Daily 级别计算 Change
 [y10, y10_chg_d] = request.security(sym_us_10y, "D", [close, close - close[1]], gaps = barmerge.gaps_off)
 [y2, y2_chg_d]   = request.security(sym_us_2y, "D", [close, close - close[1]], gaps = barmerge.gaps_off)
 yc_val = y10 - y2
@@ -434,7 +384,6 @@ if is_high_tf_yc
 
 is_bull_steep_trigger = is_high_tf_yc ? is_bull_steep_htf : is_bull_steep_daily
 
-// 锁定 10 日 (默认)
 int bars_lock_bull = math.max(1, math.ceil(lock_bull_steep * sec_per_day / sec_per_bar))
 var int bull_steep_cnt = 0
 if is_bull_steep_trigger
@@ -444,11 +393,6 @@ else if bull_steep_cnt > 0
 is_bull_steep = bull_steep_cnt > 0
 
 // --- 4. 信用风险 (OAS) ---
-// 确认时长: 连续 3 日; 熔断即时
-// 核心：全周期扫描逻辑
-// 日线图：直接读取当日状态
-// 周线/月线图：扫描本周期内每一天，只要有一天处于“熔断”状态，即触发
-// OAS > 10% 或 (OAS > 6% 且 5日涨幅 > 20%)
 
 // 1. 获取日线实时数据
 [oas_val, oas_slope, oas_chg_5d_pct, oas_time] = request.security(sym_oas, "D", [close, calc_slope_linreg(close, oas_slope_len), (close / close[5] - 1) * 100, time], gaps = barmerge.gaps_off)
@@ -460,10 +404,6 @@ if timeframe.isdaily
     // 日线图：直接看当天是否熔断
     oas_crash_scan := oas_val > 10.0 or (oas_val > 6.0 and oas_chg_5d_pct > 20.0)
 else if timeframe.isweekly or timeframe.ismonthly
-    // 周/月线图：全量扫描日线状态
-    // 我们需要在 lower_tf 表达式中直接计算好是否熔断，返回布尔值数组
-    // 注意：request.security_lower_tf 不支持复杂的元组返回，建议返回 float (1.0/0.0)
-    // 表达式逻辑：如果 (OAS > 10) 或 (OAS > 6 且 5日涨幅 > 20%) 则返回 1.0，否则 0.0
     float[] crash_flags = request.security_lower_tf(sym_oas, "D", (close > 10.0 or (close > 6.0 and (close / close[5] - 1) * 100 > 20.0)) ? 1.0 : 0.0)
     if array.size(crash_flags) > 0
         // 只要有一天是 1.0，max 就是 1.0
@@ -473,7 +413,6 @@ else if timeframe.isweekly or timeframe.ismonthly
 // 统一使用扫描结果
 is_oas_crash_trigger = oas_crash_scan
 
-// 锁定 10 日 (默认)
 int bars_lock_credit = math.max(1, math.ceil(lock_credit_crash * sec_per_day / sec_per_bar))
 var int oas_crash_cnt = 0
 if is_oas_crash_trigger
@@ -483,7 +422,6 @@ else if oas_crash_cnt > 0
 is_oas_crash = oas_crash_cnt > 0
 
 // --- 5. 流动性 (M2 / M1-M2) ---
-// 确认时长: 连续 2 个月
 [us_m2_real, us_m2_yoy, us_m2_time] = request.security(sym_us_m2, "M", [close, calc_yoy(close, liq_yoy_len), time], gaps = barmerge.gaps_off)
 
 [cn_m1, cn_m1_yoy, cn_time] = request.security(sym_cn_m1, "M", [close, calc_yoy(close, liq_yoy_len), time], gaps = barmerge.gaps_off)
@@ -491,7 +429,6 @@ is_oas_crash = oas_crash_cnt > 0
 cn_gap = cn_m1_yoy - cn_m2_yoy
 
 // --- 6. 利润空间 (CPI-PPI) ---
-// 确认时长: 连续 2 个月
 [us_cpi, us_cpi_yoy, us_prof_time] = request.security(sym_us_cpi, "M", [close, calc_yoy(close, prof_yoy_len), time], gaps = barmerge.gaps_off)
 [us_ppi, us_ppi_yoy] = request.security(sym_us_ppi, "M", [close, calc_yoy(close, prof_yoy_len)], gaps = barmerge.gaps_off)
 us_profit_gap = us_cpi_yoy - us_ppi_yoy
@@ -501,10 +438,6 @@ cn_ppi_yoy = request.security(sym_cn_ppi, "M", calc_yoy(close, prof_yoy_len), ga
 cn_profit_gap = cn_cpi_yoy - cn_ppi_yoy
 
 // --- 7. 实体热度 (铜金比) ---
-// 确认时长: 连续 5 日
-// 核心：全周期扫描逻辑
-// 日线图：直接读取当日跌幅
-// 周线/月线图：扫描本周期内每一天的跌幅，只要有一天 < -3.0%，即触发崩盘
 
 // 1. 获取日线实时数据及趋势数据
 [cop_d, cop_d_prev, cop_d_trend] = request.security(sym_copper, "D", [close, close[1], close[cg_slope_len]], gaps = barmerge.gaps_off)
@@ -512,8 +445,8 @@ cn_profit_gap = cn_cpi_yoy - cn_ppi_yoy
 
 // 2. 本地计算比值
 cg_ratio_d       = cop_d / gld_d * 1000
-cg_ratio_prev_d  = cop_d_prev / gld_d_prev * 1000     // 用于单日显示/崩盘计算
-cg_ratio_trend_d = cop_d_trend / gld_d_trend * 1000   // 用于60日趋势计算
+cg_ratio_prev_d  = cop_d_prev / gld_d_prev * 1000
+cg_ratio_trend_d = cop_d_trend / gld_d_trend * 1000
 
 // 计算单日涨跌幅 (仅用于崩盘扫描)
 cg_chg_pct_d = (cg_ratio_d / cg_ratio_prev_d - 1) * 100
@@ -525,7 +458,6 @@ if timeframe.isdaily
     cg_crash_scan := cg_chg_pct_d < -3.0
 else if timeframe.isweekly or timeframe.ismonthly
     // 周/月线图：全量扫描日线跌幅
-    // 分别获取铜和金的日线比率 (Price Ratio = close / close[1])
     float[] cop_ratios = request.security_lower_tf(sym_copper, "D", close / close[1])
     float[] gld_ratios = request.security_lower_tf(sym_gold, "D", close / close[1])
     
@@ -597,14 +529,12 @@ if is_inflation_era
     w7 := 2.0 // 实体
 
 // 2. 恐慌时代: 仅当指标为负时，权重翻倍 (只放大风险，不放大机会)
-// 先占位，具体赋值放到评分计算后进行修正
 
 // --- 逻辑层变量定义 ---
 
 // 辅助函数
 is_sustained(cond, len) => math.sum(cond ? 1 : 0, len) == len
 
-// 转换天数为Bar数
 bars_tips_conf = math.max(1, math.ceil(dur_tips_conf * sec_per_day / sec_per_bar))
 bars_yc_conf   = math.max(1, math.ceil(dur_yc_bear_conf * sec_per_day / sec_per_bar))
 bars_oas_conf  = math.max(1, math.ceil(dur_oas_conf * sec_per_day / sec_per_bar))
@@ -845,12 +775,7 @@ t6_s := cfg6.label, t6_a := cfg6.advice, t6_reason := cfg6.reason
 t7_s := cfg7.label, t7_a := cfg7.advice, t7_reason := cfg7.reason
 t8_s := cfg8.label, t8_a := cfg8.advice, t8_reason := cfg8.reason
 
-// 恐慌时代动态权重修正 (保留原逻辑：负分翻倍)
-// S3/S4/S8 已在注册表中定义了翻倍规则(weight_mult=2.0)，这里只需处理 panic_era 的额外翻倍
-// 注意：注册表里的 weight_mult 是"原生"权重。panic_era 是"环境"加成。
-// 如果注册表里已经是 2.0 (如熔断)，这里再翻倍吗？ -> 不，max(2.0, 2.0) = 2.0
-// 如果注册表里是 1.0，且是负分，且 panic_era -> 翻倍
-
+// 恐慌时代动态权重
 if is_panic_era
     if s3 < 0 and w3 < 2.0 
         w3 := 2.0
@@ -864,7 +789,6 @@ total_score = s1*w1 + s2*w2 + s3*w3 + s4*w4 + s5*w5 + s6*w6 + s7*w7 + s8*w8
 max_score   = w1 + w2 + w3 + w4 + w5 + w6 + w7 + w8
 
 // 熔断一票否决
-// 流动性熔断 (s5 == -1.0) 权重不翻倍，但也算熔断
 bool is_meltdown = (s3 == -1.0 and w3 > 1.0) or (s4 == -1.0 and w4 > 1.0) or (s8 == -1.0 and w8 > 1.0) or (s5 == -1.0)
 
 // ==========================================
@@ -873,7 +797,7 @@ bool is_meltdown = (s3 == -1.0 and w3 > 1.0) or (s4 == -1.0 and w4 > 1.0) or (s8
 
 // --- 动态曲线选择 ---
 float plot_val = na
-color dyn_c = c_gray_dark // 默认颜色
+color dyn_c = c_gray_dark
 
 // 根据不同模式选择数据源
 if mode == "1. 基准利率"
@@ -902,8 +826,6 @@ else if mode == "8. 萨姆规则"
     dyn_c := s8 == 1.0 ? c_lime : (s8 == -0.5 ? c_orange : (s8 == -1.0 ? c_super_red : c_yellow))
 
 // --- 状态文本生成器 ---
-// (配置已移至顶部)
-
 
 // 实体热度崩盘背景高亮
 bool is_cg_crash_bg = mode == "7. 实体热度" and (s7 == -1.0 or ((timeframe.isweekly or timeframe.ismonthly) and cg_crash_scan))
@@ -913,7 +835,6 @@ bgcolor(is_cg_crash_bg ? color.new(c_red, 80) : na, title="Copper Crash BG")
 bgcolor(mode == "8. 萨姆规则" and s8 == -1.0 ? color.new(c_super_red, 80) : na, title="Sahm Meltdown BG")
 
 // 基准利率救火背景高亮 (全局作用域)
-// 逻辑: 模式为1 且 (s1为-1.0 或 高周期扫描出暴跌)
 bool is_effr_panic_bg = mode == "1. 基准利率" and (s1 == -1.0 or ((timeframe.isweekly or timeframe.ismonthly) and effr_drop >= 0.5))
 bgcolor(is_effr_panic_bg ? color.new(c_red, 80) : na, title="EFFR Panic BG")
 
@@ -931,14 +852,12 @@ bgcolor(is_siphon_bg ? color.new(c_red, 80) : na, title="Siphon BG")
 plot(mode == "1. 基准利率" ? plot_val : na, "EFFR", color = dyn_c, linewidth = 2, style = plot.style_stepline)
 plot(mode == "1. 基准利率" ? effr_ema : na, "EFFR EMA", color = color.blue, linewidth = 1)
 
-// 1. 救火标记
+// 救火标记
 bool is_fire_cut = mode == "1. 基准利率" and s1 == -1.0
 if is_fire_cut and not is_fire_cut[1] and show_markers
     label.new(bar_index, plot_val + 0.5, "🚒\n救火", xloc = xloc.bar_index, yloc = yloc.price, color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
 
 // 2. 真实利率: TIPS + RGDP + 阈值
-// 优化：RGDP 极端值截断 (仅用于绘图)
-// 将绘图用的 RGDP 限制在 -10% 到 +10% 之间
 float rgdp_plot = math.max(math.min(rgdp_val, 10.0), -10.0)
 
 plot(mode == "2. 真实利率" ? plot_val : na, "TIPS", color = dyn_c, linewidth = 2)
@@ -946,8 +865,6 @@ plot(mode == "2. 真实利率" ? rgdp_plot : na, "RGDP", color = color.gray, lin
 plot(mode == "2. 真实利率" ? 0.5 * rgdp_plot : na, "0.5 RGDP", color = color.new(c_orange, 50), style = plot.style_circles)
 
 // 真实利率风险标记 (状态切换时绘制一次性标签)
-// 逻辑: 仅在状态首次触发时，在曲线下方绘制图标+文字
-// 避免连续绘制导致图表压扁或重叠
 
 // 滞胀: RGDP < 0 (显示在曲线上方，避免与虹吸重叠)
 bool is_stag = mode == "2. 真实利率" and s2 == -1.0 and rgdp_val < 0
@@ -960,16 +877,12 @@ if is_siphon and not is_siphon[1] and show_markers
     label.new(bar_index, plot_val - 0.5, "🌪️虹吸", xloc = xloc.bar_index, yloc = yloc.price, color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
 
 // 添加 RGDP 极端值标签 (显示真实值)
-// 优化：仅在"季度结束"时绘制上一个季度的标签
-// 检测季度变化: 当前季度 != 上一根K线的季度
 int cur_q = math.ceil(month(time) / 3.0)
 int prev_q_idx = math.ceil(month(time[1]) / 3.0)
 bool is_new_quarter = (cur_q != prev_q_idx) or (year(time) != year(time[1]))
 
 // 变量记录上一次绘制的标签数值，用于去重
 var float last_lbl_val = 0.0
-// 始终根据当前 K 线的数据时间更新日期字符串
-// 增加 5 天偏移量，防止时区导致季度首日(10.1)漂移回上月(9.30)而被误判为Q3
 int t_rgdp = rgdp_time + 5 * 86400000
 int y_rgdp = year(t_rgdp)
 int m_rgdp = month(t_rgdp)
@@ -992,13 +905,10 @@ if mode == "2. 真实利率" and ta.change(rgdp_val) != 0
         float plot_y = math.max(math.min(cur_val, 10.0), -10.0)
         
         if cur_val > 10.0
-            // 上方截断: 标签在上，箭头向下指
             label.new(time_mid, plot_y, "▲ " + str.tostring(cur_val, "0.0") + "%", xloc = xloc.bar_time, color = c_lime, style = label.style_label_down, textcolor = c_white, size = size.tiny)
         else
-            // 下方截断: 标签在下，箭头向上指
             label.new(time_mid, plot_y, "▼ " + str.tostring(cur_val, "0.0") + "%", xloc = xloc.bar_time, color = c_red, style = label.style_label_up, textcolor = c_white, size = size.tiny)
         
-        // 更新记录
         last_lbl_val := cur_val
 
 // 处理当前最新的季度 (如果当前是极端值，且还没结束，暂时画在最后)
@@ -1032,14 +942,14 @@ if barstate.islast and mode == "2. 真实利率"
 // 3. 利差结构: 10Y-2Y
 bool is_bull_steep_melt = mode == "3. 利差结构" and s3 == -1.0 and w3 > 1.0
 
-// 1. 曲线变色 (保持深红)
+// 曲线变色 (保持深红)
 color yc_col = is_bull_steep_melt ? c_super_red : dyn_c
 plot(mode == "3. 利差结构" ? plot_val : na, "10Y-2Y", color = yc_col, linewidth = 2)
 
-// 2. 背景高亮 (深红半透明)
+// 背景高亮 (深红半透明)
 bgcolor(is_bull_steep_melt ? color.new(c_super_red, 70) : na, title="Bull Steep Melt BG")
 
-// 3. 文本标记 (仅在熔断开始时显示，避免拥挤)
+// 文本标记 (仅在熔断开始时显示，避免拥挤)
 bool show_bull_mark = mode == "3. 利差结构" and is_bull_steep_melt
 if show_bull_mark and not show_bull_mark[1] and show_markers
     label.new(bar_index, plot_val + 0.2, "🐂\n牛陡", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
@@ -1050,12 +960,12 @@ color oas_col = dyn_c
 if mode == "4. 信用风险" and s4 == -1.0 and w4 > 1.0
     oas_col := c_super_red
 
-// 4. 信用崩盘标记
+// 信用崩盘标记
 bool is_credit_crash = mode == "4. 信用风险" and s4 == -1.0 and w4 > 1.0
 if is_credit_crash and not is_credit_crash[1] and show_markers
     label.new(bar_index, plot_val + 0.5, "💔\n危机", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
 
-// 4. 严重恶化标记 (非熔断，但恶化)
+// 严重恶化标记 (非熔断，但恶化)
 bool is_credit_bad = mode == "4. 信用风险" and s4 == -1.0 and w4 <= 1.0
 if is_credit_bad and not is_credit_bad[1] and show_markers
     label.new(bar_index, plot_val + 0.5, "🩸\n恶化", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
@@ -1082,7 +992,7 @@ if is_us
 else
     is_liq_meltdown := is_cn_crash
 
-// 5. 枯竭标记
+// 枯竭标记
 bool show_liq_mark = mode == "5. 流动性" and is_liq_meltdown
 if show_liq_mark and not show_liq_mark[1] and show_markers
     label.new(bar_index, plot_val - 4, "🏜️\n枯竭", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
@@ -1096,7 +1006,6 @@ plot(mode == "5. 流动性" and is_cn ? th_liq_cn_crash : na, "M1-M2 -5", color 
 
 bgcolor(mode == "5. 流动性" and is_liq_meltdown ? color.new(c_super_red, 70) : na, title="Liq Melt BG")
 
-// 增加标签
 if barstate.islast and mode == "5. 流动性"
     if is_us
         label.new(bar_index, th_liq_us_crash, "熔断 (-2.0)", color = c_super_red, style = label.style_label_left, textcolor = c_white, size = size.small)
@@ -1104,23 +1013,21 @@ if barstate.islast and mode == "5. 流动性"
         label.new(bar_index, th_liq_cn_crash, "熔断 (-5.0)", color = c_super_red, style = label.style_label_left, textcolor = c_white, size = size.small)
 
 // 6. 利润空间: Gap
-// 定义 CPI & PPI 变量 (提前到这里，供绘图和标签使用)
 float cpi_val = is_us ? us_cpi_yoy : cn_cpi_yoy
 float ppi_val = is_us ? us_ppi_yoy : cn_ppi_yoy
 
 plot(mode == "6. 利润空间" ? plot_val : na, "Profit Gap", color = dyn_c, linewidth = 2)
 
-// 6. 通胀过热标记
+// 通胀过热标记
 bool is_overheat = mode == "6. 利润空间" and cpi_val > 3.0
 if is_overheat and not is_overheat[1] and show_markers
     label.new(bar_index, plot_val + 4, "🥵\n过热", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
 
-// 6. 深度通缩标记
+// 深度通缩标记
 bool is_deflation = mode == "6. 利润空间" and cpi_val < 0 and ppi_val < 0
 if is_deflation and not is_deflation[1] and show_markers
     label.new(bar_index, plot_val - 4, "🥶\n通缩", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
 
-// 新增: CPI & PPI 辅助线
 // 确保只在"6. 利润空间"模式下显示
 plot(mode == "6. 利润空间" ? cpi_val : na, "CPI", color = color.purple, linewidth = 1)
 plot(mode == "6. 利润空间" ? ppi_val : na, "PPI", color = color.blue, linewidth = 1)
@@ -1132,31 +1039,25 @@ bgcolor(mode == "6. 利润空间" and cpi_val > 3.0 ? color.new(c_red, 85) : na,
 // 通缩背景高亮 (CPI < 0 且 PPI < 0)
 bgcolor(mode == "6. 利润空间" and cpi_val < 0 and ppi_val < 0 ? color.new(color.blue, 85) : na, title="Deflation BG")
 
-// 增加静态图例 (Legend Table)
 // 仅在 "6. 利润空间" 模式且为最后一根 K 线时显示
-// 位置：右下角
 var table legend_prof = table.new(position.bottom_right, 2, 4, bgcolor = c_bg, border_width = 1, border_color = color.gray, frame_width = 1)
 if barstate.islast and mode == "6. 利润空间"
-    // 标题行
     table.cell(legend_prof, 0, 0, "📊 利润空间", text_color = c_white, text_size = size.small, bgcolor = c_header)
     table.cell(legend_prof, 1, 0, "", bgcolor = c_header) // 占位
     table.merge_cells(legend_prof, 0, 0, 1, 0)
     
-    // 行 1: CPI (紫)
     table.cell(legend_prof, 0, 1, "CPI", text_color = color.purple, text_halign = text.align_left, text_size = size.small)
     table.cell(legend_prof, 1, 1, str.tostring(cpi_val, "0.00") + "%", text_color = c_white, text_halign = text.align_right, text_size = size.small)
     
-    // 行 2: PPI (蓝)
     table.cell(legend_prof, 0, 2, "PPI", text_color = color.blue, text_halign = text.align_left, text_size = size.small)
     table.cell(legend_prof, 1, 2, str.tostring(ppi_val, "0.00") + "%", text_color = c_white, text_halign = text.align_right, text_size = size.small)
 
-    // 保留过热线标签 (因为它在顶部，不遮挡曲线)
     label.new(bar_index, 3.0, "过热线 (3.0%)", color = color.new(color.red, 50), style = label.style_label_left, textcolor = c_white, size = size.small)
 
 // 7. 实体热度: 铜金比
 plot(mode == "7. 实体热度" ? plot_val : na, "Copper/Gold", color = dyn_c, linewidth = 2)
 
-// 7. 崩盘标记
+// 崩盘标记
 bool is_cg_crash_mark = mode == "7. 实体热度" and s7 == -1.0
 if is_cg_crash_mark and not is_cg_crash_mark[1] and show_markers
     label.new(bar_index, plot_val + 0.1, "📉\n崩盘", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
@@ -1171,7 +1072,7 @@ plot(mode == "7. 实体热度" ? ta.ema(plot_val, ema_len_dynamic) : na, "CG EMA
 // 8. 萨姆规则: Sahm + 阈值
 plot(mode == "8. 萨姆规则" ? plot_val : na, "Sahm", color = dyn_c, linewidth = 2)
 
-// 8. 衰退熔断标记
+// 衰退熔断标记
 bool is_sahm_melt = mode == "8. 萨姆规则" and s8 == -1.0
 if is_sahm_melt and not is_sahm_melt[1] and show_markers
     label.new(bar_index, plot_val + 0.1, "💀\n衰退", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
@@ -1192,7 +1093,6 @@ hline(0, "零线", color = color.gray, linestyle = hline.style_dashed)
 var table rpt = table.new(position.middle_left, 8, 11, bgcolor = c_bg, border_width = 1, border_color = color.gray)
 var table info = table.new(position.middle_right, 4, 6, bgcolor = c_bg, border_width = 1, border_color = color.gray)
 
-// Helper: Get color by score
 get_score_col(s) =>
     if s >= 0.5
         c_lime
@@ -1203,7 +1103,6 @@ get_score_col(s) =>
     else
         c_red
 
-// Helper to fill row
 fill_row(r, name, val_str, s, w, meta, status, action, reason, is_melt) =>
     c_s = get_score_col(s)
     w_str = w > 1.0 ? "x2" : ""
@@ -1228,13 +1127,10 @@ fill_row(r, name, val_str, s, w, meta, status, action, reason, is_melt) =>
     string act_head = sp_idx != -1 ? str.substring(action, 0, sp_idx) : action
     string act_body = sp_idx != -1 ? str.substring(action, sp_idx + 1) : ""
     
-    // 显示 Tooltip
     table.cell(rpt, 6, r, act_head, text_color = c_s, bgcolor = c_bg, tooltip = reason)
     table.cell(rpt, 7, r, act_body, text_color = c_white, bgcolor = c_bg, text_halign = text.align_left, tooltip = reason)
 
 if barstate.islast and show_report
-    // --- 左表: 报告 ---
-    // Header
     table.cell(rpt, 0, 0, "维度", text_color = c_white, bgcolor = c_header)
     table.cell(rpt, 1, 0, "数值", text_color = c_white, bgcolor = c_header)
     table.cell(rpt, 2, 0, "得分", text_color = c_white, bgcolor = c_header)
@@ -1259,12 +1155,10 @@ if barstate.islast and show_report
     fill_row(8, "8.萨姆规则", str.tostring(sahm_val, "0.00")+"%", s8, w8, "失业信号", t8_s, t8_a, t8_reason, s8 == -1.0 and w8 > 1.0)
 
     // Row 9: 宏观对冲策略
-    // 逻辑: US (Liquidity + Rate), CN (Liquidity)
     bool us_loose = s1 == 1.0 or score_us_liq == 1.0 // US: 降息 OR M2扩张
     bool us_tight = s1 < 0 or score_us_liq < 0       // US: 加息/救火 OR M2紧缩/枯竭
     bool us_panic = is_panic_era or is_meltdown      // US: 恐慌
 
-    // CN: Loose (Activate), Tight (Idle), Flat
     bool cn_loose = score_cn_liq == 1.0
     bool cn_tight = score_cn_liq == -1.0
 
@@ -1302,7 +1196,7 @@ if barstate.islast and show_report
     // 升级为双轨制建议：进攻仓位 + 避险仓位 + 警惕项
     
     // --- Row 10: 最终诊断 (双轨制逻辑重构) ---
-    // 1. 定义资产推荐开关 (Recommend)
+    // 1. 定义资产推荐开关
     bool rec_tech   = false // 科技/成长
     bool rec_crypto = false // 加密
     bool rec_cycle  = false // 周期/大宗
@@ -1313,14 +1207,14 @@ if barstate.islast and show_report
     bool rec_small  = false // 小盘/垃圾债
     bool rec_gold_atk = false // 黄金 (进攻属性)
 
-    // 2. 定义避险资产推荐 (Safe Haven)
+    // 2. 定义避险资产推荐
     bool rec_cash   = false // 美元/现金
     bool rec_bond_s = false // 短债
     bool rec_bond_l = false // 长债
     bool rec_gold_def = false // 黄金 (避险属性)
     bool rec_yen    = false // 日元
 
-    // 3. 定义否决/警惕开关 (Veto/Warn)
+    // 3. 定义否决/警惕开关
     bool veto_tech  = false
     bool veto_cycle = false
     bool veto_small = false
@@ -1335,7 +1229,7 @@ if barstate.islast and show_report
     bool warn_core  = false
     bool warn_bond_l = false
 
-    // --- 遍历维度填充开关 (Funnel Source) ---
+    // --- 遍历维度填充开关 ---
 
     // 1. 基准利率 (EFFR)
     if s1 == -1.0 // 救火
@@ -1359,30 +1253,30 @@ if barstate.islast and show_report
             rec_cash := true
             veto_tech := true, veto_small := true
     else if s2 == -0.5 // 杀估值
-        rec_div := true // 红利
+        rec_div := true
         veto_tech := true
     else if s2 == 0.0 // 成本升
         warn_tech := true
     else if s2 == 1.0 
         rec_tech := true
         if tips_live < 0 // 负利率
-            rec_gold_atk := true, rec_crypto := true // 泡沫化: 黄金+加密
+            rec_gold_atk := true, rec_crypto := true
         else // 健康
             na // 仅科技
 
-    // 3. 利差结构 (Curve)
+    // 3. 利差结构 (10Y-2Y)
     if s3 == -1.0 // 牛陡
         rec_bond_l := true, rec_gold_def := true
         veto_risk_all := true
     else if s3 == -0.5 // 倒挂
-        rec_cash := true, rec_div := true // 红利
+        rec_cash := true, rec_div := true
         veto_tech := true, veto_cycle := true
     else if s3 == 0.0 // 平坦
         warn_bond_l := true
     else if s3 == 0.5 // 陡峭
         rec_core := true
     else if s3 == 1.0 // 熊陡
-        rec_cycle := true, rec_energy := true // 熊陡利好大宗/能源
+        rec_cycle := true, rec_energy := true
 
     // 4. 信用风险 (OAS)
     if s4 == -1.0 // 熔断/恶化
@@ -1397,14 +1291,14 @@ if barstate.islast and show_report
     else if s4 == 0.0 // 压力/底部
         warn_small := true, warn_junk := true
     else if s4 == 1.0 // 收敛
-        rec_small := true // 垃圾债
+        rec_small := true
 
     // 5. 流动性 (M2)
     if s5 == -1.0 // 枯竭
         rec_cash := true
         veto_risk_all := true
     else if s5 == -0.5 // 紧缩
-        rec_div := true // 红利
+        rec_div := true
         veto_cycle := true, warn_small := true
     else if s5 == 0.0 // 存量
         warn_small := true
@@ -1417,10 +1311,10 @@ if barstate.islast and show_report
             rec_cash := true, rec_energy := true
             veto_tech := true
         else // 通缩
-            rec_staples := true // 必选消费
+            rec_staples := true
             veto_cycle := true
     else if s6 == -0.5 // 亏损
-        rec_cycle := true // 上游资源(防御)
+        rec_cycle := true
     else if s6 == 0.0 // 承压
         warn_small := true
     else if s6 == 0.5 // 修复
@@ -1428,7 +1322,7 @@ if barstate.islast and show_report
     else if s6 == 1.0 // 躺赚
         rec_tech := true
 
-    // 7. 实体热度 (Copper/Gold)
+    // 7. 实体热度 (铜金比)
     if s7 == -1.0 // 崩盘
         rec_bond_l := true, rec_gold_def := true
         veto_cycle := true
@@ -1440,7 +1334,7 @@ if barstate.islast and show_report
     else if s7 == 1.0 // 复苏
         rec_cycle := true
 
-    // 8. 萨姆规则
+    // 8. 萨姆规则 (失业信号)
     if s8 == -1.0 // 熔断
         rec_bond_l := true
         veto_risk_all := true
@@ -1452,7 +1346,7 @@ if barstate.islast and show_report
     else if s8 == 1.0 // 健康
         rec_tech := true, rec_core := true
 
-    // --- 逻辑整合 (Funnel Processing) ---
+    // --- 逻辑整合 ---
 
     // 1. 全局熔断覆盖
     if is_meltdown
@@ -1462,8 +1356,7 @@ if barstate.islast and show_report
     if veto_risk_all
         veto_tech := true, veto_cycle := true, veto_small := true, veto_core := true
 
-    // 3. 构建 警惕 字符串 (Warn String)
-    // 逻辑: 只有当该资产未被否决时，才显示警惕
+    // 3. 构建 警惕 字符串
     string warn_assets_str = ""
     if warn_tech and not veto_tech
         warn_assets_str := append_unique(warn_assets_str, A_TECH)
@@ -1478,7 +1371,7 @@ if barstate.islast and show_report
     if warn_core and not veto_core
         warn_assets_str := append_unique(warn_assets_str, A_CORE)
 
-    // 4. 构建 否决 字符串 (Veto String)
+    // 4. 构建 否决 字符串
     string veto_assets_str = ""
     if veto_risk_all
         veto_assets_str := "所有风险资产"
@@ -1494,8 +1387,7 @@ if barstate.islast and show_report
         if veto_bond_l
             veto_assets_str := append_unique(veto_assets_str, A_BOND_L)
 
-    // 5. 构建 进攻 字符串 (Risk String)
-    // 逻辑: Recommend AND NOT Veto AND NOT Warn
+    // 5. 构建 进攻 字符串
     string risk_assets_str = ""
     
     // 黄金双重属性处理: 进攻优先
@@ -1522,7 +1414,7 @@ if barstate.islast and show_report
     if rec_small and not veto_small and not warn_small
         risk_assets_str := append_unique(risk_assets_str, A_SMALL)
 
-    // 6. 构建 避险 字符串 (Safe String)
+    // 6. 构建 避险 字符串
     string safe_assets_str = ""
     
     if rec_cash
@@ -1578,9 +1470,9 @@ if barstate.islast and show_report
         risk_assets := "❌️禁止开仓"
 
     // B. 正常评分逻辑 (含红色指标)
-    // 仓位完全由总分决定，红色指标只负责在上方过滤了 risk_assets 的内容
+    // 仓位完全由总分决定
     else
-        if total_score ≤ -5.0
+        if total_score <= -5.0
             final_res := "危机模式"
             final_bg := c_red
             final_txt := c_white
@@ -1598,7 +1490,7 @@ if barstate.islast and show_report
             if risk_assets == "" 
                 risk_assets := "核心底仓"
                 
-        else if total_score ≤ 1.5
+        else if total_score <= 1.5
             final_res := "混沌震荡"
             final_bg := c_yellow
             final_txt := c_black
@@ -1626,11 +1518,11 @@ if barstate.islast and show_report
                 risk_assets := "核心股/商品"
 
     // --- 构建四行文案 (强制显示) ---
-    // 1. 否决行 (如果有)
+    // 1. 否决行
     if veto_assets != ""
         line_veto := "⛔ 否决: " + veto_assets + "\n"
         
-    // 2. 警惕行 (如果有)
+    // 2. 警惕行
     if warn_risks != ""
         line_warn := "⚠️ 警惕: " + warn_risks + "\n"
 
