@@ -1580,7 +1580,7 @@ if barstate.islast and show_report
     // B. 正常评分逻辑 (含红色指标)
     // 仓位完全由总分决定，红色指标只负责在上方过滤了 risk_assets 的内容
     else
-        if total_score < -5.0
+        if total_score ≤ -5.0
             final_res := "危机模式"
             final_bg := c_red
             final_txt := c_white
@@ -1598,7 +1598,7 @@ if barstate.islast and show_report
             if risk_assets == "" 
                 risk_assets := "核心底仓"
                 
-        else if total_score < 1.5
+        else if total_score ≤ 1.5
             final_res := "混沌震荡"
             final_bg := c_yellow
             final_txt := c_black
@@ -1607,14 +1607,13 @@ if barstate.islast and show_report
             if risk_assets == "" 
                 risk_assets := "红利/底仓"
                 
-        else if total_score <= 5.0
+        else if total_score < 5.0
             final_res := "温和增长"
             final_bg := c_lime
             final_txt := c_black
             pos_risk := "50-80%"
             pos_safe := "20-50%"
             if risk_assets == "" 
-                // 关键修正：如果总分建议进攻，但所有进攻资产都被否决了
                 risk_assets := "暂无 (建议观望)"
                 
         else // > 5.0
