@@ -1691,7 +1691,7 @@ if barstate.islast and show_report
     
     if mode == "1. 基准利率"
         d_title := "基准利率\n[EFFR]"
-        d_def := "美联储联邦基金有效利率\n全球资金成本的总阀门。"
+        d_def := "美联储联邦基金有效利率\n全球资金成本的总阀门"
         d_obs := "10月 (EMA)"
         d_logic := "🔴 救火: ≥50bp\n🟠 加息: >EMA\n🟡 震荡: ≈EMA\n🟢 降息: <EMA"
         d_conf := "FOMC公布日确认\n\n" + next_fomc_time
@@ -1931,7 +1931,7 @@ if barstate.islast and show_report
                 d_risk := "开始抽水"
         else
             d_title := "流动性增速差\n[M1增速 - M2增速]"
-            d_def := "公式：M1增速 - M2增速 (信贷脉搏)\n正: 活水注入; 负: 资金空转(定期化)。"
+            d_def := "公式：M1增速 - M2增速 (信贷脉搏)\n正: 活水注入; 负: 资金空转(定期化)"
             d_obs := "12月 (同比)"
             d_logic := "🔴 严重空转: <-5%\n🟠 空转: <0\n🟡 震荡: ≈0\n🟢 活化: >0"
             d_conf := "连续2个月确认"
@@ -2040,7 +2040,7 @@ if barstate.islast and show_report
 
     else if mode == "7. 实体热度"
         d_title := "实体热度\n[铜金比]"
-        d_def := "铜(工业) / 金(避险)\n比值涨=复苏; 比值跌=衰退。"
+        d_def := "铜(工业) / 金(避险)\n比值涨=复苏; 比值跌=衰退"
         d_obs := "60日 (趋势)"
         d_logic := "🔴 崩盘: 单日跌>3%\n🟠 衰退: 跌\n🟠 伪复苏: 涨，但铜跌\n🟡 震荡: 平\n🟢 复苏: 双涨"
         d_conf := "连续5日确认"
