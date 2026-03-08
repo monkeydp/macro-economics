@@ -936,7 +936,8 @@ string rgdp_date_str = " (" + str.tostring(y_rgdp) + " Q" + str.tostring(q_rgdp)
 
 // 优化：改用"数据突变点 + 时间偏移"的物理定位法
 // 仅在 RGDP 数值发生突变 (新季度数据发布) 时绘制
-if mode == "2. 真实利率" and ta.change(rgdp_val) != 0
+float rgdp_change = ta.change(rgdp_val)
+if mode == "2. 真实利率" and rgdp_change != 0
     // 获取当前新的 RGDP 值
     float cur_val = rgdp_val
     
@@ -2089,7 +2090,7 @@ if barstate.islast and show_report
         else // 复苏
             d_risk := "衰退开始"
             
-        d_tactics := (s7 < 0 ? (is_cg_crash ? "极度恐慌，抛售风险资产\n只有美元和美债最安全" : (is_cg_fake_recovery ? "铜比金强但都在跌，衰退假象\n不要被比值上涨迷惑" : "实体疲软，避险主导\n买黄金/美债，规避强周期")) : (s7 > 0 ? "实体需求旺盛，风险偏好上升\n买周期股、工业大宗商品" : "方向不明，多看少做"))
+        d_tactics := (s7 < 0 ? (is_cg_crash ? "只有美元和美债最安全" : (is_cg_fake_recovery ? "铜比金强但都在跌，衰退假象\n不要被比值上涨迷惑" : "实体疲软，避险主导\n买黄金/美债，规避强周期")) : (s7 > 0 ? "实体需求旺盛，风险偏好上升\n买周期股、工业大宗商品" : "方向不明，多看少做"))
 
     else if mode == "8. 萨姆规则"
         string next_nfp_date = calc_next_nfp_status(sahm_time, timenow)
