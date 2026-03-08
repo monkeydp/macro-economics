@@ -468,7 +468,6 @@ else if timeframe.isweekly or timeframe.ismonthly
 // 统一使用扫描结果
 is_cg_crash_trigger = cg_crash_scan
 
-// 锁定 5 日 (默认)
 int bars_lock_cg = math.max(1, math.ceil(lock_cg_crash * sec_per_day / sec_per_bar))
 var int cg_crash_cnt = 0
 if is_cg_crash_trigger
