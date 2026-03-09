@@ -6,7 +6,7 @@ indicator("[薯仔] 宏观总分扫描仪", overlay = false, max_labels_count = 
 // ==========================================
 show_markers = input.bool(true, "显示总事件标记", group="显示设置")
 show_markers_deep_red = input.bool(true, "显示深红事件 (熔断)", group="显示设置")
-show_markers_red = input.bool(false, "显示红色事件 (重扣)", group="显示设置")
+show_markers_red = input.bool(true, "显示红色事件 (严重)", group="显示设置")
 show_markers_orange = input.bool(false, "显示橙色事件 (预警)", group="显示设置")
 region = input.string("美国", "监控地区", options=["美国", "中国"], group="显示设置", tooltip="仅影响: 5.流动性")
 
@@ -84,7 +84,110 @@ sym_sahm        = input.symbol("FRED:SAHMREALTIME", "数据源 (Sahm)", group=gr
 sym_icsa        = input.symbol("FRED:ICSA", "数据源 (ICSA)", group=grp_8, display=display.none)
 
 // ==========================================
-// 2. 数据获取与计算
+// 2. 数据结构与状态定义
+// ==========================================
+
+// 1. 定义结构体
+type MacroState
+    float base_score      // 基础分 (-1.0 ~ 1.0)
+    float w_panic         // 危机权重 (默认 1.0)
+    float w_inflation     // 通胀权重 (默认 1.0)
+    string label          // 简短标签 (如 "牛陡")
+    color col             // 颜色 (如 red)
+
+// 2. 初始化全局配置 Map
+var state_map = map.new<string, MacroState>()
+
+// 3. 注册函数 (智能构造)
+register(string id, float s, float wp, float wi, string l, color c) =>
+    // 默认值处理：如果 wp/wi 为 na，则设为 1.0
+    float _wp = na(wp) ? 1.0 : wp
+    float _wi = na(wi) ? 1.0 : wi
+    state_map.put(id, MacroState.new(s, _wp, _wi, l, c))
+
+// 4. 核心计算方法 (逻辑层)
+// 这就是您要的 "获取分数方法"
+method get_score(MacroState this, bool is_panic, bool is_inflation) =>
+    // 默认权重为 1.0 (常规时代)
+    float w = 1.0
+    
+    // 优先级判断：危机 > 通胀 > 常规
+    if is_panic
+        w := this.w_panic
+    else if is_inflation
+        w := this.w_inflation
+        
+    // 返回最终得分 (基础分 * 权重)
+    this.base_score * w
+
+// --- 初始化所有状态配置 ---
+if barstate.isfirst
+    // --- 1. 基准利率 ---
+    register("S1_PANIC", -1.0, 1.0, 1.0, "🚒1救火", color.red)
+    register("S1_HIKE",  -0.5, 1.0, 1.0, "💧1加息", color.orange)
+    register("S1_NOISE",  0.0, 1.0, 1.0, "⚖️1震荡", color.yellow)
+    register("S1_CUT",    1.0, 1.0, 1.0, "✂️1降息", color.lime)
+
+    // --- 2. 真实利率 ---
+    register("S2_STAG",   -1.0, 1.0, 1.0, "🔥2滞胀", color.red)
+    register("S2_SIPHON", -1.0, 1.0, 1.0, "🌪️2虹吸", color.red)
+    register("S2_KILL",   -0.5, 1.0, 1.0, "🔪2杀估值", color.orange)
+    register("S2_RISE",    0.0, 1.0, 1.0, "📈2上升", color.yellow)
+    register("S2_NEG",     1.0, 1.0, 1.0, "📉2负利", color.lime)
+    register("S2_HEALTH",  1.0, 1.0, 1.0, "✅2健康", color.lime)
+
+    // --- 3. 利差结构 (危机敏感) ---
+    // 牛陡: 危机时权重 x3
+    register("S3_CRASH",  -1.0, 3.0, 1.0, "🐂3牛陡", color.red) 
+    register("S3_INVERT", -0.5, 1.0, 1.0, "🙃3倒挂", color.orange)
+    register("S3_FLAT",    0.0, 1.0, 1.0, "➖3平坦", color.yellow)
+    register("S3_STEEP",   0.5, 1.0, 1.0, "📶3陡峭", color.lime)
+    register("S3_BEAR",    1.0, 1.0, 1.0, "🐻3熊陡", color.lime)
+
+    // --- 4. 信用风险 (危机敏感) ---
+    // 熔断: 权重 x3 (虽然有一票否决，但分也要扣够)
+    register("S4_CRASH",  -1.0, 3.0, 1.0, "💔4信用崩盘", #800000) 
+    // 恶化: 权重 x3
+    register("S4_BAD",    -1.0, 3.0, 1.0, "⚠️4信用恶化", color.red)
+    register("S4_WIDEN",  -0.5, 1.0, 1.0, "📉4走阔", color.orange)
+    register("S4_BOTTOM",  0.0, 1.0, 1.0, "🔄4触底", color.yellow)
+    register("S4_LOCAL",   0.0, 1.0, 1.0, "🔍4分化", color.yellow)
+    register("S4_GOOD",    1.0, 1.0, 1.0, "✅4收敛", color.lime)
+
+    // --- 5. 流动性 (危机敏感) ---
+    // 枯竭: 危机时 x3
+    register("S5_CRASH",  -1.0, 3.0, 1.0, "💧5枯竭", color.red)
+    register("S5_TIGHT",  -0.5, 1.0, 1.0, "📉5紧缩", color.orange)
+    register("S5_NOISE",   0.0, 1.0, 1.0, "⚖️5存量", color.yellow)
+    register("S5_GOOD",    1.0, 1.0, 1.0, "🌊5宽松", color.lime)
+
+    // --- 6. 利润空间 (通胀敏感) ---
+    // 滞胀/过热: 通胀时 x2
+    register("S6_HEAT",   -1.0, 1.0, 2.0, "🔥6过热", color.red)
+    register("S6_DEFL",   -1.0, 1.0, 1.0, "❄️6通缩", color.red)
+    register("S6_BAD",    -0.5, 1.0, 2.0, "📉6倒挂", color.orange) // 利润倒挂在通胀期也很痛
+    register("S6_NOISE",   0.0, 1.0, 1.0, "⚖️6承压", color.yellow)
+    register("S6_TURN",    0.5, 1.0, 2.0, "🔄6反转", color.lime) // 正分保留 x2 (通胀抗压)
+    register("S6_GOOD",    1.0, 1.0, 2.0, "💰6走阔", color.lime) // 正分保留 x2
+
+    // --- 7. 实体热度 (通胀敏感) ---
+    // 崩盘: 通胀时 x2 (滞胀)
+    register("S7_CRASH",  -1.0, 1.0, 2.0, "📉7崩盘", color.red)
+    register("S7_RECESS", -0.5, 1.0, 1.0, "🍂7衰退", color.orange)
+    register("S7_FAKE",   -0.5, 1.0, 1.0, "🎭7伪复苏", color.orange)
+    register("S7_NOISE",   0.0, 1.0, 1.0, "⚖️7震荡", color.yellow)
+    register("S7_GOOD",    1.0, 1.0, 2.0, "🏭7复苏", color.lime) // 正分保留 x2 (商品牛市)
+
+    // --- 8. 萨姆规则 (危机敏感) ---
+    // 确认: 危机时 x3
+    register("S8_CRASH",  -1.0, 3.0, 1.0, "💀8衰退确认", color.red)
+    // 预警: 危机时 x3 (提前反应)
+    register("S8_RISK",   -0.5, 3.0, 1.0, "⚠️8衰退预警", color.orange)
+    register("S8_WARN",   -0.5, 3.0, 1.0, "⚠️8ICSA预警", color.orange)
+    register("S8_GOOD",    1.0, 1.0, 1.0, "✅8就业健康", color.lime)
+
+// ==========================================
+// 3. 数据获取与计算
 // ==========================================
 
 // 辅助函数
@@ -113,34 +216,34 @@ else if timeframe.isweekly or timeframe.ismonthly
 int dur_panic_bars = math.max(1, math.ceil(dur_sahm_panic * sec_per_day / sec_per_bar))
 bool in_panic_window = ta.barssince(effr_drop_scan >= 0.5) < dur_panic_bars
 
-float s1 = 0.0
+string id1 = na
 if in_panic_window
-    s1 := -1.0
+    id1 := "S1_PANIC"
 else if effr_live > effr_ema + th_effr_noise
-    s1 := -0.5
+    id1 := "S1_HIKE"
 else if effr_live < effr_ema - th_effr_noise
-    s1 := 1.0
+    id1 := "S1_CUT"
 else
-    s1 := 0.0
+    id1 := "S1_NOISE"
 
 // --- 2. 真实利率 (TIPS) ---
 tips_live = request.security(sym_tips, "D", close, gaps = barmerge.gaps_off)
 rgdp_val  = request.security(sym_rgdp, "D", close, gaps = barmerge.gaps_off)
 int bars_tips_conf = math.max(1, math.ceil(dur_tips_conf * sec_per_day / sec_per_bar))
 
-float s2 = 0.0
+string id2 = na
 if is_sustained(rgdp_val < 0, bars_tips_conf)
-    s2 := -1.0
+    id2 := "S2_STAG"
 else if is_sustained(tips_live >= rgdp_val, bars_tips_conf)
-    s2 := -1.0
+    id2 := "S2_SIPHON"
 else if is_sustained(tips_live >= 0.75 * rgdp_val, bars_tips_conf)
-    s2 := -0.5
+    id2 := "S2_KILL"
 else if is_sustained(tips_live >= 0.5 * rgdp_val, bars_tips_conf)
-    s2 := 0.0
+    id2 := "S2_RISE"
 else if is_sustained(tips_live < 0, bars_tips_conf)
-    s2 := 1.0
+    id2 := "S2_NEG"
 else
-    s2 := 1.0
+    id2 := "S2_HEALTH"
 
 // --- 3. 利差结构 (Yield Curve) ---
 [y10, y10_chg_d] = request.security(sym_us_10y, "D", [close, close - close[1]], gaps = barmerge.gaps_off)
@@ -186,15 +289,15 @@ bool is_bull_steep = bull_steep_cnt > 0
 int bars_yc_conf = math.max(1, math.ceil(dur_yc_bear_conf * sec_per_day / sec_per_bar))
 bool is_bear_steep = is_sustained(y10_chg_d > th_yc_bear_steep and y2_chg_d > 0 and y10_chg_d > y2_chg_d, bars_yc_conf)
 
-float s3 = 0.0
+string id3 = na
 if is_bull_steep
-    s3 := -3.0 // 【重扣分】牛陡恐慌，扣 -3.0 (极致恐慌)
+    id3 := "S3_CRASH"
 else if yc_val < -th_yc_noise
-    s3 := -0.5
+    id3 := "S3_INVERT"
 else if math.abs(yc_val) <= th_yc_noise
-    s3 := 0.0
+    id3 := "S3_FLAT"
 else
-    s3 := is_bear_steep ? 1.0 : 0.5
+    id3 := is_bear_steep ? "S3_BEAR" : "S3_STEEP"
 
 // --- 4. 信用风险 (OAS) ---
 [oas_val, oas_slope, oas_chg_5d_pct] = request.security(sym_oas, "D", [close, calc_slope_linreg(close, oas_slope_len), (close / close[5] - 1) * 100], gaps = barmerge.gaps_off)
@@ -218,15 +321,15 @@ bool is_oas_crash = oas_crash_cnt > 0
 int bars_oas_conf = math.max(1, math.ceil(dur_oas_conf * sec_per_day / sec_per_bar))
 bool is_sustained_oas_widen = is_sustained(oas_slope > th_oas_noise, bars_oas_conf)
 
-float s4 = 0.0
+string id4 = na
 if is_oas_crash
-    s4 := -3.0 // 熔断虽然一票否决，但也给极重分 -3.0，拉低总分
+    id4 := "S4_CRASH"
 else if oas_val > 6.0
-    s4 := -1.0
+    id4 := "S4_BAD"
 else if oas_val >= 3.5
-    s4 := is_sustained_oas_widen ? -0.5 : 0.0
+    id4 := is_sustained_oas_widen ? "S4_WIDEN" : "S4_LOCAL"
 else
-    s4 := is_sustained_oas_widen ? 0.0 : 1.0
+    id4 := is_sustained_oas_widen ? "S4_BOTTOM" : "S4_GOOD"
 
 // --- 5. 流动性 (M2) ---
 us_m2_yoy = request.security(sym_us_m2, "M", calc_yoy(close, liq_yoy_len), gaps = barmerge.gaps_off)
@@ -234,25 +337,25 @@ cn_m1_yoy = request.security(sym_cn_m1, "M", calc_yoy(close, liq_yoy_len), gaps 
 cn_m2_yoy = request.security(sym_cn_m2, "M", calc_yoy(close, liq_yoy_len), gaps = barmerge.gaps_off)
 cn_gap = cn_m1_yoy - cn_m2_yoy
 
-float s5 = 0.0
+string id5 = na
 if is_us
     if us_m2_yoy < th_liq_us_crash
-        s5 := -2.0 // 【重扣分】严重收缩，扣 -2.0 (旱灾)
+        id5 := "S5_CRASH"
     else if us_m2_yoy < 0
-        s5 := -0.5
+        id5 := "S5_TIGHT"
     else if us_m2_yoy > 0
-        s5 := 1.0
+        id5 := "S5_GOOD"
     else
-        s5 := 0.0
+        id5 := "S5_NOISE"
 else
     if cn_gap < th_liq_cn_crash
-        s5 := -2.0 // 【重扣分】严重空转，扣 -2.0
+        id5 := "S5_CRASH"
     else if cn_gap < 0
-        s5 := -0.5
+        id5 := "S5_TIGHT"
     else if cn_gap > 0
-        s5 := 1.0
+        id5 := "S5_GOOD"
     else
-        s5 := 0.0
+        id5 := "S5_NOISE"
 
 // --- 6. 利润空间 ---
 us_cpi_yoy = request.security(sym_us_cpi, "M", calc_yoy(close, prof_yoy_len), gaps = barmerge.gaps_off)
@@ -267,29 +370,29 @@ bool is_prof_neg = is_sustained(is_us ? us_profit_gap < 0 : cn_profit_gap < 0, b
 bool is_prof_pos = is_sustained(is_us ? us_profit_gap > 0 : cn_profit_gap > 0, bars_prof_state)
 bool is_widening = is_us ? us_profit_gap > us_profit_gap[1] : cn_profit_gap > cn_profit_gap[1]
 
-float s6 = 0.0
+string id6 = na
 if is_us
     if us_cpi_yoy > 3.0
-        s6 := -2.0 // 【重扣分】通胀过热，维持 -2.0 (杀估值)
+        id6 := "S6_HEAT"
     else if us_cpi_yoy < 0 and us_ppi_yoy < 0
-        s6 := -1.0
+        id6 := "S6_DEFL"
     else if is_prof_neg
-        s6 := is_widening ? 0.5 : -0.5
+        id6 := is_widening ? "S6_TURN" : "S6_BAD"
     else if is_prof_pos
-        s6 := is_widening ? 1.0 : 0.0
+        id6 := is_widening ? "S6_GOOD" : "S6_NOISE"
     else
-        s6 := 0.0
+        id6 := "S6_NOISE"
 else
     if cn_cpi_yoy > 3.0
-        s6 := -1.0
+        id6 := "S6_HEAT"
     else if cn_cpi_yoy < 0 and cn_ppi_yoy < 0
-        s6 := -1.0
+        id6 := "S6_DEFL"
     else if is_prof_neg
-        s6 := is_widening ? 0.5 : -0.5
+        id6 := is_widening ? "S6_TURN" : "S6_BAD"
     else if is_prof_pos
-        s6 := is_widening ? 1.0 : 0.0
+        id6 := is_widening ? "S6_GOOD" : "S6_NOISE"
     else
-        s6 := 0.0
+        id6 := "S6_NOISE"
 
 // --- 7. 实体热度 (铜金比) ---
 [cop_d, cop_d_prev, cop_d_trend] = request.security(sym_copper, "D", [close, close[1], close[cg_slope_len]], gaps = barmerge.gaps_off)
@@ -331,67 +434,76 @@ bool is_trend_down = is_sustained(cg_trend_chg_pct < -th_cg_noise, bars_cg_conf)
 bool is_cop_trend_up   = cop_trend_chg_pct > 0
 bool is_cop_trend_down = cop_trend_chg_pct < 0
 
-float s7 = 0.0
+string id7 = na
 if is_cg_crash
-    s7 := -2.0 // 【重扣分】崩盘，扣 -2.0 (恐慌抛售)
+    id7 := "S7_CRASH"
 else if is_trend_up and is_cop_trend_down
-    s7 := -0.5
+    id7 := "S7_FAKE"
 else if is_trend_down
-    s7 := -0.5
+    id7 := "S7_RECESS"
 else if is_trend_up and is_cop_trend_up
-    s7 := 1.0
+    id7 := "S7_GOOD"
 else
-    s7 := 0.0
+    id7 := "S7_NOISE"
 
 // --- 8. 萨姆规则 ---
 sahm_val = request.security(sym_sahm, "M", close, gaps = barmerge.gaps_off)
 [icsa_yoy, icsa_yoy_prev] = request.security(sym_icsa, "W", [(close / close[52] - 1) * 100, (close[1] / close[53] - 1) * 100], gaps = barmerge.gaps_off)
 bool icsa_warn = icsa_yoy > 15.0 and icsa_yoy_prev > 15.0
 
-float s8 = 0.0
+string id8 = na
 if sahm_val >= 0.5
-    s8 := -3.0 // 【重扣分】衰退确认，扣 -3.0 (经济硬着陆)
+    id8 := "S8_CRASH"
 else if sahm_val >= 0.3
-    s8 := -1.0 // 【升级】预警扣 -1.0
+    id8 := "S8_RISK"
 else if icsa_warn
-    s8 := -0.5
+    id8 := "S8_WARN"
 else
-    s8 := 1.0
+    id8 := "S8_GOOD"
 
 // ==========================================
-// 3. 总分计算与权重
+// 4. 总分计算与权重
 // ==========================================
-float w1=1.0, float w2=1.0, float w3=1.0, float w4=1.0
-float w5=1.0, float w6=1.0, float w7=1.0, float w8=1.0
 
+// 1. 判定时代
 bool is_inflation_era = (is_us ? us_cpi_yoy : cn_cpi_yoy) > 3.0
 bool is_panic_era     = sahm_val >= 0.3 or is_bull_steep
 
-if is_inflation_era
-    w6 := 2.0
-    w7 := 2.0
-if is_panic_era
-    if s3 < 0 and w3 < 2.0 
-        w3 := 2.0
-    if s4 < 0 and w4 < 2.0
-        w4 := 2.0
-    if s8 < 0 and w8 < 2.0
-        w8 := 2.0
+// 2. 获取配置对象
+MacroState cfg1 = state_map.get(id1)
+MacroState cfg2 = state_map.get(id2)
+MacroState cfg3 = state_map.get(id3)
+MacroState cfg4 = state_map.get(id4)
+MacroState cfg5 = state_map.get(id5)
+MacroState cfg6 = state_map.get(id6)
+MacroState cfg7 = state_map.get(id7)
+MacroState cfg8 = state_map.get(id8)
 
-float total_score = s1*w1 + s2*w2 + s3*w3 + s4*w4 + s5*w5 + s6*w6 + s7*w7 + s8*w8
-// 唯一保留的真熔断：OAS
+// 3. 计算加权得分
+float score1 = not na(cfg1) ? cfg1.get_score(is_panic_era, is_inflation_era) : 0.0
+float score2 = not na(cfg2) ? cfg2.get_score(is_panic_era, is_inflation_era) : 0.0
+float score3 = not na(cfg3) ? cfg3.get_score(is_panic_era, is_inflation_era) : 0.0
+float score4 = not na(cfg4) ? cfg4.get_score(is_panic_era, is_inflation_era) : 0.0
+float score5 = not na(cfg5) ? cfg5.get_score(is_panic_era, is_inflation_era) : 0.0
+float score6 = not na(cfg6) ? cfg6.get_score(is_panic_era, is_inflation_era) : 0.0
+float score7 = not na(cfg7) ? cfg7.get_score(is_panic_era, is_inflation_era) : 0.0
+float score8 = not na(cfg8) ? cfg8.get_score(is_panic_era, is_inflation_era) : 0.0
+
+float total_score = score1 + score2 + score3 + score4 + score5 + score6 + score7 + score8
+
+// 4. 熔断判定 (OAS 唯一)
 bool is_meltdown = is_oas_crash
 
 // ==========================================
-// 4. 可视化
+// 5. 可视化
 // ==========================================
 
 // --- 颜色定义 ---
-c_zone_crash  = color.new(#500000, 60) // 危机模式 (总分 < -5.0) -> 更深、更不透明的黑红
-c_zone_warn   = color.new(color.red, 85) // 衰退预警 (-5.0 <= 总分 < -1.5) -> 鲜红但透明度高
-c_zone_noise  = color.new(color.orange, 90) // 混沌震荡 (-1.5 <= 总分 < 1.5) -> 很淡的橙色
-c_zone_grow   = color.new(color.green, 90) // 温和增长 (1.5 <= 总分 <= 5.0) -> 很淡的绿色
-c_zone_boom   = color.new(#006400, 85) // 全面复苏 (总分 > 5.0)
+c_zone_crash  = color.new(#500000, 60) // 危机模式 (< -5.0)
+c_zone_warn   = color.new(color.red, 85) // 衰退预警
+c_zone_noise  = color.new(color.orange, 90) // 混沌震荡
+c_zone_grow   = color.new(color.green, 90) // 温和增长
+c_zone_boom   = color.new(#006400, 85) // 全面复苏
 
 color line_col = na
 color bg_col = na
@@ -419,15 +531,9 @@ else
 // --- 绘制总分曲线 ---
 plot(total_score, "宏观总分", color=line_col, linewidth=3)
 hline(0, "零轴", color=color.gray)
-plot(5.0, "繁荣线 (+5)", color=color.new(color.green, 30), linewidth=2, style=plot.style_line)
-plot(-5.0, "危机线 (-5)", color=color.new(color.red, 30), linewidth=2, style=plot.style_line)
 
 // --- 背景分区 (基于事件优先级的最高预警机制) ---
-// 逻辑：
-// 1. 深红 (Crisis): OAS 熔断
-// 2. 红色 (Severe): 触发任意红色事件 (牛陡/衰退确认/通胀过热)
-// 3. 橙色 (Warning): 触发任意橙色事件 (萨姆预警/铜金暴跌/流动性枯竭)
-// 4. 无色: 其他情况 (保持清爽，仅靠曲线颜色判断多空)
+// 优先级: 熔断 > 红色事件 > 橙色事件 > 无
 
 bool has_red_event = is_bull_steep or (sahm_val >= 0.5) or (us_cpi_yoy > 3.0)
 bool has_orange_event = (sahm_val >= 0.3 and sahm_val < 0.5) or is_cg_crash or (is_us ? us_m2_yoy < th_liq_us_crash : cn_gap < th_liq_cn_crash)
@@ -435,31 +541,46 @@ bool has_orange_event = (sahm_val >= 0.3 and sahm_val < 0.5) or is_cg_crash or (
 color final_bg_col = na
 
 if is_meltdown
-    final_bg_col := c_zone_crash // 优先级 1: 熔断 (深红)
+    final_bg_col := c_zone_crash 
 else if has_red_event
-    final_bg_col := c_zone_warn  // 优先级 2: 严重事件 (红)
+    final_bg_col := c_zone_warn
 else if has_orange_event
-    final_bg_col := c_zone_noise // 优先级 3: 预警事件 (橙)
+    final_bg_col := c_zone_noise
 else
-    final_bg_col := na           // 优先级 4: 无事发生
+    final_bg_col := na
 
 bgcolor(final_bg_col, title="Event Priority BG")
 
-// --- 事件标记 (深红/红/橙) ---
-// 辅助函数: 绘制事件
-draw_event(cond, txt, col, y_offset, show_flag) =>
-    if show_markers and show_flag and cond and not cond[1]
-        label.new(bar_index, total_score + y_offset, txt, color=col, style=label.style_label_down, textcolor=color.white, size=size.small)
+// --- 事件标记 ---
+// 辅助函数：智能绘制事件 (自动颜色路由)
+plot_event_label(string id, MacroState cfg) =>
+    // 仅在状态变更且非空时绘制 (避免重复刷屏)
+    if not na(id) and (na(id[1]) or id != id[1]) and not na(cfg)
+        // 判定显示开关
+        bool is_visible = false
+        // 注意：颜色比较需精确匹配 register 中的定义
+        if cfg.col == #800000 // 深红 (熔断)
+            is_visible := show_markers_deep_red
+        else if cfg.col == color.red // 红色 (重扣/崩盘)
+            is_visible := show_markers_red
+        else if cfg.col == color.orange // 橙色 (预警/恶化)
+            is_visible := show_markers_orange
+        
+        // 绘制
+        if show_markers and is_visible
+            // 动态调整 Y 轴偏移量，避免重叠
+            float y_off = 1.0
+            if cfg.col == #800000
+                y_off := 2.0 // 熔断事件画高一点
+            
+            label.new(bar_index, total_score + y_off, cfg.label, color=cfg.col, style=label.style_label_down, textcolor=color.white, size=size.small)
 
-// 1. OAS 熔断 (深红)
-draw_event(is_oas_crash, "💔信用崩盘", #800000, 2, show_markers_deep_red)
-
-// 2. 红色事件 (扣分重项: -2.0 ~ -3.0)
-draw_event(is_bull_steep, "🐂牛陡(-3)", color.red, 1, show_markers_red)
-draw_event(sahm_val >= 0.5, "💀衰退(-3)", color.red, 1, show_markers_red)
-draw_event(us_cpi_yoy > 3.0, "🔥通胀(-2)", color.red, 1, show_markers_red)
-
-// 3. 橙色事件 (预警项: -1.0 ~ -2.0)
-draw_event(sahm_val >= 0.3 and sahm_val < 0.5, "⚠️萨姆预警", color.orange, 0.5, show_markers_orange)
-draw_event(is_cg_crash, "📉铜金暴跌", color.orange, 0.5, show_markers_orange)
-draw_event((is_us ? us_m2_yoy < th_liq_us_crash : cn_gap < th_liq_cn_crash), "💧流动性枯竭", color.orange, 0.5, show_markers_orange)
+// 依次调用 8 个维度
+plot_event_label(id1, cfg1)
+plot_event_label(id2, cfg2)
+plot_event_label(id3, cfg3)
+plot_event_label(id4, cfg4)
+plot_event_label(id5, cfg5)
+plot_event_label(id6, cfg6)
+plot_event_label(id7, cfg7)
+plot_event_label(id8, cfg8)
