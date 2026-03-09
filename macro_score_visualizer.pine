@@ -8,6 +8,10 @@ show_markers = input.bool(true, "显示总事件标记", group="显示设置")
 show_markers_deep_red = input.bool(true, "显示深红事件 (熔断)", group="显示设置")
 show_markers_red = input.bool(true, "显示红色事件 (严重)", group="显示设置")
 show_markers_orange = input.bool(false, "显示橙色事件 (预警)", group="显示设置")
+show_markers_green = input.bool(false, "显示绿色事件 (机会)", group="显示设置")
+show_markers_flood_1 = input.bool(true, "显示一级注水 (温和)", group="显示设置")
+show_markers_flood_2 = input.bool(true, "显示二级注水 (强力)", group="显示设置")
+show_markers_flood_3 = input.bool(true, "显示三级注水 (史诗)", group="显示设置")
 region = input.string("美国", "监控地区", options=["美国", "中国"], group="显示设置", tooltip="仅影响: 5.流动性")
 
 // --- 全局地区变量 ---
@@ -495,7 +499,40 @@ float total_score = score1 + score2 + score3 + score4 + score5 + score6 + score7
 bool is_meltdown = is_oas_crash
 
 // ==========================================
-// 5. 可视化
+// 5. 注水雷达 (Super Liquidity Radar)
+// ==========================================
+// 仅计算，不影响总分
+
+// 1. 三级注水 (史诗级): 零利率 + M2暴增 (>10%) + 深度负利
+bool is_flood_3 = false
+if is_us
+    is_flood_3 := effr_live < 0.25 and us_m2_yoy > 10.0 and tips_live < -0.5
+else
+    is_flood_3 := false // 中国暂不定义史诗级
+
+// 2. 二级注水 (强力): 低利率 (<2.0%) + M2高增 (>5%) + 负利
+bool is_flood_2 = false
+if is_us
+    is_flood_2 := effr_live < 2.0 and us_m2_yoy > 5.0 and tips_live < 0
+else
+    is_flood_2 := cn_gap > 5.0
+
+// 3. 一级注水 (温和): 降息周期 + M2扩张 (>0)
+bool is_flood_1 = false
+if is_us
+    is_flood_1 := id1 == "S1_CUT" and us_m2_yoy > 0
+else
+    is_flood_1 := cn_gap > 0
+
+// 优先级处理 (互斥)
+if is_flood_3
+    is_flood_2 := false
+    is_flood_1 := false
+else if is_flood_2
+    is_flood_1 := false
+
+// ==========================================
+// 6. 可视化
 // ==========================================
 
 // --- 颜色定义 ---
@@ -551,6 +588,37 @@ else
 
 bgcolor(final_bg_col, title="Event Priority BG")
 
+// --- 绘制注水事件 (顶部横条) ---
+// 颜色: 浅蓝 -> 深蓝 -> 紫
+col_flood_1 = color.new(#87CEEB, 60) // 天空蓝
+col_flood_2 = color.new(#1E90FF, 50) // 道奇蓝
+col_flood_3 = color.new(#00008B, 40) // 深海蓝
+
+// 必须在全局作用域调用 plot，通过条件颜色控制显示
+p1 = plot(12, display=display.none)
+p2 = plot(13, display=display.none)
+
+// 计算最终填充颜色 (优先级: 3 > 2 > 1)
+color fill_col = na
+if show_markers_flood_3 and is_flood_3
+    fill_col := col_flood_3
+else if show_markers_flood_2 and is_flood_2
+    fill_col := col_flood_2
+else if show_markers_flood_1 and is_flood_1
+    fill_col := col_flood_1
+
+fill(p1, p2, color=fill_col, title="Flood Fill")
+
+// 绘制标签 (依然保留在 if 块中，因为 label.new 可以局部调用)
+if show_markers_flood_3 and is_flood_3 and not is_flood_3[1]
+    label.new(bar_index, 13, "🌊🌊🌊洪水滔天", color=#00008B, style=label.style_label_down, textcolor=color.white, size=size.small)
+
+if show_markers_flood_2 and is_flood_2 and not is_flood_2[1]
+    label.new(bar_index, 13, "🌊🌊大水漫灌", color=#1E90FF, style=label.style_label_down, textcolor=color.white, size=size.small)
+
+if show_markers_flood_1 and is_flood_1 and not is_flood_1[1]
+    label.new(bar_index, 13, "🌊水位上涨", color=#87CEEB, style=label.style_label_down, textcolor=color.white, size=size.small)
+
 // --- 事件标记 ---
 // 辅助函数：智能绘制事件 (自动颜色路由)
 plot_event_label(string id, MacroState cfg) =>
@@ -565,6 +633,8 @@ plot_event_label(string id, MacroState cfg) =>
             is_visible := show_markers_red
         else if cfg.col == color.orange // 橙色 (预警/恶化)
             is_visible := show_markers_orange
+        else if cfg.col == color.lime // 绿色 (机会/复苏)
+            is_visible := show_markers_green
         
         // 绘制
         if show_markers and is_visible
