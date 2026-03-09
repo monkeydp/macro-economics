@@ -188,7 +188,7 @@ bool is_bear_steep = is_sustained(y10_chg_d > th_yc_bear_steep and y2_chg_d > 0 
 
 float s3 = 0.0
 if is_bull_steep
-    s3 := -2.0 // 【降级】从熔断改为重扣 -2.0
+    s3 := -3.0 // 【重扣分】牛陡恐慌，扣 -3.0 (极致恐慌)
 else if yc_val < -th_yc_noise
     s3 := -0.5
 else if math.abs(yc_val) <= th_yc_noise
@@ -220,7 +220,7 @@ bool is_sustained_oas_widen = is_sustained(oas_slope > th_oas_noise, bars_oas_co
 
 float s4 = 0.0
 if is_oas_crash
-    s4 := -2.0 // 维持熔断级扣分 (代码层面视为 -2.0，但在总分判定时有一票否决权)
+    s4 := -3.0 // 熔断虽然一票否决，但也给极重分 -3.0，拉低总分
 else if oas_val > 6.0
     s4 := -1.0
 else if oas_val >= 3.5
@@ -237,7 +237,7 @@ cn_gap = cn_m1_yoy - cn_m2_yoy
 float s5 = 0.0
 if is_us
     if us_m2_yoy < th_liq_us_crash
-        s5 := -1.0 // 【降级】从熔断改为 -1.0
+        s5 := -2.0 // 【重扣分】严重收缩，扣 -2.0 (旱灾)
     else if us_m2_yoy < 0
         s5 := -0.5
     else if us_m2_yoy > 0
@@ -246,7 +246,7 @@ if is_us
         s5 := 0.0
 else
     if cn_gap < th_liq_cn_crash
-        s5 := -1.0 // 【降级】从熔断改为 -1.0
+        s5 := -2.0 // 【重扣分】严重空转，扣 -2.0
     else if cn_gap < 0
         s5 := -0.5
     else if cn_gap > 0
@@ -270,7 +270,7 @@ bool is_widening = is_us ? us_profit_gap > us_profit_gap[1] : cn_profit_gap > cn
 float s6 = 0.0
 if is_us
     if us_cpi_yoy > 3.0
-        s6 := -2.0
+        s6 := -2.0 // 【重扣分】通胀过热，维持 -2.0 (杀估值)
     else if us_cpi_yoy < 0 and us_ppi_yoy < 0
         s6 := -1.0
     else if is_prof_neg
@@ -333,7 +333,7 @@ bool is_cop_trend_down = cop_trend_chg_pct < 0
 
 float s7 = 0.0
 if is_cg_crash
-    s7 := -1.0 // 【降级】从熔断改为 -1.0
+    s7 := -2.0 // 【重扣分】崩盘，扣 -2.0 (恐慌抛售)
 else if is_trend_up and is_cop_trend_down
     s7 := -0.5
 else if is_trend_down
@@ -350,9 +350,9 @@ bool icsa_warn = icsa_yoy > 15.0 and icsa_yoy_prev > 15.0
 
 float s8 = 0.0
 if sahm_val >= 0.5
-    s8 := -2.0 // 【降级】从熔断改为重扣 -2.0
+    s8 := -3.0 // 【重扣分】衰退确认，扣 -3.0 (经济硬着陆)
 else if sahm_val >= 0.3
-    s8 := -1.0 // 【升级】从 -0.5 加重到 -1.0 (关键预警)
+    s8 := -1.0 // 【升级】预警扣 -1.0
 else if icsa_warn
     s8 := -0.5
 else
@@ -396,6 +396,7 @@ c_zone_boom   = color.new(#006400, 85) // 全面复苏 (总分 > 5.0)
 color line_col = na
 color bg_col = na
 
+// 颜色逻辑：熔断优先，否则按总分分区
 if is_meltdown
     line_col := #800000 // 熔断：深红
     bg_col := c_zone_crash
@@ -418,16 +419,18 @@ else
 // --- 绘制总分曲线 ---
 plot(total_score, "宏观总分", color=line_col, linewidth=3)
 hline(0, "零轴", color=color.gray)
+plot(5.0, "繁荣线 (+5)", color=color.new(color.green, 30), linewidth=2, style=plot.style_line)
+plot(-5.0, "危机线 (-5)", color=color.new(color.red, 30), linewidth=2, style=plot.style_line)
 
 // --- 背景分区 (基于事件优先级的最高预警机制) ---
 // 逻辑：
 // 1. 深红 (Crisis): OAS 熔断
 // 2. 红色 (Severe): 触发任意红色事件 (牛陡/衰退确认/通胀过热)
-// 3. 橙色 (Warning): 触发任意橙色事件 (萨姆预警/铜金暴跌)
+// 3. 橙色 (Warning): 触发任意橙色事件 (萨姆预警/铜金暴跌/流动性枯竭)
 // 4. 无色: 其他情况 (保持清爽，仅靠曲线颜色判断多空)
 
 bool has_red_event = is_bull_steep or (sahm_val >= 0.5) or (us_cpi_yoy > 3.0)
-bool has_orange_event = (sahm_val >= 0.3 and sahm_val < 0.5) or is_cg_crash
+bool has_orange_event = (sahm_val >= 0.3 and sahm_val < 0.5) or is_cg_crash or (is_us ? us_m2_yoy < th_liq_us_crash : cn_gap < th_liq_cn_crash)
 
 color final_bg_col = na
 
@@ -451,12 +454,12 @@ draw_event(cond, txt, col, y_offset, show_flag) =>
 // 1. OAS 熔断 (深红)
 draw_event(is_oas_crash, "💔信用崩盘", #800000, 2, show_markers_deep_red)
 
-// 2. 红色事件 (扣分重项)
-draw_event(is_bull_steep, "🐂牛陡(-2)", color.red, 1, show_markers_red)
-draw_event(sahm_val >= 0.5, "💀衰退(-2)", color.red, 1, show_markers_red)
+// 2. 红色事件 (扣分重项: -2.0 ~ -3.0)
+draw_event(is_bull_steep, "🐂牛陡(-3)", color.red, 1, show_markers_red)
+draw_event(sahm_val >= 0.5, "💀衰退(-3)", color.red, 1, show_markers_red)
 draw_event(us_cpi_yoy > 3.0, "🔥通胀(-2)", color.red, 1, show_markers_red)
 
-// 3. 橙色事件 (预警项)
+// 3. 橙色事件 (预警项: -1.0 ~ -2.0)
 draw_event(sahm_val >= 0.3 and sahm_val < 0.5, "⚠️萨姆预警", color.orange, 0.5, show_markers_orange)
 draw_event(is_cg_crash, "📉铜金暴跌", color.orange, 0.5, show_markers_orange)
-
+draw_event((is_us ? us_m2_yoy < th_liq_us_crash : cn_gap < th_liq_cn_crash), "💧流动性枯竭", color.orange, 0.5, show_markers_orange)
