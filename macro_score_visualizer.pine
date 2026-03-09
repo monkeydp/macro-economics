@@ -159,8 +159,7 @@ if barstate.isfirst
     register("S4_GOOD",    1.0, 1.0, 1.0, "✅4收敛", color.lime)
 
     // --- 5. 流动性 (危机敏感) ---
-    // 枯竭: 危机时 x3
-    register("S5_CRASH",  -1.0, 3.0, 1.0, "💧5枯竭", color.red)
+    register("S5_CRASH",  -1.0, 1.0, 1.0, "💧5枯竭", color.red)
     register("S5_TIGHT",  -0.5, 1.0, 1.0, "📉5紧缩", color.orange)
     register("S5_NOISE",   0.0, 1.0, 1.0, "⚖️5存量", color.yellow)
     register("S5_GOOD",    1.0, 1.0, 1.0, "🌊5宽松", color.lime)
