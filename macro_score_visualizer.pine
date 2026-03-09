@@ -387,10 +387,10 @@ bool is_meltdown = is_oas_crash
 // ==========================================
 
 // --- 颜色定义 ---
-c_zone_crash  = color.new(#800000, 80) // 危机模式 (总分 < -5.0)
-c_zone_warn   = color.new(color.red, 80) // 衰退预警 (-5.0 <= 总分 < -1.5)
-c_zone_noise  = color.new(color.orange, 85) // 混沌震荡 (-1.5 <= 总分 < 1.5)
-c_zone_grow   = color.new(color.green, 90) // 温和增长 (1.5 <= 总分 <= 5.0)
+c_zone_crash  = color.new(#500000, 60) // 危机模式 (总分 < -5.0) -> 更深、更不透明的黑红
+c_zone_warn   = color.new(color.red, 85) // 衰退预警 (-5.0 <= 总分 < -1.5) -> 鲜红但透明度高
+c_zone_noise  = color.new(color.orange, 90) // 混沌震荡 (-1.5 <= 总分 < 1.5) -> 很淡的橙色
+c_zone_grow   = color.new(color.green, 90) // 温和增长 (1.5 <= 总分 <= 5.0) -> 很淡的绿色
 c_zone_boom   = color.new(#006400, 85) // 全面复苏 (总分 > 5.0)
 
 color line_col = na
@@ -419,9 +419,28 @@ else
 plot(total_score, "宏观总分", color=line_col, linewidth=3)
 hline(0, "零轴", color=color.gray)
 
-// --- 背景分区 ---
-// 使用单一 bgcolor 根据计算出的 bg_col 动态渲染
-bgcolor(bg_col, title="Zone BG")
+// --- 背景分区 (基于事件优先级的最高预警机制) ---
+// 逻辑：
+// 1. 深红 (Crisis): OAS 熔断
+// 2. 红色 (Severe): 触发任意红色事件 (牛陡/衰退确认/通胀过热)
+// 3. 橙色 (Warning): 触发任意橙色事件 (萨姆预警/铜金暴跌)
+// 4. 无色: 其他情况 (保持清爽，仅靠曲线颜色判断多空)
+
+bool has_red_event = is_bull_steep or (sahm_val >= 0.5) or (us_cpi_yoy > 3.0)
+bool has_orange_event = (sahm_val >= 0.3 and sahm_val < 0.5) or is_cg_crash
+
+color final_bg_col = na
+
+if is_meltdown
+    final_bg_col := c_zone_crash // 优先级 1: 熔断 (深红)
+else if has_red_event
+    final_bg_col := c_zone_warn  // 优先级 2: 严重事件 (红)
+else if has_orange_event
+    final_bg_col := c_zone_noise // 优先级 3: 预警事件 (橙)
+else
+    final_bg_col := na           // 优先级 4: 无事发生
+
+bgcolor(final_bg_col, title="Event Priority BG")
 
 // --- 事件标记 (深红/红/橙) ---
 // 辅助函数: 绘制事件
