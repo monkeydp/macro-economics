@@ -202,6 +202,10 @@ calc_slope_linreg(src, len) =>
     slope = ta.linreg(src, len, 0) - ta.linreg(src, len, 1)
     slope
 
+get_icon(string txt, int count = 1) =>
+    int len = count * 2
+    str.length(txt) >= len ? str.substring(txt, 0, len) : txt
+    
 calc_yoy(src, len) => (src / src[len] - 1) * 100
 is_sustained(cond, len) => math.sum(cond ? 1 : 0, len) == len
 
@@ -613,14 +617,17 @@ else if show_markers_flood_1 and is_flood_1
 fill(p1, p2, color=fill_col, title="Flood Fill")
 
 // 绘制标签 (依然保留在 if 块中，因为 label.new 可以局部调用)
-if show_markers_flood_3 and is_flood_3 and not is_flood_3[1] and show_labels
-    label.new(bar_index, 13, "🌊🌊🌊滔天", color=#00008B, style=label.style_label_down, textcolor=color.white, size=size.small)
+if show_markers_flood_3 and is_flood_3 and not is_flood_3[1]
+    string txt = "🌊🌊🌊滔天"
+    label.new(bar_index, 13, show_labels ? txt : get_icon(txt, 3), color=#00008B, style=label.style_label_down, textcolor=color.white, size=size.small)
 
-if show_markers_flood_2 and is_flood_2 and not is_flood_2[1] and show_labels
-    label.new(bar_index, 13, "🌊🌊漫灌", color=#1E90FF, style=label.style_label_down, textcolor=color.white, size=size.small)
+if show_markers_flood_2 and is_flood_2 and not is_flood_2[1]
+    string txt = "🌊🌊漫灌"
+    label.new(bar_index, 13, show_labels ? txt : get_icon(txt, 2), color=#1E90FF, style=label.style_label_down, textcolor=color.white, size=size.small)
 
-if show_markers_flood_1 and is_flood_1 and not is_flood_1[1] and show_labels
-    label.new(bar_index, 13, "🌊上涨", color=#87CEEB, style=label.style_label_down, textcolor=color.white, size=size.small)
+if show_markers_flood_1 and is_flood_1 and not is_flood_1[1]
+    string txt = "🌊上涨"
+    label.new(bar_index, 13, show_labels ? txt : get_icon(txt, 1), color=#87CEEB, style=label.style_label_down, textcolor=color.white, size=size.small)
 
 // --- 事件标记 ---
 // 辅助函数：智能绘制事件 (自动颜色路由)
@@ -646,8 +653,8 @@ plot_event_label(string id, MacroState cfg) =>
             if cfg.col == #800000
                 y_off := 2.0 // 熔断事件画高一点
             
-            // 极简模式：如果不显示文字，则 text 为空字符串，只显示圆点
-            string txt = show_labels ? cfg.label : ""
+            // 极简模式：如果不显示文字，则只显示 Emoji (调用 get_icon)
+            string txt = show_labels ? cfg.label : get_icon(cfg.label, 2) // 事件标记大多是 Emoji+数字，取4个字符(2个单位)比较稳
             label.new(bar_index, total_score + y_off, txt, color=cfg.col, style=label.style_label_down, textcolor=color.white, size=size.small)
 
 // --- 7. 时代雷达 (Era Radar) ---
@@ -665,14 +672,14 @@ bool is_recovery_era = (id7 == "S7_GOOD") and (id6 == "S6_GOOD" or id6 == "S6_TU
 
 // --- 绘制底部横条 ---
 
-
 // 恐慌时代
 p_pan_1 = plot(-12, display=display.none)
 p_pan_2 = plot(-14, display=display.none)
 fill(p_pan_1, p_pan_2, color=(show_era_radar and is_panic_era) ? color.new(#800000, 50) : na, title="Panic Era")
 
-if show_era_radar and is_panic_era and not is_panic_era[1] and show_labels
-    label.new(bar_index, -14, "💀恐慌", color=color.new(#800000, 50), style=label.style_label_up, textcolor=color.white, size=size.small)
+if show_era_radar and is_panic_era and not is_panic_era[1]
+    string txt = "💀恐慌"
+    label.new(bar_index, -14, show_labels ? txt : get_icon(txt), color=color.new(#800000, 50), style=label.style_label_up, textcolor=color.white, size=size.small)
 
 // 复苏时代
 p_rec_1 = plot(-16, display=display.none)
@@ -680,16 +687,18 @@ p_rec_2 = plot(-18, display=display.none)
 // 控制颜色: 如果开关没开或条件不满足，颜色为 na (不显示)
 fill(p_rec_1, p_rec_2, color=(show_era_radar and is_recovery_era) ? color.new(color.green, 50) : na, title="Recovery Era")
 
-if show_era_radar and is_recovery_era and not is_recovery_era[1] and show_labels
-    label.new(bar_index, -18, "🏆复苏", color=color.new(color.green, 50), style=label.style_label_up, textcolor=color.black, size=size.small)
+if show_era_radar and is_recovery_era and not is_recovery_era[1]
+    string txt = "🏆复苏"
+    label.new(bar_index, -18, show_labels ? txt : get_icon(txt), color=color.new(color.green, 50), style=label.style_label_up, textcolor=color.black, size=size.small)
 
 // 通胀时代
 p_inf_1 = plot(-20, display=display.none)
 p_inf_2 = plot(-22, display=display.none)
 fill(p_inf_1, p_inf_2, color=(show_era_radar and is_inflation_era) ? color.new(color.purple, 50) : na, title="Inflation Era")
 
-if show_era_radar and is_inflation_era and not is_inflation_era[1] and show_labels
-    label.new(bar_index, -22, "🔥通胀", color=color.new(color.purple, 50), style=label.style_label_up, textcolor=color.white, size=size.small)
+if show_era_radar and is_inflation_era and not is_inflation_era[1]
+    string txt = "🔥通胀"
+    label.new(bar_index, -22, show_labels ? txt : get_icon(txt), color=color.new(color.purple, 50), style=label.style_label_up, textcolor=color.white, size=size.small)
 
 // --- 绘制 ±5.0 阈值线 (核心决策线) ---
 
