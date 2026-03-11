@@ -202,10 +202,9 @@ calc_slope_linreg(src, len) =>
     slope = ta.linreg(src, len, 0) - ta.linreg(src, len, 1)
     slope
 
-get_icon(string txt, int count = 1) =>
-    int len = count * 2
+get_icon(string txt, int len = 2) =>
     str.length(txt) >= len ? str.substring(txt, 0, len) : txt
-    
+
 calc_yoy(src, len) => (src / src[len] - 1) * 100
 is_sustained(cond, len) => math.sum(cond ? 1 : 0, len) == len
 
@@ -619,15 +618,16 @@ fill(p1, p2, color=fill_col, title="Flood Fill")
 // 绘制标签 (依然保留在 if 块中，因为 label.new 可以局部调用)
 if show_markers_flood_3 and is_flood_3 and not is_flood_3[1]
     string txt = "🌊🌊🌊滔天"
-    label.new(bar_index, 13, show_labels ? txt : get_icon(txt, 3), color=#00008B, style=label.style_label_down, textcolor=color.white, size=size.small)
+    label.new(bar_index, 13, show_labels ? txt : get_icon(txt, 6), color=#00008B, style=label.style_label_down, textcolor=color.white, size=size.small)
 
 if show_markers_flood_2 and is_flood_2 and not is_flood_2[1]
     string txt = "🌊🌊漫灌"
-    label.new(bar_index, 13, show_labels ? txt : get_icon(txt, 2), color=#1E90FF, style=label.style_label_down, textcolor=color.white, size=size.small)
+    label.new(bar_index, 13, show_labels ? txt : get_icon(txt, 4), color=#1E90FF, style=label.style_label_down, textcolor=color.white, size=size.small)
 
 if show_markers_flood_1 and is_flood_1 and not is_flood_1[1]
     string txt = "🌊上涨"
-    label.new(bar_index, 13, show_labels ? txt : get_icon(txt, 1), color=#87CEEB, style=label.style_label_down, textcolor=color.white, size=size.small)
+    label.new(bar_index, 13, show_labels ? txt : get_icon(txt), color=#87CEEB, style=label.style_label_down, textcolor=color.white, size=size.small)
+
 
 // --- 事件标记 ---
 // 辅助函数：智能绘制事件 (自动颜色路由)
