@@ -1,5 +1,5 @@
 //@version=6
-indicator("[薯仔] 宏观总分扫描仪", overlay = false, max_labels_count = 500)
+indicator("[薯仔] 宏观总分", overlay = false, max_labels_count = 500)
 
 // ==========================================
 // 1. 设置与参数
@@ -701,6 +701,8 @@ if show_era_radar and is_inflation_era and not is_inflation_era[1]
     label.new(bar_index, -22, show_labels ? txt : get_icon(txt), color=color.new(color.purple, 50), style=label.style_label_up, textcolor=color.white, size=size.small)
 
 // --- 绘制 ±5.0 阈值线 (核心决策线) ---
+hline(5.0, "全面复苏线", color=color.green, linestyle=hline.style_dashed, linewidth=1)
+hline(-5.0, "危机模式线", color=color.red, linestyle=hline.style_dashed, linewidth=1)
 
 // --- 8. 恢复事件标记 (Event Markers) ---
 plot_event_label(id1, cfg1)
