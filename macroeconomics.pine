@@ -1760,8 +1760,63 @@ if barstate.islast and show_report
     // (5) 现状 (如: 全面复苏)
     table.cell(rpt, 5, 10, final_res, bgcolor = final_bgcolor, text_color = final_txt)
     
+    // --- Tooltip 生成逻辑 (11种场景) ---
+    string tip_title = ""
+    string tip_desc = ""
+    
+    // A. 反直觉/矛盾区 (7种)
+    if total_score >= 1.5 and total_score < 5.0 and (s7 == -1.0 or s2 == -1.0)
+        tip_title := "🟢 【衰退式宽松】 (抱团取暖)"
+        tip_desc := "🤔 疑惑: 实体/资金面差(两红一橙)，为何半仓/重仓？\n✅ 核心矛盾: 典型的“资产荒”。实体烂(S7红)导致资金不敢投实业，全涌入金融市场抱团。央行通常在救市(S1绿)。\n👉 策略含义: 这 50-80% 仓位不是赌经济复苏，而是赚“流动性溢价”(核心资产)和“避险溢价”(债)。"
+        
+    else if total_score > 5.0 and (s6 <= 0.0 or s7 <= 0.0) and (s1 == 1.0 or s5 == 1.0)
+        tip_title := "🟢 【无盈利繁荣】 (水牛/泡沫)"
+        tip_desc := "🤔 疑惑: 企业不赚钱甚至亏损，为何满仓猛干？这不是泡沫吗？\n✅ 核心矛盾: “水牛”。股市上涨不靠业绩(分子)，全靠降息放水拔估值(分母)。\n👉 策略含义: 享受泡沫。此时看业绩你就输了，要跟着央行的指挥棒跳舞，直到水龙头关上的那一刻。"
+        
+    else if total_score < -1.5 and (s7 == 1.0 or s6 == 1.0) and (s6 == -1.0 or s1 < 0 or s2 < 0)
+        tip_title := "🟠 【过热死】 (杀估值)"
+        tip_desc := "🤔 疑惑: 经济红火，财报也好，为何清仓跑路？\n✅ 核心矛盾: “戴维斯双杀”前夜。实体太好引发了通胀失控，央行被迫暴力加息(S1红)。\n👉 策略含义: 避其锋芒。业绩再好也抵不过估值腰斩。别留恋过去的繁荣，那是最后的晚餐。"
+        
+    else if s4 == -1.0 and (s1 == 1.0 or s5 == 1.0)
+        tip_title := "🛑 【流动性陷阱】 (信用杀)"
+        tip_desc := "🤔 疑惑: 央行都降息救市了，政策底都出来了，为何还不让抄底？还要我割肉？\n✅ 核心矛盾: “金融危机”。信用传导链条断裂，银行不敢放贷，企业不敢投，钱在空转。\n👉 策略含义: 保命第一。这时候的任何反弹都是诱多，千万别接飞刀。"
+        
+    else if total_score < -1.5 and total_score >= -5.0 and (s3 < 0 or s8 < 0)
+        tip_title := "🟠 【预防式下跌】 (抢跑/聪明的钱)"
+        tip_desc := "🤔 疑惑: 风平浪静，大家都在赚钱，为何突然让我跑？是不是太敏感了？\n✅ 核心矛盾: “聪明的钱在撤退”。先行指标(利差/萨姆)看到了未来6-12个月的衰退。\n👉 策略含义: 宁可卖错，不可不做。哪怕少赚最后几个铜板，也要规避可能的崩盘风险。"
+        
+    else if total_score >= -1.5 and total_score <= 1.5 and math.abs(s1) < 1.0 and math.abs(s2) < 1.0 and math.abs(s3) < 1.0 and math.abs(s4) < 1.0
+        tip_title := "🟡 【垃圾时间】 (阴跌)"
+        tip_desc := "🤔 疑惑: 看起来也没啥大风险，也没啥大利好，为何账户一直缩水？\n✅ 核心矛盾: “存量消耗战”。没有新故事，没有新资金，市场在漫无目的的震荡中通过“阴跌”来收割耐心。\n👉 策略含义: 空仓是种能力。这时候操作越多，亏得越多。"
+        
+    else if (s6 > 0 or s7 > 0) and s4 < 0
+        tip_title := "🟡 【信用背离】 (假顶)"
+        tip_desc := "🤔 疑惑: 股市明明在大涨，天天创新高，为何因为一个我看都不看的债券指标(OAS)让我减仓？\n✅ 核心矛盾: “聪明钱在撤退”的终极信号。债券市场通常比股市更聪明、更敏感。\n👉 策略含义: 听债券的。不要被股市的狂热蒙蔽双眼，提前离场。"
+
+    // B. 顺直觉/共振区 (4种)
+    else if total_score > 5.0
+        tip_title := "🟢 【全面复苏】 (共振)"
+        tip_desc := "✅ 核心矛盾: 实体与金融向上共振。戴维斯双击，每一次回调都是上车机会。\n👉 策略含义: 满仓猛干。"
+        
+    else if total_score >= 1.5
+        tip_title := "🟢 【温和复苏】 (结构性)"
+        tip_desc := "✅ 核心矛盾: 经济曲折前进。虽无全面爆发，但局部亮点(科技/消费)足以支撑慢牛。\n👉 策略含义: 轻指数重个股。"
+        
+    else if total_score < -1.5
+        tip_title := "🔴 【典型衰退】 (泥沙俱下)"
+        tip_desc := "✅ 核心矛盾: 周期下行，需求萎缩。市场为衰退定价，普跌。\n👉 策略含义: 防御反击，只留抗跌资产。"
+        
+    else if total_score > -1.5 and (s1 == 1.0 or s5 == 1.0)
+        tip_title := "🟡 【底部反转】 (政策底)"
+        tip_desc := "✅ 核心矛盾: 政策底领先市场底。虽然经济数据难看，但流动性已改变预期。\n👉 策略含义: 左侧建仓，博弈修复。"
+    else
+        tip_title := "【宏观诊断】"
+        tip_desc := "当前得分为 " + str.tostring(total_score) + "，请参考左侧具体指标分析。"
+
+    string final_tooltip = tip_title + "\n\n" + tip_desc
+    
     // (6) 详细建议
-    table.cell(rpt, 6, 10, final_full_sugg, bgcolor = final_bgcolor, text_color = final_txt, text_halign = text.align_left), table.merge_cells(rpt, 6, 10, 7, 10)
+    table.cell(rpt, 6, 10, final_full_sugg, bgcolor = final_bgcolor, text_color = final_txt, text_halign = text.align_left, tooltip = final_tooltip), table.merge_cells(rpt, 6, 10, 7, 10)
 
     // --- 右表: 详情 ---
     string d_title="", string d_def="", string d_obs="", string d_logic="", string d_conf="", string d_w="", string d_cur_stat="", string d_cur_val="", string d_turn_val="", string d_cur_mean="", string d_risk="", string d_tactics="", string d_tactics_turn=""
