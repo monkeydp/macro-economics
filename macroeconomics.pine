@@ -37,7 +37,7 @@ dur_yc_bear_conf= input.int(5, "熊陡确认时长 (日)", minval=1, group=grp_3
 th_yc_noise     = input.float(0.15, "震荡阈值", minval=0.0, step=0.01, group=grp_3, display=display.none)
 th_yc_bull_steep= input.float(0.15, "牛陡容差", minval=0.0, step=0.01, group=grp_3, display=display.none)
 th_yc_bear_steep= input.float(0.15, "熊陡容差", minval=0.0, step=0.01, group=grp_3, display=display.none)
-lock_bull_steep = input.int(10, "牛陡熔断锁定 (日)", minval=1, group=grp_3, display=display.none)
+lock_bull_steep = input.int(10, "牛陡锁定 (日)", minval=1, group=grp_3, display=display.none)
 
 
 // --- 4. 信用风险 (OAS) ---
@@ -869,10 +869,6 @@ max_score   = 8.0 + (is_inflation_era ? 2.0 : 0.0) + (is_recovery_era ? 2.0 : 0.
 // 熔断一票否决 (仅保留 OAS)
 bool is_meltdown = (id4 == "S4_CRASH")
 
-// 熔断降级 (仅用于 UI 变红，不强制空仓)
-// 其他原熔断项: 牛陡, 萨姆, 流动性, 铜金比
-bool is_soft_melt = (id3 == "S3_CRASH") or (id8 == "S8_CRASH") or (id5 == "S5_US_CRASH" or id5 == "S5_CN_CRASH") or (id7 == "S7_CRASH")
-
 // ==========================================
 // 4. UI 渲染
 // ==========================================
@@ -908,13 +904,6 @@ else if mode == "8. 萨姆规则"
     dyn_c := id8 == "S8_CRASH" ? c_super_red : (s8 == 1.0 ? c_lime : (s8 == -0.5 ? c_orange : c_yellow))
 
 // --- 状态文本生成器 ---
-
-// 实体热度崩盘背景高亮 (移除)
-// bool is_cg_crash_bg = mode == "7. 实体热度" and (id7 == "S7_CRASH" or ((timeframe.isweekly or timeframe.ismonthly) and cg_crash_scan))
-// bgcolor(is_cg_crash_bg ? color.new(c_super_red, 80) : na, title="Copper Crash BG")
-
-// 萨姆规则熔断背景高亮 (移除)
-// bgcolor(mode == "8. 萨姆规则" and id8 == "S8_CRASH" ? color.new(c_super_red, 80) : na, title="Sahm Meltdown BG")
 
 // 基准利率救火背景高亮 (全局作用域)
 bool is_effr_panic_bg = mode == "1. 基准利率" and (s1 == -1.0 or ((timeframe.isweekly or timeframe.ismonthly) and effr_drop >= 0.5))
@@ -1025,12 +1014,9 @@ if barstate.islast and mode == "2. 真实利率"
 // 3. 利差结构: 10Y-2Y
 bool is_bull_steep_melt = mode == "3. 利差结构" and s3 == -1.0 and w3 > 1.0
 
-// 曲线变色 (保持深红)
-color yc_col = is_bull_steep_melt ? c_super_red : dyn_c
+// 曲线变色
+color yc_col = is_bull_steep_melt ? c_red : dyn_c
 plot(mode == "3. 利差结构" ? plot_val : na, "10Y-2Y", color = yc_col, linewidth = 2)
-
-// 背景高亮 (移除牛陡熔断高亮，仅字体红)
-// bgcolor(is_bull_steep_melt ? color.new(c_super_red, 70) : na, title="Bull Steep Melt BG")
 
 // 文本标记 (仅在熔断开始时显示，避免拥挤)
 bool show_bull_mark = mode == "3. 利差结构" and is_bull_steep_melt
@@ -1048,7 +1034,7 @@ bool is_credit_crash = mode == "4. 信用风险" and s4 == -1.0 and w4 > 1.0
 if is_credit_crash and not is_credit_crash[1] and show_markers
     label.new(bar_index, plot_val + 0.5, "💔\n危机", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
 
-// 严重恶化标记 (非熔断，但恶化)
+// 严重恶化标记
 bool is_credit_bad = mode == "4. 信用风险" and s4 == -1.0 and w4 <= 1.0
 if is_credit_bad and not is_credit_bad[1] and show_markers
     label.new(bar_index, plot_val + 0.5, "🩸\n恶化", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
@@ -1081,20 +1067,17 @@ if show_liq_mark and not show_liq_mark[1] and show_markers
     label.new(bar_index, plot_val - 4, "🏜️\n枯竭", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
 
 if is_liq_meltdown
-    liq_col := c_super_red
+    liq_col := c_red
 
 plot(mode == "5. 流动性" ? plot_val : na, "Liquidity", color = liq_col, linewidth = 2)
-plot(mode == "5. 流动性" and is_us ? th_liq_us_crash : na, "M2 -2", color = c_super_red)
-plot(mode == "5. 流动性" and is_cn ? th_liq_cn_crash : na, "M1-M2 -5", color = c_super_red)
-
-// 移除流动性熔断背景高亮
-// bgcolor(mode == "5. 流动性" and is_liq_meltdown ? color.new(c_super_red, 70) : na, title="Liq Melt BG")
+plot(mode == "5. 流动性" and is_us ? th_liq_us_crash : na, "M2 -2", color = c_red)
+plot(mode == "5. 流动性" and is_cn ? th_liq_cn_crash : na, "M1-M2 -5", color = c_red)
 
 if barstate.islast and mode == "5. 流动性"
     if is_us
-        label.new(bar_index, th_liq_us_crash, "熔断 (-2.0)", color = c_super_red, style = label.style_label_left, textcolor = c_white, size = size.small)
+        label.new(bar_index, th_liq_us_crash, "枯竭 (-2.0)", color = c_red, style = label.style_label_left, textcolor = c_white, size = size.small)
     else
-        label.new(bar_index, th_liq_cn_crash, "熔断 (-5.0)", color = c_super_red, style = label.style_label_left, textcolor = c_white, size = size.small)
+        label.new(bar_index, th_liq_cn_crash, "枯竭 (-5.0)", color = c_red, style = label.style_label_left, textcolor = c_white, size = size.small)
 
 // 6. 利润空间: Gap
 float cpi_val = is_us ? us_cpi_yoy : cn_cpi_yoy
@@ -1144,10 +1127,7 @@ plot(mode == "7. 实体热度" ? plot_val : na, "Copper/Gold", color = dyn_c, li
 // 实体热度崩盘标记
 bool is_cg_crash_mark = mode == "7. 实体热度" and id7 == "S7_CRASH"
 if is_cg_crash_mark and not is_cg_crash_mark[1] and show_markers
-    label.new(bar_index, plot_val + 0.1, "📉\n熔断", color = color(na), style = label.style_none, textcolor = c_super_red, size = size.small, textalign = text.align_center)
-
-// 实体热度崩盘背景高亮 (已移除)
-// bgcolor(is_cg_crash_bg ? color.new(c_super_red, 80) : na, title="Copper Crash BG")
+    label.new(bar_index, plot_val + 0.1, "📉\n崩盘", color = color(na), style = label.style_none, textcolor = c_red, size = size.small, textalign = text.align_center)
 
 // 动态计算 EMA 周期
 // 日线: 60 (季度线)
@@ -1159,18 +1139,17 @@ plot(mode == "7. 实体热度" ? ta.ema(plot_val, ema_len_dynamic) : na, "CG EMA
 // 8. 萨姆规则: Sahm + 阈值
 plot(mode == "8. 萨姆规则" ? plot_val : na, "Sahm", color = dyn_c, linewidth = 2)
 
-// 衰退熔断标记
 bool is_sahm_melt = mode == "8. 萨姆规则" and s8 == -1.0
 if is_sahm_melt and not is_sahm_melt[1] and show_markers
     label.new(bar_index, plot_val + 0.1, "💀\n衰退", color = color(na), style = label.style_none, textcolor = c_black, size = size.small, textalign = text.align_center)
 
 // 萨姆规则阈值线
-plot(mode == "8. 萨姆规则" ? 0.50 : na, "衰退熔断线", color = c_super_red, linewidth = 2, style = plot.style_line)
-plot(mode == "8. 萨姆规则" ? 0.30 : na, "衰退关注线", color = c_orange, linewidth = 1, style = plot.style_circles)
+plot(mode == "8. 萨姆规则" ? 0.50 : na, "衰退危机", color = c_red, linewidth = 2, style = plot.style_line)
+plot(mode == "8. 萨姆规则" ? 0.30 : na, "衰退关注", color = c_orange, linewidth = 1, style = plot.style_circles)
 
 // 萨姆规则标签
 if mode == "8. 萨姆规则" and barstate.islast
-    label.new(bar_index + 3, 0.50, "衰退熔断 (0.5%)", color = color(na), style = label.style_none, textcolor = c_super_red, size = size.normal, textalign = text.align_left)
+    label.new(bar_index + 3, 0.50, "衰退熔断 (0.5%)", color = color(na), style = label.style_none, textcolor = c_red, size = size.normal, textalign = text.align_left)
     label.new(bar_index + 3, 0.30, "衰退关注 (0.3%)", color = color(na), style = label.style_none, textcolor = c_orange, size = size.small, textalign = text.align_left)
 
 // 通用 0 轴 (虚线)
