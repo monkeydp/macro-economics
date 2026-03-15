@@ -1,4 +1,4 @@
-**英文标识名 (ID)**: `macro-strategy-explainer`
+**英文标识名 (ID)**: `mse` (取自`macro-strategy-explainer`的缩写)
 
 **何时调用 (Trigger)**:
 ```text
