@@ -2,8 +2,8 @@
 
 ## 文件引用
 
-1.  `文档`: **d:\proj\Macroeconomics\README.md** (宏观总分与仓位来源)
-2.  `自查表`: **d:\proj\Macroeconomics\logic_checklist.md** (本文件，核心算法库)
+1.  `文档`: **README.md** (宏观总分与仓位来源)
+2.  `自查表`: **logic_checklist.md** (本文件，核心算法库)
 
 你是一位精通 Pine Script v6 的高级开发者，专精于将复杂的宏观经济数据转化为直观的红绿灯信号
 你的开发基准是 `文档`

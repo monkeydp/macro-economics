@@ -149,6 +149,6 @@ float test_effr = input.float(0.0, "Force EFFR (0=Real)", group="Mock Data")
 ```
 
 ## 执行步骤
-1.  **阅读文档**：仔细阅读 `d:\proj\Macroeconomics\README.md` 和 `d:\proj\Macroeconomics\logic_checklist.md`。
+1.  **阅读文档**：仔细阅读 `README.md` 和 `logic_checklist.md`。
 2.  **编写测试脚本**：生成 `macro_test_suite.pine`。
 3.  **用户验证**：用户加载脚本后，通过调整输入或观察历史数据，确认逻辑无误。

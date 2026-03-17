@@ -7,13 +7,13 @@
 
 以下为本提示词中使用的文件简称及其绝对路径，所有规则均基于这些文件：
 
-1.  `文档`: **d:\proj\Macroeconomics\README.md**
-2.  `自查表`: **d:\proj\Macroeconomics\logic_checklist.md**
+1.  `文档`: **README.md**
+2.  `自查表`: **logic_checklist.md**
     *   `左表`: 自查表中的 **左表文案对照表**
     *   `资产表`: 自查表中的 **资产全景映射表**
     *   `属性表`: 自查表中的 **资产属性含义详解**
     *   `杀伤表`: 自查表中的 **杀伤逻辑层级对比**
-2.  `右表`: **d:\proj\Macroeconomics\logic_checklist_right_table.md**
+2.  `右表`: **logic_checklist_right_table.md**
 
 ## 核心原则 (执行红线)
 

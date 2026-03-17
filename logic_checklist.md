@@ -2,8 +2,8 @@
 
 ## 文件引用
 
-1.  `文档`: **d:\proj\Macroeconomics\README.md** (宏观总分与仓位来源)
-2.  `自查表`: **d:\proj\Macroeconomics\logic_checklist.md** (本文件，核心算法库)
+1.  `文档`: **README.md** (宏观总分与仓位来源)
+2.  `自查表`: **logic_checklist.md** (本文件，核心算法库)
     *   `左表`: **左表文案对照表**
     *   `资产表`: **资产全景映射表**
     *   `属性表`: **资产属性含义详解**
