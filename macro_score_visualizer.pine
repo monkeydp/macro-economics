@@ -98,8 +98,7 @@ sym_icsa        = input.symbol("FRED:ICSA", "数据源 (ICSA)", group=grp_8, dis
 // 1. 定义结构体
 type MacroState
     float base_score      // 基础分 (-1.0 ~ 1.0)
-    float w_panic         // 危机权重 (默认 1.0)
-    float w_inflation     // 通胀权重 (默认 1.0)
+    int dim_id            // 维度ID (1-8)
     string label          // 简短标签 (如 "牛陡")
     color col             // 颜色 (如 red)
 
@@ -107,91 +106,119 @@ type MacroState
 var state_map = map.new<string, MacroState>()
 
 // 3. 注册函数 (智能构造)
-register(string id, float s, float wp, float wi, string l, color c) =>
-    // 默认值处理：如果 wp/wi 为 na，则设为 1.0
-    float _wp = na(wp) ? 1.0 : wp
-    float _wi = na(wi) ? 1.0 : wi
-    state_map.put(id, MacroState.new(s, _wp, _wi, l, c))
+register(string id, float s, int d, string l, color c) =>
+    state_map.put(id, MacroState.new(s, d, l, c))
 
 // 4. 核心计算方法 (逻辑层)
-// 这就是您要的 "获取分数方法"
-method get_score(MacroState this, bool is_panic, bool is_inflation) =>
-    // 默认权重为 1.0 (常规时代)
+method get_score(MacroState this, bool is_panic, bool is_stagflation, bool is_inflation, bool is_depression, bool is_recovery) =>
+    // 默认权重为 1.0
     float w = 1.0
+    float s = this.base_score
+    int d = this.dim_id
     
-    // 优先级判断：危机 > 通胀 > 常规
-    if is_panic
-        w := this.w_panic
-    else if is_inflation
-        w := this.w_inflation
+    // --- 负分逻辑 (风险放大) ---
+    if s < 0
+        // 1. 滞胀时代 (Stagflation): RGDP < 0 且 CPI > 3.0%
+        // 负分 x3: 真实利率(2) / 利润空间(6)
+        // 负分 x2: 实体热度(7) / 基准利率(1)
+        if is_stagflation
+            if d == 2 or d == 6
+                w := math.max(w, 3.0)
+            if d == 7 or d == 1
+                w := math.max(w, 2.0)
         
+        // 2. 通胀时代 (Inflation): RGDP >= 0 且 CPI > 3.0%
+        // 负分 x2: 利润空间(6) / 实体热度(7)
+        if is_inflation
+            if d == 6 or d == 7
+                w := math.max(w, 2.0)
+
+        // 3. 萧条时代 (Depression): RGDP < 0 且 CPI < 0 且 PPI < 0
+        // 负分 x3: 真实利率(2)
+        // 负分 x2: 利润空间(6) / 实体热度(7)
+        if is_depression
+            if d == 2
+                w := math.max(w, 3.0)
+            if d == 6 or d == 7
+                w := math.max(w, 2.0)
+
+        // 4. 恐慌时代 (Panic): 萨姆 > 0.3% 或 牛陡
+        // 负分 x3: 利差结构(3) / 信用风险(4) / 萨姆规则(8)
+        if is_panic
+            if d == 3 or d == 4 or d == 8
+                w := math.max(w, 3.0)
+
+    // --- 正分逻辑 (机会放大) ---
+    // 5. 复苏时代 (Recovery): 实体热度 = +1.0 且 利润空间 ≥ +0.5
+    if s > 0 and is_recovery
+        if d == 7 // 实体热度 -> x2
+            w := math.max(w, 2.0)
+        if d == 6 // 利润空间
+            if s >= 1.0 // 利润走阔 (+1.0) -> x2
+                w := math.max(w, 2.0)
+            else if s >= 0.5 // 困境反转 (+0.5) -> x1.5
+                w := math.max(w, 1.5)
+    
     // 返回最终得分 (基础分 * 权重)
-    this.base_score * w
+    s * w
 
 // --- 初始化所有状态配置 ---
 if barstate.isfirst
-    // --- 1. 基准利率 ---
-    register("S1_PANIC", -1.0, 1.0, 1.0, "🚒1救火", color.red)
-    register("S1_HIKE",  -0.5, 1.0, 1.0, "💧1加息", color.orange)
-    register("S1_NOISE",  0.0, 1.0, 1.0, "⚖️1震荡", color.yellow)
-    register("S1_CUT",    1.0, 1.0, 1.0, "✂️1降息", color.lime)
+    // --- 1. 基准利率 (ID=1) ---
+    register("S1_PANIC", -1.0, 1, "🚒1救火降息", #800000)
+    register("S1_HIKE",  -0.5, 1, "💧1加息周期", color.orange)
+    register("S1_NOISE",  0.0, 1, "⚖️1利率震荡", color.yellow)
+    register("S1_CUT",    1.0, 1, "✂️1降息周期", color.lime)
 
-    // --- 2. 真实利率 ---
-    register("S2_STAG",   -1.0, 1.0, 1.0, "🔥2滞胀", color.red)
-    register("S2_SIPHON", -1.0, 1.0, 1.0, "🌪️2虹吸", color.red)
-    register("S2_KILL",   -0.5, 1.0, 1.0, "🔪2杀估值", color.orange)
-    register("S2_RISE",    0.0, 1.0, 1.0, "📈2上升", color.yellow)
-    register("S2_NEG",     1.0, 1.0, 1.0, "📉2负利", color.lime)
-    register("S2_HEALTH",  1.0, 1.0, 1.0, "✅2健康", color.lime)
+    // --- 2. 真实利率 (ID=2) ---
+    register("S2_STAG",   -1.0, 2, "🔥2经济衰退", color.red)
+    register("S2_SIPHON", -1.0, 2, "🌪️2虹吸", color.red)
+    register("S2_KILL",   -0.5, 2, "🔪2杀估值", color.orange)
+    register("S2_RISE",    0.0, 2, "📈2容错率低", color.yellow)
+    register("S2_HEALTH",  1.0, 2, "✅2健康支撑", color.lime)
+    register("S2_NEG",     1.0, 2, "📉2负利率", color.lime)
 
-    // --- 3. 利差结构 (危机敏感) ---
-    // 牛陡: 危机时权重 x3
-    register("S3_CRASH",  -1.0, 3.0, 1.0, "🐂3牛陡", color.red) 
-    register("S3_INVERT", -0.5, 1.0, 1.0, "🙃3倒挂", color.orange)
-    register("S3_FLAT",    0.0, 1.0, 1.0, "➖3平坦", color.yellow)
-    register("S3_STEEP",   0.5, 1.0, 1.0, "📶3陡峭", color.lime)
-    register("S3_BEAR",    1.0, 1.0, 1.0, "🐻3熊陡", color.lime)
+    // --- 3. 利差结构 (ID=3) ---
+    register("S3_CRASH",  -1.0, 3, "🐂3牛陡", color.red) 
+    register("S3_INVERT", -0.5, 3, "🙃3倒挂", color.orange)
+    register("S3_FLAT",    0.0, 3, "➖3平坦", color.yellow)
+    register("S3_STEEP",   0.5, 3, "📶3陡峭", color.lime)
+    register("S3_BEAR",    1.0, 3, "🐻3熊陡", color.lime)
 
-    // --- 4. 信用风险 (危机敏感) ---
-    // 熔断: 权重 x3 (虽然有一票否决，但分也要扣够)
-    register("S4_CRASH",  -1.0, 3.0, 1.0, "💔4信用崩盘", #800000) 
-    // 恶化: 权重 x3
-    register("S4_BAD",    -1.0, 3.0, 1.0, "⚠️4信用恶化", color.red)
-    register("S4_WIDEN",  -0.5, 1.0, 1.0, "📉4走阔", color.orange)
-    register("S4_BOTTOM",  0.0, 1.0, 1.0, "🔄4触底", color.yellow)
-    register("S4_LOCAL",   0.0, 1.0, 1.0, "🔍4分化", color.yellow)
-    register("S4_GOOD",    1.0, 1.0, 1.0, "✅4收敛", color.lime)
+    // --- 4. 信用风险 (ID=4) ---
+    register("S4_CRASH",  -1.0, 4, "💔4信用危机", #800000) 
+    register("S4_BAD",    -1.0, 4, "⚠️4严重恶化", color.red)
+    register("S4_WIDEN",  -0.5, 4, "📉4风险走阔", color.orange)
+    register("S4_LOCAL",   0.0, 4, "🔍4局部压力", color.yellow)
+    register("S4_BOTTOM",  0.0, 4, "🔄4底部回升", color.yellow)
+    register("S4_GOOD",    1.0, 4, "✅4风险收敛", color.lime)
 
-    // --- 5. 流动性 (危机敏感) ---
-    register("S5_CRASH",  -1.0, 1.0, 1.0, "💧5枯竭", color.red)
-    register("S5_TIGHT",  -0.5, 1.0, 1.0, "📉5紧缩", color.orange)
-    register("S5_NOISE",   0.0, 1.0, 1.0, "⚖️5存量", color.yellow)
-    register("S5_GOOD",    1.0, 1.0, 1.0, "🌊5宽松", color.lime)
+    // --- 5. 流动性 (ID=5) ---
+    register("S5_CRASH",  -1.0, 5, "💧5严重收缩", #800000)
+    register("S5_TIGHT",  -0.5, 5, "📉5资金收缩", color.orange)
+    register("S5_NOISE",   0.0, 5, "⚖️5存量博弈", color.yellow)
+    register("S5_GOOD",    1.0, 5, "🌊5资金扩张", color.lime)
 
-    // --- 6. 利润空间 (通胀敏感) ---
-    // 滞胀/过热: 通胀时 x2
-    register("S6_HEAT",   -1.0, 1.0, 2.0, "🔥6过热", color.red)
-    register("S6_DEFL",   -1.0, 1.0, 1.0, "❄️6通缩", color.red)
-    register("S6_BAD",    -0.5, 1.0, 2.0, "📉6倒挂", color.orange) // 利润倒挂在通胀期也很痛
-    register("S6_NOISE",   0.0, 1.0, 1.0, "⚖️6承压", color.yellow)
-    register("S6_TURN",    0.5, 1.0, 2.0, "🔄6反转", color.lime) // 正分保留 x2 (通胀抗压)
-    register("S6_GOOD",    1.0, 1.0, 2.0, "💰6走阔", color.lime) // 正分保留 x2
+    // --- 6. 利润空间 (ID=6) ---
+    register("S6_HEAT",   -1.0, 6, "🔥6通胀过热", color.red)
+    register("S6_DEFL",   -1.0, 6, "❄️6深度通缩", color.red)
+    register("S6_BAD",    -0.5, 6, "📉6亏损恶化", color.orange)
+    register("S6_NOISE",   0.0, 6, "⚖️6利润承压", color.yellow)
+    register("S6_TURN",    0.5, 6, "🔄6困境反转", color.lime) 
+    register("S6_GOOD",    1.0, 6, "💰6利润走阔", color.lime) 
 
-    // --- 7. 实体热度 (通胀敏感) ---
-    // 崩盘: 通胀时 x2 (滞胀)
-    register("S7_CRASH",  -1.0, 1.0, 2.0, "📉7崩盘", color.red)
-    register("S7_RECESS", -0.5, 1.0, 1.0, "🍂7衰退", color.orange)
-    register("S7_FAKE",   -0.5, 1.0, 1.0, "🎭7伪复苏", color.orange)
-    register("S7_NOISE",   0.0, 1.0, 1.0, "⚖️7震荡", color.yellow)
-    register("S7_GOOD",    1.0, 1.0, 2.0, "🏭7复苏", color.lime) // 正分保留 x2 (商品牛市)
+    // --- 7. 实体热度 (ID=7) ---
+    register("S7_CRASH",  -1.0, 7, "📉7信心崩盘", color.red)
+    register("S7_RECESS", -0.5, 7, "🍂7实体衰退", color.orange)
+    register("S7_FAKE",   -0.5, 7, "🎭7伪复苏", color.orange)
+    register("S7_NOISE",   0.0, 7, "⚖️7常态震荡", color.yellow)
+    register("S7_GOOD",    1.0, 7, "🏭7实体复苏", color.lime)
 
-    // --- 8. 萨姆规则 (危机敏感) ---
-    // 确认: 危机时 x3
-    register("S8_CRASH",  -1.0, 3.0, 1.0, "💀8衰退确认", color.red)
-    // 预警: 危机时 x3 (提前反应)
-    register("S8_RISK",   -0.5, 3.0, 1.0, "⚠️8衰退预警", color.orange)
-    register("S8_WARN",   -0.5, 3.0, 1.0, "⚠️8ICSA预警", color.orange)
-    register("S8_GOOD",    1.0, 1.0, 1.0, "✅8就业健康", color.lime)
+    // --- 8. 萨姆规则 (ID=8) ---
+    register("S8_CRASH",  -1.0, 8, "💀8衰退确认", color.red)
+    register("S8_RISK",   -0.5, 8, "⚠️8衰退关注", color.orange)
+    register("S8_WARN",   -0.5, 8, "⚠️8ICSA预警", color.orange)
+    register("S8_GOOD",    1.0, 8, "✅8就业健康", color.lime)
 
 // ==========================================
 // 3. 数据获取与计算
@@ -225,6 +252,9 @@ else if timeframe.isweekly or timeframe.ismonthly
 
 int dur_panic_bars = math.max(1, math.ceil(dur_sahm_panic * sec_per_day / sec_per_bar))
 bool in_panic_window = ta.barssince(effr_drop_scan >= 0.5) < dur_panic_bars
+
+// 救火降息锁定判定
+bool is_s1_panic_locked = in_panic_window
 
 string id1 = na
 if in_panic_window
@@ -347,9 +377,21 @@ cn_m1_yoy = request.security(sym_cn_m1, "M", calc_yoy(close, liq_yoy_len), gaps 
 cn_m2_yoy = request.security(sym_cn_m2, "M", calc_yoy(close, liq_yoy_len), gaps = barmerge.gaps_off)
 cn_gap = cn_m1_yoy - cn_m2_yoy
 
+// 锁定机制: 流动性枯竭 (M2 / M1-M2)
+// 根据文档: 强制锁定 3 个月
+int bars_lock_liq = math.max(1, math.ceil(lock_liq_crash * 30 * sec_per_day / sec_per_bar))
+bool liq_crash_scan = is_us ? (us_m2_yoy < th_liq_us_crash) : (cn_gap < th_liq_cn_crash)
+
+var int liq_crash_cnt = 0
+if liq_crash_scan
+    liq_crash_cnt := bars_lock_liq
+else if liq_crash_cnt > 0
+    liq_crash_cnt := liq_crash_cnt - 1
+bool is_s5_crash_locked = liq_crash_cnt > 0
+
 string id5 = na
 if is_us
-    if us_m2_yoy < th_liq_us_crash
+    if is_s5_crash_locked
         id5 := "S5_CRASH"
     else if us_m2_yoy < 0
         id5 := "S5_TIGHT"
@@ -358,7 +400,7 @@ if is_us
     else
         id5 := "S5_NOISE"
 else
-    if cn_gap < th_liq_cn_crash
+    if is_s5_crash_locked
         id5 := "S5_CRASH"
     else if cn_gap < 0
         id5 := "S5_TIGHT"
@@ -475,9 +517,22 @@ else
 // 4. 总分计算与权重
 // ==========================================
 
-// 1. 判定时代
-bool is_inflation_era = (is_us ? us_cpi_yoy : cn_cpi_yoy) > 3.0
-bool is_panic_era     = sahm_val >= 0.3 or is_bull_steep
+// 1. 判定时代 (Era Flags)
+// - 滞胀时代 (Stagflation): RGDP < 0 且 CPI > 3.0%
+bool is_stagflation_era = rgdp_val < 0 and (is_us ? us_cpi_yoy : cn_cpi_yoy) > 3.0
+
+// - 通胀时代 (Inflation): RGDP >= 0 且 CPI > 3.0%
+bool is_inflation_era   = rgdp_val >= 0 and (is_us ? us_cpi_yoy : cn_cpi_yoy) > 3.0
+
+// - 萧条时代 (Depression): RGDP < 0 且 CPI < 0 且 PPI < 0
+bool is_depression_era  = rgdp_val < 0 and (is_us ? (us_cpi_yoy < 0 and us_ppi_yoy < 0) : (cn_cpi_yoy < 0 and cn_ppi_yoy < 0))
+
+// - 恐慌时代 (Panic): 萨姆 > 0.3% 或 牛陡
+bool is_panic_era       = sahm_val >= 0.3 or is_bull_steep
+
+// - 复苏时代 (Recovery): 实体热度(ID=7) = +1.0 且 利润空间(ID=6) >= +0.5
+// 依赖状态解析，放到获取配置后判定
+bool is_recovery_era = false 
 
 // 2. 获取配置对象
 MacroState cfg1 = state_map.get(id1)
@@ -489,20 +544,26 @@ MacroState cfg6 = state_map.get(id6)
 MacroState cfg7 = state_map.get(id7)
 MacroState cfg8 = state_map.get(id8)
 
+// 判断复苏时代
+if not na(cfg7) and not na(cfg6)
+    is_recovery_era := (cfg7.base_score == 1.0) and (cfg6.base_score >= 0.5)
+
 // 3. 计算加权得分
-float score1 = not na(cfg1) ? cfg1.get_score(is_panic_era, is_inflation_era) : 0.0
-float score2 = not na(cfg2) ? cfg2.get_score(is_panic_era, is_inflation_era) : 0.0
-float score3 = not na(cfg3) ? cfg3.get_score(is_panic_era, is_inflation_era) : 0.0
-float score4 = not na(cfg4) ? cfg4.get_score(is_panic_era, is_inflation_era) : 0.0
-float score5 = not na(cfg5) ? cfg5.get_score(is_panic_era, is_inflation_era) : 0.0
-float score6 = not na(cfg6) ? cfg6.get_score(is_panic_era, is_inflation_era) : 0.0
-float score7 = not na(cfg7) ? cfg7.get_score(is_panic_era, is_inflation_era) : 0.0
-float score8 = not na(cfg8) ? cfg8.get_score(is_panic_era, is_inflation_era) : 0.0
+float score1 = not na(cfg1) ? cfg1.get_score(is_panic_era, is_stagflation_era, is_inflation_era, is_depression_era, is_recovery_era) : 0.0
+float score2 = not na(cfg2) ? cfg2.get_score(is_panic_era, is_stagflation_era, is_inflation_era, is_depression_era, is_recovery_era) : 0.0
+float score3 = not na(cfg3) ? cfg3.get_score(is_panic_era, is_stagflation_era, is_inflation_era, is_depression_era, is_recovery_era) : 0.0
+float score4 = not na(cfg4) ? cfg4.get_score(is_panic_era, is_stagflation_era, is_inflation_era, is_depression_era, is_recovery_era) : 0.0
+float score5 = not na(cfg5) ? cfg5.get_score(is_panic_era, is_stagflation_era, is_inflation_era, is_depression_era, is_recovery_era) : 0.0
+float score6 = not na(cfg6) ? cfg6.get_score(is_panic_era, is_stagflation_era, is_inflation_era, is_depression_era, is_recovery_era) : 0.0
+float score7 = not na(cfg7) ? cfg7.get_score(is_panic_era, is_stagflation_era, is_inflation_era, is_depression_era, is_recovery_era) : 0.0
+float score8 = not na(cfg8) ? cfg8.get_score(is_panic_era, is_stagflation_era, is_inflation_era, is_depression_era, is_recovery_era) : 0.0
 
 float total_score = score1 + score2 + score3 + score4 + score5 + score6 + score7 + score8
 
-// 4. 熔断判定 (OAS 唯一)
-bool is_meltdown = is_oas_crash
+// 4. 危机判定 (Crisis: 归零风险)
+// 包含: S1_PANIC(救火降息), S4_CRASH(信用崩盘), S5_CRASH(流动性枯竭)
+// 只有当这些事件处于"锁定/持续"状态时才触发危机
+bool is_crisis = is_s1_panic_locked or is_oas_crash or is_s5_crash_locked
 
 // ==========================================
 // 5. 注水雷达 (Super Liquidity Radar)
@@ -542,57 +603,42 @@ else if is_flood_2
 // ==========================================
 
 // --- 颜色定义 ---
-c_zone_crash  = color.new(#500000, 60) // 危机模式
-c_zone_warn   = color.new(color.red, 85) // 衰退预警
-c_zone_noise  = color.new(color.orange, 90) // 混沌震荡
-c_zone_grow   = color.new(color.green, 90) // 温和增长
-c_zone_boom   = color.new(#006400, 85) // 全面复苏
+// 对应 README 中的 6 级颜色系统
+c_zone_crisis   = color.new(#500000, 60) // 🛑 深红背景 (危机)
+c_zone_recess   = color.new(color.red, 85) // 🔴 红色 (衰退)
+c_zone_warn     = color.new(color.orange, 90) // 🟠 橙色 (逆风)
+c_zone_noise    = color.new(color.yellow, 90) // 🟡 黄色 (震荡)
+c_zone_grow     = color.new(color.green, 90) // 🟢 浅绿 (弱进攻)
+c_zone_boom     = color.new(#006400, 85) // 🟢 深绿背景 (满仓进攻)
 
 color line_col = na
 color bg_col = na
 
-// 颜色逻辑：熔断优先，否则按总分分区
-if is_meltdown
-    line_col := #800000 // 熔断：深红
-    bg_col := c_zone_crash
-else if total_score <= -6
+// 颜色逻辑：线段颜色只看总分，背景颜色只看危机
+if total_score <= -6.0
     line_col := color.red
-    bg_col := c_zone_crash
-else if total_score < -3
+else if total_score < -3.0 // (-6.0, -3.0)
     line_col := color.orange
-    bg_col := c_zone_warn
-else if total_score <= 1
+else if total_score <= 1.0 // [-3.0, +1.0]
     line_col := color.yellow
-    bg_col := c_zone_noise
-else if total_score < 4.0
+else if total_score < 4.0 // (+1.0, +4.0)
     line_col := color.lime
-    bg_col := c_zone_grow
-else
+else // >= +4.0
     line_col := #006400
-    bg_col := c_zone_boom
+
+// 背景只在危机时显示
+if is_crisis
+    bg_col := c_zone_crisis
+else
+    bg_col := na
 
 // --- 绘制总分曲线 ---
 plot(total_score, "宏观总分", color=line_col, linewidth=3)
 hline(0, "零轴", color=color.gray)
 
-// --- 背景分区 (基于事件优先级的最高预警机制) ---
-// 优先级: 熔断 > 红色事件 > 橙色事件 > 无
-
-bool has_red_event = is_bull_steep or (sahm_val >= 0.5) or (us_cpi_yoy > 3.0)
-bool has_orange_event = (sahm_val >= 0.3 and sahm_val < 0.5) or is_cg_crash or (is_us ? us_m2_yoy < th_liq_us_crash : cn_gap < th_liq_cn_crash)
-
-color final_bg_col = na
-
-if is_meltdown
-    final_bg_col := c_zone_crash 
-else if has_red_event
-    final_bg_col := c_zone_warn
-else if has_orange_event
-    final_bg_col := c_zone_noise
-else
-    final_bg_col := na
-
-bgcolor(final_bg_col, title="Event Priority BG")
+// --- 背景分区 ---
+// 直接使用主逻辑计算出的背景颜色
+bgcolor(bg_col, title="Zone Background")
 
 // --- 绘制注水事件 (顶部横条) ---
 // 颜色: 浅蓝 -> 深蓝 -> 紫
@@ -601,8 +647,8 @@ col_flood_2 = color.new(#1E90FF, 50) // 道奇蓝
 col_flood_3 = color.new(#00008B, 40) // 深海蓝
 
 // 必须在全局作用域调用 plot，通过条件颜色控制显示
-p1 = plot(12, display=display.none)
-p2 = plot(13, display=display.none)
+p1 = plot(9, display=display.none)
+p2 = plot(10, display=display.none)
 
 // 计算最终填充颜色 (优先级: 3 > 2 > 1)
 color fill_col = na
@@ -618,16 +664,16 @@ fill(p1, p2, color=fill_col, title="Flood Fill")
 // 绘制标签 (依然保留在 if 块中，因为 label.new 可以局部调用)
 if show_markers_flood_3 and is_flood_3 and not is_flood_3[1]
     string txt = "🌊🌊🌊滔天"
-    label.new(bar_index, 13, show_labels ? txt : get_icon(txt, 6), color=#00008B, style=label.style_label_down, textcolor=color.white, size=size.small, tooltip="洪水滔天")
+    label.new(bar_index, 10, show_labels ? txt : get_icon(txt, 6), color=#00008B, style=label.style_label_down, textcolor=color.white, size=size.small, tooltip="洪水滔天")
 
 
 if show_markers_flood_2 and is_flood_2 and not is_flood_2[1]
     string txt = "🌊🌊漫灌"
-    label.new(bar_index, 13, show_labels ? txt : get_icon(txt, 4), color=#1E90FF, style=label.style_label_down, textcolor=color.white, size=size.small, tooltip="大水漫灌")
+    label.new(bar_index, 10, show_labels ? txt : get_icon(txt, 4), color=#1E90FF, style=label.style_label_down, textcolor=color.white, size=size.small, tooltip="大水漫灌")
 
 if show_markers_flood_1 and is_flood_1 and not is_flood_1[1]
     string txt = "🌊上涨"
-    label.new(bar_index, 13, show_labels ? txt : get_icon(txt), color=#87CEEB, style=label.style_label_down, textcolor=color.white, size=size.small, tooltip="水位上涨")
+    label.new(bar_index, 10, show_labels ? txt : get_icon(txt), color=#87CEEB, style=label.style_label_down, textcolor=color.white, size=size.small, tooltip="水位上涨")
 
 
 // --- 事件标记 ---
@@ -661,50 +707,61 @@ plot_event_label(string id, MacroState cfg) =>
 
 // --- 7. 时代雷达 (Era Radar) ---
 // ==========================================
-
-// 1. 复苏时代 (Recovery Era): 实体+1.0 (必须) 且 利润>=+0.5 (不拖后腿)
-// 使用 id6, id7 判定
-bool is_recovery_era = (id7 == "S7_GOOD") and (id6 == "S6_GOOD" or id6 == "S6_TURN")
-
-// 2. 恐慌时代 (Panic Era): 萨姆 > 0.3 或 牛陡
-// is_panic_era 已经在前面定义过了
-
-// 3. 通胀时代 (Inflation Era): CPI > 3.0
-// is_inflation_era 已经在前面定义过了
+// 已经在前面定义了 is_stagflation_era, is_inflation_era, is_depression_era, is_panic_era, is_recovery_era
 
 // --- 绘制底部横条 ---
 
+offset = -14
+
 // 恐慌时代
-p_pan_1 = plot(-12, display=display.none)
-p_pan_2 = plot(-14, display=display.none)
+p_pan_1 = plot(offset, display=display.none)
+p_pan_2 = plot(offset-2, display=display.none)
 fill(p_pan_1, p_pan_2, color=(show_era_radar and is_panic_era) ? color.new(#800000, 50) : na, title="Panic Era")
 
 if show_era_radar and is_panic_era and not is_panic_era[1]
     string txt = "💀恐慌"
-    label.new(bar_index, -14, show_labels ? txt : get_icon(txt), color=color.new(#800000, 50), style=label.style_label_up, textcolor=color.white, size=size.small, tooltip="恐慌时代")
+    label.new(bar_index, offset-2, show_labels ? txt : get_icon(txt), color=color.new(#800000, 50), style=label.style_label_up, textcolor=color.white, size=size.small, tooltip="恐慌时代")
 
-// 复苏时代
-p_rec_1 = plot(-16, display=display.none)
-p_rec_2 = plot(-18, display=display.none)
-// 控制颜色: 如果开关没开或条件不满足，颜色为 na (不显示)
+// 萧条时代
+p_dep_1 = plot(offset-3, display=display.none)
+p_dep_2 = plot(offset-5, display=display.none)
+fill(p_dep_1, p_dep_2, color=(show_era_radar and is_depression_era) ? color.new(color.gray, 50) : na, title="Depression Era")
+
+if show_era_radar and is_depression_era and not is_depression_era[1]
+    string txt = "❄️萧条"
+    label.new(bar_index, offset-5, show_labels ? txt : get_icon(txt), color=color.new(color.gray, 50), style=label.style_label_up, textcolor=color.white, size=size.small, tooltip="萧条时代")
+
+// 滞胀时代
+p_stag_1 = plot(offset-6, display=display.none)
+p_stag_2 = plot(offset-8, display=display.none)
+fill(p_stag_1, p_stag_2, color=(show_era_radar and is_stagflation_era) ? color.new(color.purple, 40) : na, title="Stagflation Era")
+
+if show_era_radar and is_stagflation_era and not is_stagflation_era[1]
+    string txt = "🔥滞胀"
+    label.new(bar_index, offset-8, show_labels ? txt : get_icon(txt), color=color.new(color.purple, 40), style=label.style_label_up, textcolor=color.white, size=size.small, tooltip="滞胀时代")
+
+// 通胀时代
+p_inf_1 = plot(offset-9, display=display.none)
+p_inf_2 = plot(offset-11, display=display.none)
+fill(p_inf_1, p_inf_2, color=(show_era_radar and is_inflation_era) ? color.new(#ff2fff, 60) : na, title="Inflation Era")
+
+if show_era_radar and is_inflation_era and not is_inflation_era[1]
+    string txt = "🔥通胀"
+    label.new(bar_index, offset-11, show_labels ? txt : get_icon(txt), color=color.new(#ff2fff, 60), style=label.style_label_up, textcolor=color.white, size=size.small, tooltip="通胀时代")
+
+// 复苏时代 
+p_rec_1 = plot(offset-12, display=display.none)
+p_rec_2 = plot(offset-14, display=display.none)
 fill(p_rec_1, p_rec_2, color=(show_era_radar and is_recovery_era) ? color.new(color.green, 50) : na, title="Recovery Era")
 
 if show_era_radar and is_recovery_era and not is_recovery_era[1]
     string txt = "🏆复苏"
-    label.new(bar_index, -18, show_labels ? txt : get_icon(txt), color=color.new(color.green, 50), style=label.style_label_up, textcolor=color.black, size=size.small, tooltip="复苏时代")
+    label.new(bar_index, offset-14, show_labels ? txt : get_icon(txt), color=color.new(color.green, 50), style=label.style_label_up, textcolor=color.black, size=size.small, tooltip="复苏时代")
 
-// 通胀时代
-p_inf_1 = plot(-20, display=display.none)
-p_inf_2 = plot(-22, display=display.none)
-fill(p_inf_1, p_inf_2, color=(show_era_radar and is_inflation_era) ? color.new(color.purple, 50) : na, title="Inflation Era")
-
-if show_era_radar and is_inflation_era and not is_inflation_era[1]
-    string txt = "🔥通胀"
-    label.new(bar_index, -22, show_labels ? txt : get_icon(txt), color=color.new(color.purple, 50), style=label.style_label_up, textcolor=color.white, size=size.small, tooltip="通胀时代")
-
-// --- 绘制 ±5.0 阈值线 (核心决策线) ---
-hline(5.0, "全面复苏线", color=color.green, linestyle=hline.style_dashed, linewidth=1)
-hline(-5.0, "危机模式线", color=color.red, linestyle=hline.style_dashed, linewidth=1)
+// --- 绘制核心决策线 ---
+// 依据 README 的边界：深度衰退 <= -6.0，全面繁荣 >= 4.0
+hline(4.0, "全面繁荣线", color=color.green, linestyle=hline.style_dashed, linewidth=1)
+hline(-6.0, "深度衰退线", color=color.red, linestyle=hline.style_dashed, linewidth=1)
 
 // --- 8. 恢复事件标记 (Event Markers) ---
 plot_event_label(id1, cfg1)
