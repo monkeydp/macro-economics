@@ -542,7 +542,7 @@ else if is_flood_2
 // ==========================================
 
 // --- 颜色定义 ---
-c_zone_crash  = color.new(#500000, 60) // 危机模式 (< -5.0)
+c_zone_crash  = color.new(#500000, 60) // 危机模式
 c_zone_warn   = color.new(color.red, 85) // 衰退预警
 c_zone_noise  = color.new(color.orange, 90) // 混沌震荡
 c_zone_grow   = color.new(color.green, 90) // 温和增长
@@ -555,16 +555,16 @@ color bg_col = na
 if is_meltdown
     line_col := #800000 // 熔断：深红
     bg_col := c_zone_crash
-else if total_score < -5.0
+else if total_score <= -6
     line_col := color.red
     bg_col := c_zone_crash
-else if total_score < -1.5
+else if total_score < -3
     line_col := color.orange
     bg_col := c_zone_warn
-else if total_score < 1.5
+else if total_score <= 1
     line_col := color.yellow
     bg_col := c_zone_noise
-else if total_score <= 5.0
+else if total_score < 4.0
     line_col := color.lime
     bg_col := c_zone_grow
 else
